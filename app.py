@@ -3,7 +3,10 @@ import os
 import time
 import html
 from threading import Lock
+  
 
+
+##
 app = Flask(__name__)
 # The public dictionary
 WORDS_FILE = 'words.txt'
@@ -27,15 +30,23 @@ def get_client_ip():
 def read_words():
     words_list = []
     try:
-        # We read from WORDS_FILE (Approved words)
         with open(WORDS_FILE, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-            # CHANGE HERE: Removed [-50:] so it iterates over ALL lines
             for line in reversed(lines): 
                 if ':' in line:
-                    parts = line.strip().split(':', 1)
-                    if len(parts) == 2:
-                        words_list.append({'word': parts[0].strip(), 'def': parts[1].strip()})
+                    # UPDATED: Split into max 3 parts (Word : Def : Author)
+                    parts = line.strip().split(':', 2)
+                    word = parts[0].strip()
+                    definition = parts[1].strip()
+                    # Handle existing words that might not have an author yet
+                    author = parts[2].strip() if len(parts) > 2 else ""
+                    
+                    if word and definition:
+                        words_list.append({
+                            'word': word, 
+                            'def': definition,
+                            'author': author
+                        })
     except Exception as e:
         print(f"Error reading file: {e}")
     return words_list
@@ -47,16 +58,6 @@ def index():
 @app.route('/api/words', methods=['GET'])
 def get_words():
     return jsonify(read_words())
-
-@app.route('/api/stats', methods=['GET'])
-def get_stats():
-    count = 0
-    try:
-        with open(WORDS_FILE, 'r', encoding='utf-8') as f:
-            count = sum(1 for line in f if line.strip())
-    except:
-        pass
-    return jsonify({'count': count})
 
 @app.route('/api/add', methods=['POST'])
 def add_word():
@@ -75,18 +76,21 @@ def add_word():
     data = request.json
     word = data.get('word', '')
     definition = data.get('definition', '')
+    # UPDATED: Get the nickname
+    nickname = data.get('nickname', 'Anonymous')
     
-    if len(word) > 50 or len(definition) > 300:
+    if len(word) > 50 or len(definition) > 300 or len(nickname) > 20:
         return jsonify({'success': False, 'error': 'Text too long.'}), 400
     
     if word and definition:
         clean_word = html.escape(word).replace('\n', ' ').replace(':', '-')
-        clean_def = html.escape(definition).replace('\n', ' ')
+        clean_def = html.escape(definition).replace('\n', ' ').replace(':', '-')
+        clean_nick = html.escape(nickname).replace('\n', ' ').replace(':', '-')
         
-        # WRITE TO SUBMISSIONS.TXT INSTEAD
+        # WRITE TO SUBMISSIONS.TXT (Word:Def:Nick)
         with file_lock:
             with open(SUBMISSIONS_FILE, 'a', encoding='utf-8') as f:
-                f.write(f"{clean_word}:{clean_def}\n")
+                f.write(f"{clean_word}:{clean_def}:{clean_nick}\n")
         
         return jsonify({'success': True, 'message': 'Word submitted for review!'})
     
