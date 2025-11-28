@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yeni Sözcükler</title>
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
@@ -13,10 +13,8 @@
             --text-main: #2c2c2c;
             --text-muted: #5d5c61;
             --accent: #8e7f7f;
-            --def-box-bg: #fffef0;
-            --def-box-border: #dcd6cc;
-            --shadow: 0 4px 10px rgba(60, 50, 40, 0.08);
-            --radius: 8px;
+            --shadow: 0 4px 15px rgba(60, 50, 40, 0.1);
+            --radius: 12px;
         }
 
         body {
@@ -24,191 +22,245 @@
             background-color: var(--bg-color);
             color: var(--text-main);
             margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            padding: 20px;
+            font-size: 18px;
         }
 
+        /* The Main Title from the sketch */
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            margin-top: 20px;
+        }
+
+        h1 {
+            font-family: 'Caveat', cursive; /* Handwritten style */
+            font-size: 4.5rem;
+            margin: 0;
+            color: var(--text-main);
+            transform: rotate(-2deg); /* Slight tilt like the drawing */
+        }
+        
+        .subtitle {
+            font-family: 'Caveat', cursive;
+            font-size: 1.7rem;
+            color: var(--text-muted);
+            margin-top: -10px;
+            display: block;
+        }
+
+        /* Layout: Form on Top, Feed Below */
         .container {
-            width: 90%; max-width: 1000px;
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 40px; 
-            /* UPDATED: Height removed so it hugs the content, added padding */
-            height: auto;
-            padding: 50px 0;
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
         }
 
-        .card {
+        /* --- THE FEED (Left Side) --- */
+        .feed-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .word-card {
             background: var(--card-bg);
-            border: 1px solid #e0dcd5;
-            padding: 40px;
-            display: flex; flex-direction: column;
-            box-shadow: var(--shadow);
+            padding: 25px;
             border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border-left: 5px solid var(--accent);
+            position: relative;
         }
 
-        h2 {
-            font-weight: 700; margin-top: 0;
-            color: var(--text-main); font-size: 1.6rem;
-            border-bottom: 2px solid #ece8df; padding-bottom: 15px; margin-bottom: 25px;
+        .word-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
         }
 
-        .word-list {
-            /* UPDATED: Fixed height creates the smaller scrollable box */
-            height: 400px;
-            overflow-y: auto; margin-bottom: 25px;
-            list-style: none; padding: 0; border-right: 1px solid #f0ece3;
+        .word-def {
+            font-size: 1.2rem;
+            line-height: 1.7;
+            color: #4a4a4a;
+            white-space: pre-wrap;
         }
 
-        .word-item {
-            padding: 12px 5px; cursor: pointer; transition: color 0.2s;
-            font-size: 1.1rem; color: var(--text-muted);
-            border-bottom: 1px dashed #ece8df;
-        }
-        .word-item:hover { color: var(--accent); padding-left: 5px; }
-
-        .definition-display {
-            background-color: var(--def-box-bg);
-            border: 2px solid var(--def-box-border);
-            outline: 1px dashed #dcd6cc; outline-offset: -6px;
-            padding: 25px; min-height: 120px;
+        .word-author {
+            margin-top: 15px;
+            font-size: 0.95rem;
+            color: #999;
+            text-align: right;
+            font-style: italic;
+            border-top: 1px dashed #ddd;
+            padding-top: 8px;
         }
 
-        .def-title { font-size: 1.4rem; margin-bottom: 15px; font-weight: 700; font-style: italic; }
-        .def-text { color: #4a4a4a; line-height: 1.8; font-size: 1rem; }
+        /* --- THE FORM (Top - Horizontal Layout) --- */
+        .form-card {
+            background: #fff;
+            padding: 30px;
+            border-radius: var(--radius);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
 
-        .form-group { margin-bottom: 20px; position: relative; }
+        .form-title {
+            font-family: 'Caveat', cursive;
+            font-size: 2.3rem;
+            margin-bottom: 20px;
+            color: var(--accent);
+        }
+
+        .form-fields {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group { margin-bottom: 0; }
 
         label {
-            display: block; margin-bottom: 10px; font-size: 0.85rem;
+            display: block; margin-bottom: 5px; font-size: 0.85rem;
             text-transform: uppercase; letter-spacing: 1px;
             color: #888; font-family: sans-serif;
         }
 
         input, textarea {
-            width: 100%; padding: 15px; background-color: #faf9f6;
-            border: 1px solid #dcd6cc; font-size: 1.1rem;
+            width: 100%; padding: 12px; background-color: #faf9f6;
+            border: 1px solid #dcd6cc; font-size: 1.05rem;
             font-family: 'Merriweather', serif; outline: none;
-            box-sizing: border-box; transition: border-color 0.3s;
-            color: var(--text-main);
+            box-sizing: border-box; border-radius: 6px;
         }
-        input:focus, textarea:focus { border-color: var(--accent); background-color: #fff; }
+        
+        input:focus, textarea:focus { 
+            border-color: var(--accent); 
+            background-color: #fff; 
+        }
 
         button {
-            width: 100%; padding: 18px;
+            padding: 15px 30px;
             background-color: var(--text-main);
-            color: #fff; border: none; font-size: 1rem;
-            cursor: pointer; font-family: sans-serif;
-            text-transform: uppercase; letter-spacing: 1px;
-            transition: background 0.3s; margin-top: 10px;
+            color: #fff; border: none; font-size: 1.05rem;
+            cursor: pointer; border-radius: 6px;
+            font-weight: bold;
+            transition: all 0.3s;
+            white-space: nowrap;
+            height: 47px;
         }
-        button:hover { background-color: var(--accent); }
-        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        button:hover { background-color: var(--accent); transform: translateY(-2px); }
 
-        .char-limit {
-            font-family: sans-serif;
-            font-size: 0.75rem;
-            color: #999;
-            text-align: right;
-            margin-top: 5px;
-        }
-        .char-limit.near-limit { color: #d35400; }
-        .char-limit.at-limit { color: #c0392b; font-weight: bold; }
+        .char-limit { font-size: 0.8rem; color: #ccc; text-align: right; margin-top: 4px; position: absolute; bottom: -20px; right: 0; }
+        
+        .def-wrapper { position: relative; padding-bottom: 20px; }
 
         @media (max-width: 768px) {
-            .container { grid-template-columns: 1fr; height: auto; padding: 20px 0; }
-            .word-list { height: 250px; border-right: none; } /* Adjusted for mobile */
+            .form-fields { 
+                grid-template-columns: 1fr; 
+            }
+            button {
+                width: 100%;
+            }
+            h1 { font-size: 3.5rem; }
+            body { font-size: 16px; }
         }
     </style>
 </head>
 <body>
 
+    <header>
+        <h1>Yeni Sözcükler</h1>
+        <span class="subtitle">"Create a new word..."</span>
+    </header>
+
     <div class="container">
-        <div class="card">
-            <h2>Dictionary</h2>
-            <ul class="word-list" id="wordList"></ul>
-            <div class="definition-display">
-                <div class="def-title" id="displayWord">Bir sözcük seç</div>
-                <div class="def-text" id="displayDef">ve anlamını gör</div>
+        <div class="form-card">
+            <div class="form-title">Contribute</div>
+
+            <div class="form-fields">
+                <div class="form-group">
+                    <label>The Word</label>
+                    <input type="text" id="inputWord" maxlength="50" placeholder="e.g. Limerence">
+                </div>
+
+                <div class="form-group def-wrapper">
+                    <label>Definition</label>
+                    <textarea id="inputDef" rows="2" maxlength="300" oninput="updateCount(this)"></textarea>
+                    <div class="char-limit" id="charCount">0 / 300</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Adder Nickname</label>
+                    <input type="text" id="inputNick" maxlength="20" placeholder="e.g. WordSmith22">
+                </div>
+
+                <button onclick="submitWord()">Add to Dictionary</button>
             </div>
         </div>
 
-        <div class="card">
-            <h2>Contribute</h2>
-
-            <div class="form-group">
-                <label>The Word (Max 50)</label>
-                <input type="text" id="inputWord" maxlength="50" placeholder=" yeni sözcüğünü dillendir">
-            </div>
-
-            <div class="form-group">
-                <label>The Definition (Max 300)</label>
-                <textarea id="inputDef" rows="6" maxlength="300" oninput="updateCount(this)"></textarea>
-                <div class="char-limit" id="charCount">0 / 300</div>
-            </div>
-
-            <button onclick="submitWord()">Add to Dictionary</button>
+        <div class="feed-container" id="feedList">
+            <div style="text-align:center; color:#999; margin-top:50px;">Loading words...</div>
         </div>
     </div>
 
 <script>
-    let knownWordCount = 0;
-
     fetchWords();
 
     function updateCount(field) {
-        const count = field.value.length;
-        const limit = 300;
-        const display = document.getElementById('charCount');
-
-        display.innerText = `${count} / ${limit}`;
-
-        if (count >= limit) {
-            display.classList.add('at-limit');
-            display.classList.remove('near-limit');
-        } else if (count > 250) {
-            display.classList.add('near-limit');
-            display.classList.remove('at-limit');
-        } else {
-            display.classList.remove('near-limit', 'at-limit');
-        }
+        document.getElementById('charCount').innerText = `${field.value.length} / 300`;
     }
 
     async function fetchWords() {
         try {
             const response = await fetch('/api/words');
             const words = await response.json();
-            knownWordCount = words.length;
-
-            const list = document.getElementById('wordList');
+            const list = document.getElementById('feedList');
             list.innerHTML = '';
 
+            if(words.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:#ccc;">No words yet. Be the first!</div>';
+                return;
+            }
+
             words.forEach(item => {
-                const li = document.createElement('li');
-                li.className = 'word-item';
-                li.innerText = item.word;
-                const decoded = new DOMParser().parseFromString(item.def, "text/html").documentElement.textContent;
-                li.onclick = () => showDefinition(item.word, decoded);
-                list.appendChild(li);
+                // Decode HTML entities
+                const parser = new DOMParser();
+                const safeDef = parser.parseFromString(item.def, "text/html").documentElement.textContent;
+                const safeWord = parser.parseFromString(item.word, "text/html").documentElement.textContent;
+                const safeAuth = item.author ? parser.parseFromString(item.author, "text/html").documentElement.textContent : '';
+
+                const card = document.createElement('div');
+                card.className = 'word-card';
+                
+                let htmlContent = `
+                    <div class="word-title">${safeWord}</div>
+                    <div class="word-def">${safeDef}</div>
+                `;
+
+                if(safeAuth) {
+                    htmlContent += `<div class="word-author">— submitted by ${safeAuth}</div>`;
+                }
+
+                card.innerHTML = htmlContent;
+                list.appendChild(card);
             });
         } catch (e) {
-            console.error("Error fetching words");
+            console.error("Error fetching words", e);
         }
-    }
-
-    function showDefinition(word, def) {
-        document.getElementById('displayWord').innerText = word;
-        document.getElementById('displayDef').innerText = def;
     }
 
     async function submitWord() {
         const word = document.getElementById('inputWord').value.trim();
         const definition = document.getElementById('inputDef').value.trim();
+        const nickname = document.getElementById('inputNick').value.trim();
         const btn = document.querySelector("button");
 
         if (!word || !definition) {
-            alert("Please fill in both fields.");
+            alert("Please fill in the Word and Definition.");
             return;
         }
 
@@ -219,18 +271,17 @@
             const response = await fetch('/api/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ word, definition })
+                body: JSON.stringify({ word, definition, nickname })
             });
-
-            const data = await response.json();
 
             if (response.ok) {
                 document.getElementById('inputWord').value = '';
                 document.getElementById('inputDef').value = '';
+                document.getElementById('inputNick').value = ''; // clear nickname too
                 updateCount(document.getElementById('inputDef'));
-
                 alert("Word submitted! It will appear after moderation review.");
             } else {
+                const data = await response.json();
                 alert(data.error || "Error saving word.");
             }
         } catch (error) {
