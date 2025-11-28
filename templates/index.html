@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yeni Sözcükler</title>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-color: #f4f1ea;
+            --card-bg: #fdfbf7;
+            --text-main: #2c2c2c;
+            --text-muted: #5d5c61;
+            --accent: #8e7f7f;
+            --def-box-bg: #fffef0;
+            --def-box-border: #dcd6cc;
+            --shadow: 0 4px 10px rgba(60, 50, 40, 0.08);
+            --radius: 8px;
+        }
+
+        body {
+            font-family: 'Merriweather', serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 90%; max-width: 1000px;
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 40px; 
+            /* UPDATED: Height removed so it hugs the content, added padding */
+            height: auto;
+            padding: 50px 0;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid #e0dcd5;
+            padding: 40px;
+            display: flex; flex-direction: column;
+            box-shadow: var(--shadow);
+            border-radius: var(--radius);
+        }
+
+        h2 {
+            font-weight: 700; margin-top: 0;
+            color: var(--text-main); font-size: 1.6rem;
+            border-bottom: 2px solid #ece8df; padding-bottom: 15px; margin-bottom: 25px;
+        }
+
+        .word-list {
+            /* UPDATED: Fixed height creates the smaller scrollable box */
+            height: 400px;
+            overflow-y: auto; margin-bottom: 25px;
+            list-style: none; padding: 0; border-right: 1px solid #f0ece3;
+        }
+
+        .word-item {
+            padding: 12px 5px; cursor: pointer; transition: color 0.2s;
+            font-size: 1.1rem; color: var(--text-muted);
+            border-bottom: 1px dashed #ece8df;
+        }
+        .word-item:hover { color: var(--accent); padding-left: 5px; }
+
+        .definition-display {
+            background-color: var(--def-box-bg);
+            border: 2px solid var(--def-box-border);
+            outline: 1px dashed #dcd6cc; outline-offset: -6px;
+            padding: 25px; min-height: 120px;
+        }
+
+        .def-title { font-size: 1.4rem; margin-bottom: 15px; font-weight: 700; font-style: italic; }
+        .def-text { color: #4a4a4a; line-height: 1.8; font-size: 1rem; }
+
+        .form-group { margin-bottom: 20px; position: relative; }
+
+        label {
+            display: block; margin-bottom: 10px; font-size: 0.85rem;
+            text-transform: uppercase; letter-spacing: 1px;
+            color: #888; font-family: sans-serif;
+        }
+
+        input, textarea {
+            width: 100%; padding: 15px; background-color: #faf9f6;
+            border: 1px solid #dcd6cc; font-size: 1.1rem;
+            font-family: 'Merriweather', serif; outline: none;
+            box-sizing: border-box; transition: border-color 0.3s;
+            color: var(--text-main);
+        }
+        input:focus, textarea:focus { border-color: var(--accent); background-color: #fff; }
+
+        button {
+            width: 100%; padding: 18px;
+            background-color: var(--text-main);
+            color: #fff; border: none; font-size: 1rem;
+            cursor: pointer; font-family: sans-serif;
+            text-transform: uppercase; letter-spacing: 1px;
+            transition: background 0.3s; margin-top: 10px;
+        }
+        button:hover { background-color: var(--accent); }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        .char-limit {
+            font-family: sans-serif;
+            font-size: 0.75rem;
+            color: #999;
+            text-align: right;
+            margin-top: 5px;
+        }
+        .char-limit.near-limit { color: #d35400; }
+        .char-limit.at-limit { color: #c0392b; font-weight: bold; }
+
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; height: auto; padding: 20px 0; }
+            .word-list { height: 250px; border-right: none; } /* Adjusted for mobile */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="card">
+            <h2>Dictionary</h2>
+            <ul class="word-list" id="wordList"></ul>
+            <div class="definition-display">
+                <div class="def-title" id="displayWord">Bir sözcük seç</div>
+                <div class="def-text" id="displayDef">ve anlamını gör</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Contribute</h2>
+
+            <div class="form-group">
+                <label>The Word (Max 50)</label>
+                <input type="text" id="inputWord" maxlength="50" placeholder=" yeni sözcüğünü dillendir">
+            </div>
+
+            <div class="form-group">
+                <label>The Definition (Max 300)</label>
+                <textarea id="inputDef" rows="6" maxlength="300" oninput="updateCount(this)"></textarea>
+                <div class="char-limit" id="charCount">0 / 300</div>
+            </div>
+
+            <button onclick="submitWord()">Add to Dictionary</button>
+        </div>
+    </div>
+
+<script>
+    let knownWordCount = 0;
+
+    fetchWords();
+
+    function updateCount(field) {
+        const count = field.value.length;
+        const limit = 300;
+        const display = document.getElementById('charCount');
+
+        display.innerText = `${count} / ${limit}`;
+
+        if (count >= limit) {
+            display.classList.add('at-limit');
+            display.classList.remove('near-limit');
+        } else if (count > 250) {
+            display.classList.add('near-limit');
+            display.classList.remove('at-limit');
+        } else {
+            display.classList.remove('near-limit', 'at-limit');
+        }
+    }
+
+    async function fetchWords() {
+        try {
+            const response = await fetch('/api/words');
+            const words = await response.json();
+            knownWordCount = words.length;
+
+            const list = document.getElementById('wordList');
+            list.innerHTML = '';
+
+            words.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'word-item';
+                li.innerText = item.word;
+                const decoded = new DOMParser().parseFromString(item.def, "text/html").documentElement.textContent;
+                li.onclick = () => showDefinition(item.word, decoded);
+                list.appendChild(li);
+            });
+        } catch (e) {
+            console.error("Error fetching words");
+        }
+    }
+
+    function showDefinition(word, def) {
+        document.getElementById('displayWord').innerText = word;
+        document.getElementById('displayDef').innerText = def;
+    }
+
+    async function submitWord() {
+        const word = document.getElementById('inputWord').value.trim();
+        const definition = document.getElementById('inputDef').value.trim();
+        const btn = document.querySelector("button");
+
+        if (!word || !definition) {
+            alert("Please fill in both fields.");
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerText = "Saving...";
+
+        try {
+            const response = await fetch('/api/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ word, definition })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                document.getElementById('inputWord').value = '';
+                document.getElementById('inputDef').value = '';
+                updateCount(document.getElementById('inputDef'));
+
+                alert("Word submitted! It will appear after moderation review.");
+            } else {
+                alert(data.error || "Error saving word.");
+            }
+        } catch (error) {
+            alert("Network error.");
+        }
+
+        btn.disabled = false;
+        btn.innerText = "Add to Dictionary";
+    }
+</script>
+
+</body>
+</html>
