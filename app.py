@@ -6,7 +6,7 @@ from threading import Lock
 import re
   
 ## the tunnel URL used from playit.gg
-## http://147.185.221.224:2416/
+## x
 
 ##
 app = Flask(__name__)
@@ -29,9 +29,8 @@ LAST_MODIFIED_TIME = 0
 
 # --- REGEX DEFINITIONS (GÜNCELLENDİ: Nokta ve Virgül eklendi) ---
 # Harf, boşluk, nokta ve virgül
-ALPHA_WITH_SPACES = re.compile(r'^[a-zA-ZçÇğĞıİöÖşŞüÜ\s.,]*$')
-# Harf, nokta ve virgül (boşluksuz)
-ALPHA_ONLY_OR_EMPTY = re.compile(r'^[a-zA-ZçÇğĞıİöÖşŞüÜ.,]*$')
+ALPHANUM_WITH_SPACES = re.compile(r'^[a-zA-ZçÇğĞıİöÖşŞüÜ\s.,-1234567890]*$')
+
 # -----------------------------
 
 # Ensure files exist
@@ -40,8 +39,12 @@ for f in [WORDS_FILE, SUBMISSIONS_FILE]:
         open(f, 'w').close()
 
 def get_client_ip():
-    if request.headers.get('X-Forwarded-For'):
-        return request.headers.get('X-Forwarded-For').split(',')[0]
+    """
+    FIX: Prioritizes the immediate remote address (request.remote_addr) 
+    as the key for rate-limiting. This is the IP that established 
+    the connection to the server, and is the safest IP to use for checks 
+    against user-spoofable headers like X-Forwarded-For.
+    """
     return request.remote_addr
 
 def update_cache_if_dirty():
@@ -149,7 +152,8 @@ def get_words():
 
 @app.route('/api/add', methods=['POST'])
 def add_word():
-    client_ip = get_client_ip()
+    # get_client_ip now uses the safer request.remote_addr for rate-limiting
+    client_ip = get_client_ip() 
     current_time = time.time()
     
     if client_ip in user_last_post_time:
@@ -165,11 +169,11 @@ def add_word():
     nickname = data.get('nickname', '')
 
     # --- GÜNCELLENMİŞ DOĞRULAMA (Nokta ve virgül içerir) ---
-    if not word.strip() or not ALPHA_ONLY_OR_EMPTY.match(word.strip()):
+    if not word.strip() or not ALPHANUM_WITH_SPACES.match(word.strip()):
         return jsonify({'success': False, 'error': 'Sözcük alanı sadece harf, nokta veya virgül içerebilir.'}), 400
-    if nickname and not ALPHA_ONLY_OR_EMPTY.match(nickname):
+    if nickname and not ALPHANUM_WITH_SPACES.match(nickname):
         return jsonify({'success': False, 'error': 'Takma ad sadece harf, nokta veya virgül içerebilir.'}), 400
-    if not definition.strip() or not ALPHA_WITH_SPACES.match(definition):
+    if not definition.strip() or not ALPHANUM_WITH_SPACES.match(definition):
         return jsonify({'success': False, 'error': 'Tanım sadece harf, boşluk, nokta veya virgül içerebilir.'}), 400
     
     if not nickname.strip():
@@ -193,4 +197,4 @@ def add_word():
 
 if __name__ == '__main__':
     update_cache_if_dirty()
-    app.run(host='0.0.0.0', port=PORT, debug=True)
+    app.run(host='0.0.0.0', port=PORT, debug=False)
