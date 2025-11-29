@@ -12,6 +12,8 @@ app = Flask(__name__)
 WORDS_FILE = 'words.txt'
 # The holding area
 SUBMISSIONS_FILE = 'submissions.txt'
+# port number
+PORT = 5000
 
 # Locks for thread safety
 file_lock = Lock()
@@ -97,4 +99,4 @@ def add_word():
     return jsonify({'success': False, 'error': 'Missing data'}), 400
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=PORT, debug=True)

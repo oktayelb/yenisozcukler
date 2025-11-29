@@ -15,6 +15,8 @@
             --accent: #8e7f7f;
             --shadow: 0 4px 15px rgba(60, 50, 40, 0.1);
             --radius: 12px;
+            --success-color: #4CAF50; /* Başarı için yeşil */
+            --error-color: #f44336; /* Hata için kırmızı */
         }
 
         body {
@@ -168,42 +170,83 @@
             h1 { font-size: 3.5rem; }
             body { font-size: 16px; }
         }
+
+        /* --- ÖZEL BİLDİRİM STİLLERİ --- */
+        .notification-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .custom-alert {
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            padding: 15px 25px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-weight: 700;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            transform: translateX(100%); /* Başlangıçta sağdan dışarıda */
+            min-width: 250px;
+        }
+
+        .custom-alert.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .custom-alert-success {
+            border-left: 6px solid var(--success-color);
+        }
+
+        .custom-alert-error {
+            border-left: 6px solid var(--error-color);
+        }
+        /* --- ÖZEL BİLDİRİM STİLLERİ SONU --- */
     </style>
 </head>
 <body>
 
+    <div class="notification-container" id="notificationContainer"></div>
+
     <header>
         <h1>Yeni Sözcükler</h1>
-        <span class="subtitle">"Create a new word..."</span>
+        <span class="subtitle">"Yeni bir sözcük oluştur..."</span>
     </header>
 
     <div class="container">
         <div class="form-card">
-            <div class="form-title">Contribute</div>
+            <div class="form-title">Katkıda Bulun</div>
 
             <div class="form-fields">
                 <div class="form-group">
-                    <label>The Word</label>
-                    <input type="text" id="inputWord" maxlength="50" placeholder="e.g. Limerence">
+                    <label>Sözcük</label>
+                    <input type="text" id="inputWord" maxlength="50" placeholder="">
                 </div>
 
                 <div class="form-group def-wrapper">
-                    <label>Definition</label>
+                    <label>Tanım</label>
                     <textarea id="inputDef" rows="2" maxlength="300" oninput="updateCount(this)"></textarea>
                     <div class="char-limit" id="charCount">0 / 300</div>
                 </div>
 
                 <div class="form-group">
-                    <label>Adder Nickname</label>
-                    <input type="text" id="inputNick" maxlength="20" placeholder="e.g. WordSmith22">
+                    <label>Ekleyenin Takma Adı</label>
+                    <input type="text" id="inputNick" maxlength="20" placeholder="Örn: SözcükUstası22">
                 </div>
 
-                <button onclick="submitWord()">Add to Dictionary</button>
+                <button onclick="submitWord()">Sözlüğe Ekle</button>
             </div>
         </div>
 
         <div class="feed-container" id="feedList">
-            <div style="text-align:center; color:#999; margin-top:50px;">Loading words...</div>
+            <div style="text-align:center; color:#999; margin-top:50px;">Sözcükler yükleniyor...</div>
         </div>
     </div>
 
@@ -214,6 +257,39 @@
         document.getElementById('charCount').innerText = `${field.value.length} / 300`;
     }
 
+    /**
+     * Özel bir bildirim kartı oluşturur ve gösterir.
+     * @param {string} message - Gösterilecek mesaj.
+     * @param {string} type - 'success' veya 'error'. Stil ve renk için kullanılır.
+     */
+    function showCustomAlert(message, type = 'success') {
+        const container = document.getElementById('notificationContainer');
+        const alertDiv = document.createElement('div');
+        
+        // Stil ve içerik ayarlamaları
+        alertDiv.className = `custom-alert custom-alert-${type}`;
+        alertDiv.textContent = message;
+        
+        // Bildirimi en üste ekle (en yeni en üstte)
+        container.prepend(alertDiv); 
+
+        // Görünür hale getir
+        setTimeout(() => {
+            alertDiv.classList.add('show');
+        }, 10); // CSS animasyonunu başlatmak için kısa bir gecikme
+
+        // 4 saniye sonra kaybolmasını ve silinmesini sağla
+        setTimeout(() => {
+            alertDiv.classList.remove('show');
+            
+            // Kaybolduktan sonra DOM'dan kaldır (CSS geçiş süresine uygun bekleme)
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 500); 
+        }, 4000);
+    }
+
+
     async function fetchWords() {
         try {
             const response = await fetch('/api/words');
@@ -222,7 +298,7 @@
             list.innerHTML = '';
 
             if(words.length === 0) {
-                list.innerHTML = '<div style="text-align:center; color:#ccc;">No words yet. Be the first!</div>';
+                list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz sözcük yok. İlk siz ekleyin!</div>';
                 return;
             }
 
@@ -259,7 +335,7 @@
                 if (item.author) {
                     const authDiv = document.createElement('div');
                     authDiv.className = 'word-author';
-                    authDiv.textContent = `— submitted by ${decode(item.author)}`;
+                    authDiv.textContent = `— ekleyen ${decode(item.author)}`;
                     card.appendChild(authDiv);
                 }
 
@@ -277,12 +353,12 @@
         const btn = document.querySelector("button");
 
         if (!word || !definition) {
-            alert("Please fill in the Word and Definition.");
+            showCustomAlert("Lütfen Sözcük ve Tanım alanlarını doldurun.", "error"); 
             return;
         }
 
         btn.disabled = true;
-        btn.innerText = "Saving...";
+        btn.innerText = "Kaydediliyor...";
 
         try {
             const response = await fetch('/api/add', {
@@ -296,17 +372,17 @@
                 document.getElementById('inputDef').value = '';
                 document.getElementById('inputNick').value = ''; 
                 updateCount(document.getElementById('inputDef'));
-                alert("Word submitted! It will appear after moderation review.");
+                showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
             } else {
                 const data = await response.json();
-                alert(data.error || "Error saving word.");
+                showCustomAlert(data.error || "Sözcük kaydedilirken bir hata oluştu.", "error");
             }
         } catch (error) {
-            alert("Network error.");
+            showCustomAlert("Ağ hatası.", "error");
         }
 
         btn.disabled = false;
-        btn.innerText = "Add to Dictionary";
+        btn.innerText = "Sözlüğe Ekle";
     }
 </script>
 
