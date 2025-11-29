@@ -227,25 +227,42 @@
             }
 
             words.forEach(item => {
-                // Decode HTML entities
-                const parser = new DOMParser();
-                const safeDef = parser.parseFromString(item.def, "text/html").documentElement.textContent;
-                const safeWord = parser.parseFromString(item.word, "text/html").documentElement.textContent;
-                const safeAuth = item.author ? parser.parseFromString(item.author, "text/html").documentElement.textContent : '';
-
+                // SECURITY UPDATE:
+                // We avoid using innerHTML to construct the card content to prevent XSS.
+                // Instead, we use textContent which treats all input strictly as text.
+                
                 const card = document.createElement('div');
                 card.className = 'word-card';
-                
-                let htmlContent = `
-                    <div class="word-title">${safeWord}</div>
-                    <div class="word-def">${safeDef}</div>
-                `;
 
-                if(safeAuth) {
-                    htmlContent += `<div class="word-author">— submitted by ${safeAuth}</div>`;
+                // Helper to decode HTML entities (like &amp; or &lt;) 
+                // so they look correct in textContent
+                const parser = new DOMParser();
+                const decode = (str) => {
+                    if (!str) return '';
+                    return parser.parseFromString(str, "text/html").documentElement.textContent;
+                };
+
+                // Create Title
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'word-title';
+                titleDiv.textContent = decode(item.word);
+
+                // Create Definition
+                const defDiv = document.createElement('div');
+                defDiv.className = 'word-def';
+                defDiv.textContent = decode(item.def);
+
+                card.appendChild(titleDiv);
+                card.appendChild(defDiv);
+
+                // Create Author (if present)
+                if (item.author) {
+                    const authDiv = document.createElement('div');
+                    authDiv.className = 'word-author';
+                    authDiv.textContent = `— submitted by ${decode(item.author)}`;
+                    card.appendChild(authDiv);
                 }
 
-                card.innerHTML = htmlContent;
                 list.appendChild(card);
             });
         } catch (e) {
@@ -277,7 +294,7 @@
             if (response.ok) {
                 document.getElementById('inputWord').value = '';
                 document.getElementById('inputDef').value = '';
-                document.getElementById('inputNick').value = ''; // clear nickname too
+                document.getElementById('inputNick').value = ''; 
                 updateCount(document.getElementById('inputDef'));
                 alert("Word submitted! It will appear after moderation review.");
             } else {
