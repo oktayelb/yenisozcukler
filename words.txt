@@ -886,3 +886,6 @@ zevktaş : hobideş
 erinç:belki:oktay
 üzün:hüzün, üzmekten ün eki ile:oktay
 vıcıklık:vizkosite:oktay
+olunç:tabii tabii ki:oktay
+kolunç:keşke:oktay
+sakınç:tövbe:oktay

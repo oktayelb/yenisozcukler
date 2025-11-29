@@ -12,7 +12,7 @@ class AdminApp:
         self.root.geometry("600x700")
         
         # Data storage
-        self.entries = [] # List of dictionaries: {'line': str, 'action': 'none'}
+        self.entries = [] # List of dictionaries
         self.load_submissions()
 
         # GUI Setup
@@ -59,14 +59,20 @@ class AdminApp:
             lines = f.readlines()
             for line in lines:
                 if ':' in line:
-                    parts = line.strip().split(':', 1)
-                    if len(parts) == 2:
+                    # UPDATED: Split into max 3 parts (Word : Def : Author)
+                    parts = line.strip().split(':', 2)
+                    if len(parts) >= 2:
+                        word = parts[0]
+                        definition = parts[1]
+                        author = parts[2] if len(parts) > 2 else "Anonymous"
+                        
                         self.entries.append({
-                            'word': parts[0], 
-                            'def': parts[1], 
+                            'word': word, 
+                            'def': definition, 
+                            'author': author,
                             'original_line': line,
                             'action': 'none', # none, approve, reject
-                            'ui_ref': None # Will store the frame widget
+                            'ui_ref': None
                         })
 
     def populate_list(self):
@@ -84,8 +90,12 @@ class AdminApp:
             info_frame = tk.Frame(card, bg="white")
             info_frame.pack(side="left", fill="both", expand=True, padx=10)
             
+            # Word Title
             tk.Label(info_frame, text=item['word'], font=("Segoe UI", 12, "bold"), bg="white", anchor="w").pack(fill="x")
+            # Definition
             tk.Label(info_frame, text=item['def'], font=("Segoe UI", 10), fg="#555", bg="white", wraplength=350, justify="left", anchor="w").pack(fill="x")
+            # Author (UPDATED)
+            tk.Label(info_frame, text=f"Author: {item['author']}", font=("Segoe UI", 9, "italic"), fg="#999", bg="white", anchor="e").pack(fill="x")
 
             # Buttons
             btn_frame = tk.Frame(card, bg="white")
@@ -130,8 +140,9 @@ class AdminApp:
 
         for item in self.entries:
             if item['action'] == 'approve':
-                # Reconstruct line ensuring newline
-                approved_lines.append(f"{item['word']}:{item['def']}\n")
+                # Reconstruct line ensuring newline AND AUTHOR (UPDATED)
+                # words.txt format: Word:Def:Author
+                approved_lines.append(f"{item['word']}:{item['def']}:{item['author']}\n")
             elif item['action'] == 'reject':
                 pass # Do nothing, effectively deletes it
             else:

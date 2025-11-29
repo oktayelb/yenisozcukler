@@ -227,18 +227,18 @@
             <div class="form-fields">
                 <div class="form-group">
                     <label>Sözcük</label>
-                    <input type="text" id="inputWord" maxlength="50" placeholder="">
+                    <input type="text" id="inputWord" maxlength="50" placeholder="Örn: Limerence" onkeypress="return allowOnlyLetters(event, false)">
                 </div>
 
                 <div class="form-group def-wrapper">
                     <label>Tanım</label>
-                    <textarea id="inputDef" rows="2" maxlength="300" oninput="updateCount(this)"></textarea>
+                    <textarea id="inputDef" rows="2" maxlength="300" oninput="updateCount(this)" placeholder="Tanımı buraya yazın..." onkeypress="return allowOnlyLetters(event, true)"></textarea>
                     <div class="char-limit" id="charCount">0 / 300</div>
                 </div>
 
                 <div class="form-group">
                     <label>Ekleyenin Takma Adı</label>
-                    <input type="text" id="inputNick" maxlength="20" placeholder="Örn: SözcükUstası22">
+                    <input type="text" id="inputNick" maxlength="20" placeholder="Örn: SözcükUstası22" onkeypress="return allowOnlyLetters(event, false)">
                 </div>
 
                 <button onclick="submitWord()">Sözlüğe Ekle</button>
@@ -246,11 +246,13 @@
         </div>
 
         <div class="feed-container" id="feedList">
-            <div style="text-align:center; color:#999; margin-top:50px;">Sözcükler yükleniyor...</div>
+            <div style="text-align:center; color:#999; margin-top:50px;" id="loadingMessage">Sözcükler yükleniyor...</div>
         </div>
     </div>
 
 <script>
+    const CACHE_KEY = 'wordCache';
+
     fetchWords();
 
     function updateCount(field) {
@@ -258,31 +260,192 @@
     }
 
     /**
-     * Özel bir bildirim kartı oluşturur ve gösterir.
-     * @param {string} message - Gösterilecek mesaj.
-     * @param {string} type - 'success' veya 'error'. Stil ve renk için kullanılır.
+     * Klavyeden girilen karakterin sadece harf (Türkçe dahil), nokta veya virgül
+     * olup olmadığını kontrol eder.
      */
+    function allowOnlyLetters(event, allowSpaces) {
+        const key = event.key;
+        
+        if (event.ctrlKey || event.altKey || event.metaKey || 
+            ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key)) {
+            return true;
+        }
+
+        if (event.ctrlKey && ['a', 'c', 'x', 'v'].includes(key.toLowerCase())) {
+            return true;
+        }
+
+        let regex;
+        if (allowSpaces) {
+            // Harfler, boşluk, nokta ve virgül
+            regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,]$/;
+        } else {
+            // Sadece harfler, nokta ve virgül
+            regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ.,]$/;
+        }
+
+        if (regex.test(key)) {
+            return true;
+        } else {
+            event.preventDefault();
+            return false;
+        }
+    }
+
+
+    /**
+     * Sözcük kartını oluşturur
+     * @param {Object} item - Sözcük verisi
+     */
+    function createWordCardElement(item) {
+        const card = document.createElement('div');
+        card.className = 'word-card';
+
+        const parser = new DOMParser();
+        const decode = (str) => {
+            if (!str) return '';
+            return parser.parseFromString(str, "text/html").documentElement.textContent;
+        };
+
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'word-title';
+        titleDiv.textContent = decode(item.word);
+
+        const defDiv = document.createElement('div');
+        defDiv.className = 'word-def';
+        defDiv.textContent = decode(item.def);
+
+        card.appendChild(titleDiv);
+        card.appendChild(defDiv);
+
+        if (item.author) {
+            const authDiv = document.createElement('div');
+            authDiv.className = 'word-author';
+            authDiv.textContent = `— ekleyen ${decode(item.author)}`;
+            card.appendChild(authDiv);
+        }
+        
+        return card;
+    }
+
+
+    /**
+     * DOM'a kartları hızlıca ekler
+     */
+    function appendCardsToDOM(words, listElement, prepend = false) {
+        const fragment = document.createDocumentFragment();
+        
+        words.forEach(item => {
+            const card = createWordCardElement(item);
+            if (prepend) {
+                fragment.prepend(card);
+            } else {
+                fragment.appendChild(card);
+            }
+        });
+
+        if (prepend) {
+            listElement.prepend(fragment);
+        } else {
+            listElement.appendChild(fragment);
+        }
+    }
+
+
+    /**
+     * Ön belleği yükler
+     */
+    function loadCache() {
+        try {
+            const cachedString = localStorage.getItem(CACHE_KEY);
+            if (cachedString) {
+                return JSON.parse(cachedString);
+            }
+        } catch (e) {
+            console.error("Local storage'dan veri yüklenirken hata:", e);
+        }
+        return null;
+    }
+
+    /**
+     * Ön belleği kaydeder
+     */
+    function saveCache(words, totalCount) {
+        try {
+            const data = {
+                words: words,
+                count: totalCount,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+        } catch (e) {
+            console.error("Local storage'a veri kaydedilirken hata:", e);
+        }
+    }
+
+
+    async function fetchWords() {
+        const list = document.getElementById('feedList');
+        const loadingMessage = document.getElementById('loadingMessage');
+        let words = [];
+        let cachedData = loadCache();
+        let clientCount = 0;
+        let url = '/api/words';
+
+        if (cachedData) {
+            words = cachedData.words;
+            clientCount = cachedData.count;
+            list.innerHTML = '';
+            appendCardsToDOM(words, list, false);
+            url = `/api/words?count=${clientCount}`;
+        } else {
+             list.innerHTML = `<div style="text-align:center; color:#999; margin-top:50px;" id="loadingMessage">Sözcükler yükleniyor...</div>`;
+        }
+        
+        try {
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.status === 'updated' && data.words.length > 0) {
+                appendCardsToDOM(data.words, list, true);
+                const newWords = [...data.words, ...words];
+                saveCache(newWords, data.total_count);
+                
+            } else if (data.status === 'full' && data.words.length > 0) {
+                list.innerHTML = '';
+                appendCardsToDOM(data.words, list, false);
+                saveCache(data.words, data.total_count);
+            } else if (data.status === 'full' && data.words.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz sözcük yok. İlk siz ekleyin!</div>';
+                saveCache([], 0);
+            }
+
+        } catch (e) {
+            console.error("Error fetching words", e);
+             if (!cachedData) {
+                 list.innerHTML = '<div style="text-align:center; color:#f44336; margin-top:50px;">Sözcükler yüklenemedi. Ağ bağlantınızı kontrol edin.</div>';
+             } else {
+                 showCustomAlert("Sözlük güncellenemedi. Önbelleklenmiş veri gösteriliyor.", "error");
+             }
+        }
+    }
+
     function showCustomAlert(message, type = 'success') {
         const container = document.getElementById('notificationContainer');
         const alertDiv = document.createElement('div');
         
-        // Stil ve içerik ayarlamaları
         alertDiv.className = `custom-alert custom-alert-${type}`;
         alertDiv.textContent = message;
         
-        // Bildirimi en üste ekle (en yeni en üstte)
         container.prepend(alertDiv); 
 
-        // Görünür hale getir
         setTimeout(() => {
             alertDiv.classList.add('show');
-        }, 10); // CSS animasyonunu başlatmak için kısa bir gecikme
+        }, 10); 
 
-        // 4 saniye sonra kaybolmasını ve silinmesini sağla
         setTimeout(() => {
             alertDiv.classList.remove('show');
             
-            // Kaybolduktan sonra DOM'dan kaldır (CSS geçiş süresine uygun bekleme)
             setTimeout(() => {
                 alertDiv.remove();
             }, 500); 
@@ -290,72 +453,37 @@
     }
 
 
-    async function fetchWords() {
-        try {
-            const response = await fetch('/api/words');
-            const words = await response.json();
-            const list = document.getElementById('feedList');
-            list.innerHTML = '';
-
-            if(words.length === 0) {
-                list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz sözcük yok. İlk siz ekleyin!</div>';
-                return;
-            }
-
-            words.forEach(item => {
-                // SECURITY UPDATE:
-                // We avoid using innerHTML to construct the card content to prevent XSS.
-                // Instead, we use textContent which treats all input strictly as text.
-                
-                const card = document.createElement('div');
-                card.className = 'word-card';
-
-                // Helper to decode HTML entities (like &amp; or &lt;) 
-                // so they look correct in textContent
-                const parser = new DOMParser();
-                const decode = (str) => {
-                    if (!str) return '';
-                    return parser.parseFromString(str, "text/html").documentElement.textContent;
-                };
-
-                // Create Title
-                const titleDiv = document.createElement('div');
-                titleDiv.className = 'word-title';
-                titleDiv.textContent = decode(item.word);
-
-                // Create Definition
-                const defDiv = document.createElement('div');
-                defDiv.className = 'word-def';
-                defDiv.textContent = decode(item.def);
-
-                card.appendChild(titleDiv);
-                card.appendChild(defDiv);
-
-                // Create Author (if present)
-                if (item.author) {
-                    const authDiv = document.createElement('div');
-                    authDiv.className = 'word-author';
-                    authDiv.textContent = `— ekleyen ${decode(item.author)}`;
-                    card.appendChild(authDiv);
-                }
-
-                list.appendChild(card);
-            });
-        } catch (e) {
-            console.error("Error fetching words", e);
-        }
-    }
-
     async function submitWord() {
         const word = document.getElementById('inputWord').value.trim();
         const definition = document.getElementById('inputDef').value.trim();
         const nickname = document.getElementById('inputNick').value.trim();
         const btn = document.querySelector("button");
 
+        // --- CLIENT-SIDE SUBMISSION VALIDATION ---
+        // Nokta ve virgül de eklendi
+        const alphaOnly = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ.,]+$/;
+        const alphaWithSpaces = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,]*$/;
+
         if (!word || !definition) {
             showCustomAlert("Lütfen Sözcük ve Tanım alanlarını doldurun.", "error"); 
             return;
         }
+        
+        if (!word.match(alphaOnly)) {
+            showCustomAlert("Sözcük alanı sadece harf, nokta veya virgül içerebilir.", "error");
+            return;
+        }
+        
+        if (nickname && !nickname.match(alphaOnly)) {
+            showCustomAlert("Takma Ad alanı sadece harf, nokta veya virgül içerebilir.", "error");
+            return;
+        }
+
+        if (!definition.match(alphaWithSpaces)) {
+            showCustomAlert("Tanım alanı sadece harf, nokta, virgül ve boşluk içerebilir.", "error");
+            return;
+        }
+        // ------------------------------------------
 
         btn.disabled = true;
         btn.innerText = "Kaydediliyor...";
@@ -373,6 +501,9 @@
                 document.getElementById('inputNick').value = ''; 
                 updateCount(document.getElementById('inputDef'));
                 showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
+                
+                fetchWords(); 
+                
             } else {
                 const data = await response.json();
                 showCustomAlert(data.error || "Sözcük kaydedilirken bir hata oluştu.", "error");
