@@ -1,3 +1,8 @@
+# Yeni Sözcükler (New Words)
+
+A community-driven platform for suggesting and curating new or niche Turkish words and their definitions.
+
+
 ## Türkçe
 
 ### Proje Özeti
@@ -29,9 +34,6 @@ Yüksek trafik yükü veya saldırı durumlarında hizmetin kesintisiz çalışm
 
 ---
 
-# Yeni Sözcükler (New Words)
-
-A community-driven platform for suggesting and curating new or niche Turkish words and their definitions.
 
 ---
 
