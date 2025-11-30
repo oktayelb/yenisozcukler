@@ -1,138 +1,65 @@
-\*\*\*
+## Türkçe
 
+### Proje Özeti
 
+**Yeni Sözcükler**, Türkçe kelime sözlüğünün topluluk tarafından oluşturulmasını amaçlayan Flask tabanlı bir web uygulamasıdır. Platform, içerik kalitesini korumak için gönderim ve moderasyon aşamalarından oluşan bir iş akışı kullanır.
 
-\## Türkçe
+**Canlı Adres:** `http://147.185.221.224:2416/`
 
+### Tasarım ve Kullanıcı Arayüzü
 
+Uygulama sade, kağıt benzeri bir görünüm benimser. Başlıklar için el yazısı stilinde (Caveat), gövde metinleri için ise klasik serif (Merriweather) yazı tipleri kullanılır. Soluk renkler ve hafif gölgelerle desteklenen bu yapı, dikkat dağıtmayan, analog bir atmosfer oluşturur.
 
-\### Proje Özeti
+### Güvenlik ve Moderasyon
 
+Önerilen kelimeler önce ayrı bir kuyrukta (`submissions.txt`) tutulur ve `admin.py` üzerinden yürütülen moderasyon sürecini geçmeden genel sözlüğe (`words.txt`) eklenmez.
 
+Platform bütünlüğünü korumak için mevcut önlemler:
 
-\*\*Yeni Sözcükler\*\*, Türkçe kelime sözlüğünün topluluk tarafından oluşturulmasını sağlayan Flask tabanlı bir web uygulamasıdır. Platform, içerik kalitesini ve bütünlüğünü korumak için bir gönderim ve moderasyon iş akışı kullanır.
+* **Sunucu Taraflı Doğrulama:** Kelime, tanım ve takma ad alanlarının yalnızca izin verilen karakterleri (harfler, boşluklar, noktalar, virgüller) içerdiği doğrulanır. Maksimum uzunluk sınırları uygulanır (Kelime 50, Tanım 300, Takma Ad 20 karakter).
+* **Oran Sınırlaması (Rate Limiting):** Gönderimlerin aynı IP adresinden 5 saniyede bir yapılmasına izin verilerek temel düzeyde bir spam koruması sağlanır.
 
+### Dağıtım Notu
 
+Hizmet şu anda genel erişim için **playit.gg** aracılığıyla tünellenmektedir. Bu geçici bir çözümdür; yakın zamanda daha kalıcı ve özel bir barındırma ortamına geçiş planlanmaktadır.
 
-\*\*Canlı Adres:\*\* `http://147.185.221.224:2416/`
+### Gelecek Güvenlik Planları
 
+Yüksek trafik yükü veya saldırı durumlarında hizmetin kesintisiz çalışmasını sağlamak için özel bir DDOS koruma katmanı eklenmesi planlanmaktadır.
 
+---
 
-\### Tasarım ve Kullanıcı Arayüzü
-
-
-
-Uygulama, \*\*sade ve kağıt benzeri bir estetiğe\*\* sahiptir. Tasarım, başlıklar için el yazısı stilindeki yazı tipleri (Caveat) ile gövde metinleri için klasik serif tipografiyi (Merriweather) birleştirir; soluk renkler ve hafif gölgeler kullanılarak dikkat dağıtıcı olmayan, analog bir his yaratılmıştır.
-
-
-
-\### Güvenlik ve Moderasyon
-
-
-
-Önerilen kelimeler ayrı bir kuyrukta (`submissions.txt`) tutulur ve genel sözlüğe (`words.txt`) eklenmeden önce, `admin.py` uygulaması aracılığıyla moderatör kontrollü bir inceleme sürecinden geçmek zorundadır.
-
-
-
-Platform bütünlüğünü korumak için mevcut önlemler şunları içerir:
-
-\* \*\*Sunucu Taraflı Doğrulama:\*\* Arka uç, kelime, tanım ve takma adın yalnızca izin verilen karakterleri (harfler, boşluklar, noktalar, virgüller) içerdiğini kesin olarak doğrular ve maksimum uzunluk sınırlarını uygular (Kelime maks. 50, Tanım maks. 300, Takma Ad maks. 20).
-
-\* \*\*Oran Sınırlaması (Rate Limiting):\*\* Gönderim spam'ine karşı temel bir savunma olarak, her istemci IP adresi için gönderimler 5 saniyede bir ile sınırlandırılmıştır.
-
-
-
-\### Dağıtım Notu
-
-
-
-Hizmet, şu anda genel erişilebilirlik için \*\*playit.gg\*\* kullanılarak tünellenmektedir. Bu geçici bir kurulumdur ve yakın gelecekte daha kalıcı, özel bir barındırma çözümüne geçiş yapılacaktır.
-
-
-
-\### Gelecek Güvenlik Planları
-
-
-
-Yüksek hacimli trafik veya kötü niyetli saldırılar altında hizmetin kullanılabilirliğini sağlamak için \*\*özel bir DDOS savunma katmanı\*\* uygulamayı planlıyoruz.
-
-
-
-\*\*\*
-
-\*\*\*
-
-
-
-\# Yeni Sözcükler (New Words)
-
-
+# Yeni Sözcükler (New Words)
 
 A community-driven platform for suggesting and curating new or niche Turkish words and their definitions.
 
+---
 
+## English
 
-\*\*\*
+### Project Overview
 
+**Yeni Sözcükler** is a Flask-based web application designed to support the collaborative creation of a Turkish word dictionary. It relies on a submission and moderation workflow to maintain quality and accuracy.
 
+**Live Address:** `http://147.185.221.224:2416/`
 
-\## English
+### Design and User Interface
 
+The application adopts a simple, paperlike aesthetic. Titles use handwritten-style fonts (Caveat), while body text relies on a classic serif typeface (Merriweather). Muted colors and light shadows help create a calm, analog-style visual atmosphere.
 
+### Security and Moderation
 
-\### Project Overview
+Word suggestions are stored in a separate queue (`submissions.txt`) and must pass a moderator review through the `admin.py` interface before being added to the public dictionary (`words.txt`).
 
+Current safeguards include:
 
+* **Server-Side Validation:** The backend ensures that submitted words, definitions, and nicknames contain only allowed characters (letters, spaces, periods, commas) and enforces length limits (Word 50, Definition 300, Nickname 20 characters).
+* **Rate Limiting:** Each client IP is restricted to one submission every 5 seconds to reduce spam.
 
-\*\*Yeni Sözcükler\*\* is a Flask-based web application that facilitates the collaborative creation of a word dictionary. The platform uses a submission and moderation workflow to ensure quality and integrity.
+### Deployment Note
 
+Public access is currently provided through tunneling via **playit.gg**. This setup is temporary, with a planned move to a dedicated, permanent hosting environment.
 
+### Future Security Plans
 
-\*\*Live Address:\*\* `http://147.185.221.224:2416/`
-
-
-
-\### Design and User Interface
-
-
-
-The application features a \*\*simple, paperlike aesthetic\*\*. The design uses muted colors (e.g., `#f4f1ea` background, `#fdfbf7` card), subtle box shadows, and handwritten-style fonts (Caveat) for titles, combined with classic serif typography (Merriweather) for body text. This combination is intended to create a distraction-free, analog feel.
-
-
-
-\### Security and Moderation
-
-
-
-Submissions are held in a separate queue (`submissions.txt`) and must pass through a moderator-controlled review process via the `admin.py` application before being added to the public dictionary (`words.txt`).
-
-
-
-Current measures to maintain platform integrity include:
-
-\* \*\*Server-Side Validation:\*\* The backend strictly verifies that the word, definition, and nickname only contain allowed characters (letters, spaces, periods, commas) and enforces maximum length limits (Word max 50, Definition max 300, Nickname max 20).
-
-\* \*\*Rate Limiting:\*\* A basic defense against submission spam is enforced by limiting each client IP address to one post every 5 seconds.
-
-
-
-\### Deployment Note
-
-
-
-The service is currently being tunneled using \*\*playit.gg\*\* for public accessibility. This is a temporary setup, and a transition to a more permanent, dedicated hosting solution will be implemented in the near future.
-
-
-
-\### Future Security Plans
-
-
-
-We are planning to implement a \*\*dedicated DDOS defense layer\*\* to ensure service availability under high-volume traffic or malicious attacks.
-
-
-
-\*\*\*
-
-
-
+A dedicated DDOS protection layer is planned to maintain service availability during high traffic or malicious activity.
