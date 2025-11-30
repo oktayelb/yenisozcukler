@@ -14,9 +14,10 @@
             --text-muted: #5d5c61;
             --accent: #8e7f7f;
             --shadow: 0 4px 15px rgba(60, 50, 40, 0.1);
+            --shadow-hover: 0 8px 25px rgba(60, 50, 40, 0.15);
             --radius: 12px;
-            --success-color: #4CAF50; /* Başarı için yeşil */
-            --error-color: #f44336; /* Hata için kırmızı */
+            --success-color: #4CAF50;
+            --error-color: #f44336;
         }
 
         body {
@@ -26,21 +27,30 @@
             margin: 0;
             padding: 20px;
             font-size: 18px;
+            transition: background-color 0.3s;
         }
 
-        /* The Main Title from the sketch */
         header {
             text-align: center;
             margin-bottom: 40px;
             margin-top: 20px;
+            overflow: hidden;
         }
 
         h1 {
-            font-family: 'Caveat', cursive; /* Handwritten style */
+            font-family: 'Caveat', cursive;
             font-size: 4.5rem;
             margin: 0;
             color: var(--text-main);
-            transform: rotate(-2deg); /* Slight tilt like the drawing */
+            transform: rotate(-2deg);
+            opacity: 0;
+            transform: translateY(-20px) rotate(-5deg);
+            transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        h1.loaded {
+            opacity: 1;
+            transform: translateY(0) rotate(-2deg);
         }
         
         .subtitle {
@@ -49,9 +59,14 @@
             color: var(--text-muted);
             margin-top: -10px;
             display: block;
+            opacity: 0;
+            transition: opacity 1s ease 0.3s;
         }
 
-        /* Layout: Form on Top, Feed Below */
+        .subtitle.loaded {
+            opacity: 1;
+        }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -60,7 +75,6 @@
             gap: 40px;
         }
 
-        /* --- THE FEED (Left Side) --- */
         .feed-container {
             display: flex;
             flex-direction: column;
@@ -69,11 +83,29 @@
 
         .word-card {
             background: var(--card-bg);
-            padding: 25px;
+            padding: 30px 25px; 
             border-radius: var(--radius);
             box-shadow: var(--shadow);
+            border: 1px solid rgba(142, 127, 127, 0.3); 
             border-left: 5px solid var(--accent);
             position: relative;
+            transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease, border-left-width 0.3s ease, opacity 0.5s ease;
+        }
+        
+        .word-card.fade-in {
+            opacity: 0;
+            transform: translateY(50px);
+        }
+
+        .word-card.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .word-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-hover);
+            border-left-width: 8px;
         }
 
         .word-title {
@@ -102,12 +134,12 @@
             padding-top: 8px;
         }
 
-        /* --- THE FORM (Top - Horizontal Layout) --- */
         .form-card {
             background: #fff;
             padding: 30px;
             border-radius: var(--radius);
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-top: 4px solid var(--accent);
         }
 
         .form-title {
@@ -137,11 +169,13 @@
             border: 1px solid #dcd6cc; font-size: 1.05rem;
             font-family: 'Merriweather', serif; outline: none;
             box-sizing: border-box; border-radius: 6px;
+            transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s;
         }
         
         input:focus, textarea:focus { 
             border-color: var(--accent); 
             background-color: #fff; 
+            box-shadow: 0 0 0 3px rgba(142, 127, 127, 0.2);
         }
 
         button {
@@ -150,13 +184,26 @@
             color: #fff; border: none; font-size: 1.05rem;
             cursor: pointer; border-radius: 6px;
             font-weight: bold;
-            transition: all 0.3s;
+            transition: all 0.2s;
             white-space: nowrap;
             height: 47px;
         }
-        button:hover { background-color: var(--accent); transform: translateY(-2px); }
+        button:hover { 
+            background-color: var(--accent); 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        button:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
 
-        .char-limit { font-size: 0.8rem; color: #ccc; text-align: right; margin-top: 4px; position: absolute; bottom: -20px; right: 0; }
+        .char-limit { font-size: 0.8rem; color: #aaa; text-align: right; margin-top: 4px; position: absolute; bottom: -20px; right: 0; }
         
         .def-wrapper { position: relative; padding-bottom: 20px; }
 
@@ -168,10 +215,11 @@
                 width: 100%;
             }
             h1 { font-size: 3.5rem; }
-            body { font-size: 16px; }
+            body { padding: 10px; font-size: 16px; }
+            .form-card { padding: 20px; }
+            .word-card { padding: 20px; }
         }
 
-        /* --- ÖZEL BİLDİRİM STİLLERİ --- */
         .notification-container {
             position: fixed;
             top: 20px;
@@ -192,8 +240,9 @@
             font-weight: 700;
             opacity: 0;
             transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
-            transform: translateX(100%); /* Başlangıçta sağdan dışarıda */
+            transform: translateX(100%);
             min-width: 250px;
+            cursor: pointer;
         }
 
         .custom-alert.show {
@@ -208,7 +257,6 @@
         .custom-alert-error {
             border-left: 6px solid var(--error-color);
         }
-        /* --- ÖZEL BİLDİRİM STİLLERİ SONU --- */
     </style>
 </head>
 <body>
@@ -216,8 +264,8 @@
     <div class="notification-container" id="notificationContainer"></div>
 
     <header>
-        <h1>Yeni Sözcükler</h1>
-        <span class="subtitle">"Yeni bir sözcük oluştur..."</span>
+        <h1 id="mainTitle">Yeni Sözcükler</h1>
+        <span class="subtitle" id="subtitleText">"Yeni bir sözcük oluştur..."</span>
     </header>
 
     <div class="container">
@@ -227,7 +275,7 @@
             <div class="form-fields">
                 <div class="form-group">
                     <label>Sözcük</label>
-                    <input type="text" id="inputWord" maxlength="50" placeholder="Örn: Limerence" onkeypress="return allowOnlyLetters(event, false)">
+                    <input type="text" id="inputWord" maxlength="50" placeholder="Örn: Limerence101" onkeypress="return allowOnlyLetters(event, false)">
                 </div>
 
                 <div class="form-group def-wrapper">
@@ -253,16 +301,16 @@
 <script>
     const CACHE_KEY = 'wordCache';
 
-    fetchWords();
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('mainTitle').classList.add('loaded');
+        document.getElementById('subtitleText').classList.add('loaded');
+        fetchWords();
+    });
 
     function updateCount(field) {
         document.getElementById('charCount').innerText = `${field.value.length} / 300`;
     }
 
-    /**
-     * Klavyeden girilen karakterin sadece harf (Türkçe dahil), nokta veya virgül
-     * olup olmadığını kontrol eder.
-     */
     function allowOnlyLetters(event, allowSpaces) {
         const key = event.key;
         
@@ -277,11 +325,9 @@
 
         let regex;
         if (allowSpaces) {
-            // Harfler, boşluk, nokta ve virgül
-            regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,]$/;
+            regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]$/;
         } else {
-            // Sadece harfler, nokta ve virgül
-            regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ.,]$/;
+            regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ.,0-9]$/;
         }
 
         if (regex.test(key)) {
@@ -292,14 +338,9 @@
         }
     }
 
-
-    /**
-     * Sözcük kartını oluşturur
-     * @param {Object} item - Sözcük verisi
-     */
     function createWordCardElement(item) {
         const card = document.createElement('div');
-        card.className = 'word-card';
+        card.className = 'word-card fade-in'; 
 
         const parser = new DOMParser();
         const decode = (str) => {
@@ -328,33 +369,52 @@
         return card;
     }
 
-
-    /**
-     * DOM'a kartları hızlıca ekler
-     */
     function appendCardsToDOM(words, listElement, prepend = false) {
-        const fragment = document.createDocumentFragment();
+        const loadingMessage = document.getElementById('loadingMessage');
+        if (loadingMessage) {
+            loadingMessage.remove();
+        }
         
+        const fragment = document.createDocumentFragment();
+        const cardsToAnimate = [];
+
         words.forEach(item => {
             const card = createWordCardElement(item);
+            // If we're doing a full render (listElement empty), animate all
+            if (prepend || listElement.children.length === 0) {
+                 cardsToAnimate.push(card);
+            }
+
             if (prepend) {
-                fragment.prepend(card);
+                fragment.appendChild(card); // append to fragment, we'll prepend fragment into list
             } else {
                 fragment.appendChild(card);
             }
         });
 
         if (prepend) {
-            listElement.prepend(fragment);
+            // Prepend fragment's nodes in correct order
+            // We insert before the first child to preserve order (newest first)
+            if (listElement.firstChild) {
+                listElement.insertBefore(fragment, listElement.firstChild);
+            } else {
+                listElement.appendChild(fragment);
+            }
         } else {
             listElement.appendChild(fragment);
         }
+        
+        cardsToAnimate.forEach((card, index) => {
+            if (card.classList.contains('fade-in')) {
+                const delay = index * 80;
+                setTimeout(() => {
+                    card.classList.remove('fade-in');
+                    card.classList.add('show');
+                }, delay);
+            }
+        });
     }
 
-
-    /**
-     * Ön belleği yükler
-     */
     function loadCache() {
         try {
             const cachedString = localStorage.getItem(CACHE_KEY);
@@ -367,9 +427,6 @@
         return null;
     }
 
-    /**
-     * Ön belleği kaydeder
-     */
     function saveCache(words, totalCount) {
         try {
             const data = {
@@ -383,41 +440,65 @@
         }
     }
 
-
     async function fetchWords() {
         const list = document.getElementById('feedList');
-        const loadingMessage = document.getElementById('loadingMessage');
         let words = [];
         let cachedData = loadCache();
         let clientCount = 0;
         let url = '/api/words';
 
         if (cachedData) {
-            words = cachedData.words;
-            clientCount = cachedData.count;
+            words = cachedData.words || [];
+            clientCount = cachedData.count || 0;
             list.innerHTML = '';
             appendCardsToDOM(words, list, false);
             url = `/api/words?count=${clientCount}`;
         } else {
-             list.innerHTML = `<div style="text-align:center; color:#999; margin-top:50px;" id="loadingMessage">Sözcükler yükleniyor...</div>`;
+            if (!document.getElementById('loadingMessage')) {
+                list.innerHTML = `<div style="text-align:center; color:#999; margin-top:50px;" id="loadingMessage">Sözcükler yükleniyor...</div>`;
+            }
         }
         
         try {
             const response = await fetch(url);
             const data = await response.json();
-            
-            if (data.status === 'updated' && data.words.length > 0) {
-                appendCardsToDOM(data.words, list, true);
-                const newWords = [...data.words, ...words];
-                saveCache(newWords, data.total_count);
-                
-            } else if (data.status === 'full' && data.words.length > 0) {
+
+            // CASE 1: Server says updated
+            if (data.status === 'updated') {
+                // If server returned new words
+                if (data.words && data.words.length > 0) {
+                    // Prepend newest words and update cache
+                    appendCardsToDOM(data.words, list, true);
+                    const newWords = [...data.words, ...words];
+                    saveCache(newWords, data.total_count);
+                } else {
+                    // No new words — do NOT clear DOM.
+                    // But if client had cache, update the stored total_count to server's total_count
+                    if (cachedData) {
+                        saveCache(words, data.total_count);
+                    } else {
+                        // No cache and server returned empty updated -> show empty message
+                        list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz sözcük yok. İlk siz ekleyin!</div>';
+                        saveCache([], data.total_count || 0);
+                    }
+                }
+            }
+            // CASE 2: Full reload from server (useful when client had no cache)
+            else if (data.status === 'full' && data.words.length > 0) {
                 list.innerHTML = '';
                 appendCardsToDOM(data.words, list, false);
                 saveCache(data.words, data.total_count);
-            } else if (data.status === 'full' && data.words.length === 0) {
-                list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz sözcük yok. İlk siz ekleyin!</div>';
-                saveCache([], 0);
+            }
+            // CASE 3: Server returned zero words (and didn't set 'updated')
+            else if (data.words && data.words.length === 0) {
+                // If we had no cache, show empty message
+                if (!cachedData) {
+                    list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz sözcük yok. İlk siz ekleyin!</div>';
+                    saveCache([], 0);
+                } else {
+                    // had cache and server returned empty unknown-case -> preserve cache
+                    saveCache(words, data.total_count || cachedData.count || 0);
+                }
             }
 
         } catch (e) {
@@ -437,6 +518,11 @@
         alertDiv.className = `custom-alert custom-alert-${type}`;
         alertDiv.textContent = message;
         
+        alertDiv.onclick = () => {
+             alertDiv.classList.remove('show');
+             setTimeout(() => alertDiv.remove(), 500); 
+        };
+        
         container.prepend(alertDiv); 
 
         setTimeout(() => {
@@ -452,17 +538,14 @@
         }, 4000);
     }
 
-
     async function submitWord() {
         const word = document.getElementById('inputWord').value.trim();
         const definition = document.getElementById('inputDef').value.trim();
         const nickname = document.getElementById('inputNick').value.trim();
         const btn = document.querySelector("button");
 
-        // --- CLIENT-SIDE SUBMISSION VALIDATION ---
-        // Nokta ve virgül de eklendi
-        const alphaOnly = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ.,]+$/;
-        const alphaWithSpaces = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,]*$/;
+        const alphaOnly = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ.,0-9]+$/;
+        const alphaWithSpaces = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]*$/;
 
         if (!word || !definition) {
             showCustomAlert("Lütfen Sözcük ve Tanım alanlarını doldurun.", "error"); 
@@ -470,20 +553,19 @@
         }
         
         if (!word.match(alphaOnly)) {
-            showCustomAlert("Sözcük alanı sadece harf, nokta veya virgül içerebilir.", "error");
+            showCustomAlert("Sözcük alanı sadece harf, rakam, nokta veya virgül içerebilir.", "error");
             return;
         }
         
         if (nickname && !nickname.match(alphaOnly)) {
-            showCustomAlert("Takma Ad alanı sadece harf, nokta veya virgül içerebilir.", "error");
+            showCustomAlert("Takma Ad alanı sadece harf, rakam, nokta veya virgül içerebilir.", "error");
             return;
         }
 
         if (!definition.match(alphaWithSpaces)) {
-            showCustomAlert("Tanım alanı sadece harf, nokta, virgül ve boşluk içerebilir.", "error");
+            showCustomAlert("Tanım alanı sadece harf, rakam, nokta, virgül ve boşluk içerebilir.", "error");
             return;
         }
-        // ------------------------------------------
 
         btn.disabled = true;
         btn.innerText = "Kaydediliyor...";
@@ -502,7 +584,7 @@
                 updateCount(document.getElementById('inputDef'));
                 showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
                 
-                fetchWords(); 
+                fetchWords();
                 
             } else {
                 const data = await response.json();
@@ -519,4 +601,3 @@
 
 </body>
 </html>
-
