@@ -18,19 +18,21 @@
             --radius: 12px;
             --success-color: #4CAF50;
             --error-color: #f44336;
+            --like-color-active: #E53935; /* Kırmızımsı bir renk */
         }
 
-        /* --- KARANLIK MOD RENK TANIMLARI --- */
+        /* --- DARK MODE COLOR DEFINITIONS --- */
         body.dark-mode {
             --bg-color: #2c2c34;
             --card-bg: #3c3c45;
             --text-main: #f0f0f0;
             --text-muted: #a0a0a0;
-            --accent: #b8a9a9; /* Açık ve okunur olması için aksan rengini de açtık */
+            --accent: #b8a9a9; 
             --shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
             --shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.6);
+            --like-color-active: #FF7043; 
         }
-        /* --- KARANLIK MOD RENK TANIMLARI BİTİŞ --- */
+        /* --- DARK MODE COLOR DEFINITIONS END --- */
 
         body {
             font-family: 'Merriweather', serif;
@@ -39,7 +41,7 @@
             margin: 0;
             padding: 20px;
             font-size: 18px;
-            transition: background-color 0.3s, color 0.3s; /* Renk geçişi eklendi */
+            transition: background-color 0.3s, color 0.3s;
         }
 
         header {
@@ -127,12 +129,13 @@
             color: var(--text-main);
             display: flex;
             justify-content: space-between;
+            align-items: center;
         }
 
         .word-def {
             font-size: 1.2rem;
             line-height: 1.7;
-            color: var(--text-muted); /* Renk değişkeni kullanıldı */
+            color: var(--text-muted);
             white-space: pre-wrap;
         }
 
@@ -142,7 +145,7 @@
             color: #999;
             text-align: right;
             font-style: italic;
-            border-top: 1px dashed #ddd; /* Dark mode'da görünür olması için güncellenebilir */
+            border-top: 1px dashed #ddd;
             padding-top: 8px;
         }
         
@@ -178,12 +181,12 @@
         label {
             display: block; margin-bottom: 5px; font-size: 0.85rem;
             text-transform: uppercase; letter-spacing: 1px;
-            color: var(--text-muted); /* Renk değişkeni kullanıldı */
+            color: var(--text-muted);
             font-family: sans-serif;
         }
 
         input, textarea {
-            width: 100%; padding: 12px; background-color: var(--bg-color); /* Renk değişkeni kullanıldı */
+            width: 100%; padding: 12px; background-color: var(--bg-color);
             border: 1px solid #dcd6cc; font-size: 1.05rem;
             font-family: 'Merriweather', serif; outline: none;
             box-sizing: border-box; border-radius: 6px;
@@ -193,36 +196,29 @@
         
         input:focus, textarea:focus { 
             border-color: var(--accent); 
-            background-color: var(--card-bg); /* Renk değişkeni kullanıldı */
+            background-color: var(--card-bg);
             box-shadow: 0 0 0 3px rgba(142, 127, 127, 0.2);
         }
-
-        button {
+        
+        /* Submit Button */
+        .form-card button {
             padding: 15px 30px;
             background-color: var(--text-main);
-            color: var(--bg-color); border: none; font-size: 1.05rem; /* Renk değişkeni kullanıldı */
+            color: var(--card-bg); border: none; font-size: 1.05rem;
             cursor: pointer; border-radius: 6px;
             font-weight: bold;
             transition: all 0.2s;
             white-space: nowrap;
             height: 47px;
         }
-        button:hover { 
+
+        .form-card button:hover { 
             background-color: var(--accent); 
             transform: translateY(-1px);
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
         }
-        button:active {
-            transform: translateY(1px);
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
 
-        .char-limit { font-size: 0.8rem; color: var(--text-muted); /* Renk değişkeni kullanıldı */ text-align: right; margin-top: 4px; position: absolute; bottom: -20px; right: 0; }
+        .char-limit { font-size: 0.8rem; color: var(--text-muted); text-align: right; margin-top: 4px; position: absolute; bottom: -20px; right: 0; }
         
         .def-wrapper { position: relative; padding-bottom: 20px; }
 
@@ -230,7 +226,7 @@
             .form-fields { 
                 grid-template-columns: 1fr; 
             }
-            button {
+            .form-card button {
                 width: 100%;
             }
             h1 { font-size: 3.5rem; }
@@ -254,7 +250,7 @@
             flex-direction: column;
             gap: 10px;
         }
-
+        
         .custom-alert {
             background-color: var(--card-bg);
             color: var(--text-main);
@@ -283,9 +279,9 @@
             border-left: 6px solid var(--error-color);
         }
         
-        /* --- YENİ KARANLIK MOD DÜĞMESİ STİLİ --- */
+        /* --- DARK MODE TOGGLE STYLE --- */
         .mode-toggle {
-            position: fixed;
+            position: absolute;
             top: 20px;
             left: 20px;
             background: var(--card-bg);
@@ -306,13 +302,69 @@
             background: var(--accent);
             color: var(--card-bg);
         }
-        /* --- YENİ KARANLIK MOD DÜĞMESİ STİLİ BİTİŞ --- */
+        /* --- DARK MODE TOGGLE STYLE END --- */
+        
+        /* --- LIKE BUTTON STYLES --- */
+        .like-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            user-select: none;
+        }
+        
+        .like-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+            transition: transform 0.1s ease-out;
+            /* Yalnızca form butonları için tanımlanan yükseklik değerini burada geçersiz kıl */
+            height: auto !important; 
+        }
+        
+        .like-button:hover:not(:disabled) {
+            transform: scale(1.1);
+        }
+        
+        .like-button:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+        
+        .like-button:disabled {
+            cursor: wait;
+        }
+
+        .like-icon {
+            fill: none;
+            stroke: var(--text-muted);
+            stroke-width: 2;
+            transition: fill 0.3s, stroke 0.3s;
+        }
+
+        .like-button.liked .like-icon {
+            fill: var(--like-color-active);
+            stroke: var(--like-color-active);
+        }
+        
+        .like-count {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            min-width: 20px;
+            text-align: left;
+            transition: color 0.3s;
+        }
+        /* --- LIKE BUTTON STYLES END --- */
+
     </style>
 </head>
 <body>
 
     <div class="notification-container" id="notificationContainer"></div>
 
+    <!-- DARK MODE TOGGLE BUTTON -->
     <button class="mode-toggle" id="darkModeToggle">Karanlık Mod</button>
     
     <header>
@@ -352,17 +404,18 @@
 
 <script>
     const CACHE_KEY = 'wordCache';
-    const THEME_KEY = 'userTheme'; // Yeni tema anahtarı
+    const THEME_KEY = 'userTheme'; 
+    // Cooldown matches the 1-second server-side limit
+    const LIKE_COOLDOWN_MS = 1000; 
+    const buttonsCooldown = {}; // { word_id: cooldown_timestamp }
 
     document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('mainTitle').classList.add('loaded');
         document.getElementById('subtitleText').classList.add('loaded');
         
-        // --- KARANLIK MOD YÜKLEME MANTIKLARI ---
         const savedTheme = localStorage.getItem(THEME_KEY);
         const darkModeToggle = document.getElementById('darkModeToggle');
 
-        // Kaydedilen temayı yükle veya sistem tercihini kullan
         if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.body.classList.add('dark-mode');
             darkModeToggle.textContent = 'Aydınlık Mod';
@@ -370,14 +423,11 @@
             darkModeToggle.textContent = 'Karanlık Mod';
         }
 
-        // Düğme olay dinleyicisini ayarla
         darkModeToggle.addEventListener('click', toggleDarkMode);
-        // --- KARANLIK MOD YÜKLEME BİTİŞ ---
         
         fetchWords();
     });
 
-    // --- KARANLIK MOD GEÇİŞ FONKSİYONU ---
     function toggleDarkMode() {
         const isDarkMode = document.body.classList.toggle('dark-mode');
         const darkModeToggle = document.getElementById('darkModeToggle');
@@ -390,7 +440,6 @@
             darkModeToggle.textContent = 'Karanlık Mod';
         }
     }
-    // --- KARANLIK MOD GEÇİŞ FONKSİYONU BİTİŞ ---
 
     function updateCount(field) {
         document.getElementById('charCount').innerText = `${field.value.length} / 300`;
@@ -422,6 +471,84 @@
             return false;
         }
     }
+    
+    // --- NEW FUNCTION: Create Like Button ---
+    function createLikeButton(item) {
+        const wordId = item.id;
+        const container = document.createElement('div');
+        container.className = 'like-container';
+        
+        const button = document.createElement('button');
+        // 'is_liked' property is now coming from the backend
+        button.className = item.is_liked ? 'like-button liked' : 'like-button';
+        button.id = `like-btn-${wordId}`;
+        button.onclick = () => likeWord(wordId, button);
+        
+        // Heart Icon (SVG)
+        button.innerHTML = `
+            <svg class="like-icon" width="24" height="24" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+        `;
+        
+        const countSpan = document.createElement('span');
+        countSpan.className = 'like-count';
+        countSpan.id = `like-count-${wordId}`;
+        countSpan.textContent = item.likes || 0;
+
+        container.appendChild(button);
+        container.appendChild(countSpan);
+        return container;
+    }
+    
+    // --- NEW FUNCTION: Like Action ---
+    async function likeWord(wordId, button) {
+        // Frontend spam prevention check
+        const now = Date.now();
+        const lastClick = buttonsCooldown[wordId] || 0;
+
+        if (now < lastClick) {
+            // Already in cooldown
+            return;
+        }
+
+        button.disabled = true;
+        // Set cooldown timestamp
+        buttonsCooldown[wordId] = now + LIKE_COOLDOWN_MS; 
+
+        try {
+            const response = await fetch(`/api/like/${wordId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const countElement = document.getElementById(`like-count-${wordId}`);
+                
+                if (countElement) {
+                    countElement.textContent = data.new_likes;
+                }
+                
+                if (data.action === 'liked') {
+                    button.classList.add('liked');
+                } else if (data.action === 'unliked') {
+                    button.classList.remove('liked');
+                }
+                
+            } else {
+                const data = await response.json();
+                showCustomAlert(data.error || "Oylama başarısız.", "error");
+            }
+        } catch (error) {
+            showCustomAlert("Ağ hatası.", "error");
+        } finally {
+            // Re-enable button after cooldown ends
+            setTimeout(() => {
+                 button.disabled = false;
+            }, LIKE_COOLDOWN_MS);
+        }
+    }
 
     function createWordCardElement(item) {
         const card = document.createElement('div');
@@ -435,7 +562,13 @@
 
         const titleDiv = document.createElement('div');
         titleDiv.className = 'word-title';
-        titleDiv.textContent = decode(item.word);
+        
+        const wordText = document.createElement('span');
+        wordText.textContent = decode(item.word);
+        titleDiv.appendChild(wordText);
+        
+        // Add Like Button and Counter
+        titleDiv.appendChild(createLikeButton(item));
 
         const defDiv = document.createElement('div');
         defDiv.className = 'word-def';
@@ -465,21 +598,18 @@
 
         words.forEach(item => {
             const card = createWordCardElement(item);
-            // If we're doing a full render (listElement empty), animate all
             if (prepend || listElement.children.length === 0) {
                  cardsToAnimate.push(card);
             }
 
             if (prepend) {
-                fragment.appendChild(card); // append to fragment, we'll prepend fragment into list
+                fragment.appendChild(card); 
             } else {
                 fragment.appendChild(card);
             }
         });
 
         if (prepend) {
-            // Prepend fragment's nodes in correct order
-            // We insert before the first child to preserve order (newest first)
             if (listElement.firstChild) {
                 listElement.insertBefore(fragment, listElement.firstChild);
             } else {
@@ -525,64 +655,49 @@
         }
     }
 
-    async function fetchWords() {
+
+    async function fetchWords(forceReload = false) {
         const list = document.getElementById('feedList');
         let words = [];
         let cachedData = loadCache();
         let clientCount = 0;
         let url = '/api/words';
 
-        if (cachedData) {
+        if (cachedData && !forceReload) {
             words = cachedData.words || [];
             clientCount = cachedData.count || 0;
             list.innerHTML = '';
             appendCardsToDOM(words, list, false);
             url = `/api/words?count=${clientCount}`;
         } else {
-            if (!document.getElementById('loadingMessage')) {
-                list.innerHTML = `<div style="text-align:center; color:#999; margin-top:50px;" id="loadingMessage">Sözcükler yükleniyor...</div>`;
-            }
+            list.innerHTML = `<div style="text-align:center; color:#999; margin-top:50px;" id="loadingMessage">Sözcükler yükleniyor...</div>`;
+            url = '/api/words'; 
         }
         
         try {
             const response = await fetch(url);
             const data = await response.json();
 
-            // CASE 1: Server says updated
             if (data.status === 'updated') {
-                // If server returned new words
                 if (data.words && data.words.length > 0) {
-                    // Prepend newest words and update cache
                     appendCardsToDOM(data.words, list, true);
                     const newWords = [...data.words, ...words];
                     saveCache(newWords, data.total_count);
+                } else if (!cachedData || forceReload) {
+                    list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz onaylanmış sözcük yok. İlk siz ekleyin!</div>';
+                    saveCache([], data.total_count || 0);
                 } else {
-                    // No new words — do NOT clear DOM.
-                    // But if client had cache, update the stored total_count to server's total_count
-                    if (cachedData) {
-                        saveCache(words, data.total_count);
-                    } else {
-                        // No cache and server returned empty updated -> show empty message
-                        list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz sözcük yok. İlk siz ekleyin!</div>';
-                        saveCache([], data.total_count || 0);
-                    }
+                    saveCache(words, data.total_count);
                 }
             }
-            // CASE 2: Full reload from server (useful when client had no cache)
-            else if (data.status === 'full' && data.words.length > 0) {
-                list.innerHTML = '';
-                appendCardsToDOM(data.words, list, false);
-                saveCache(data.words, data.total_count);
-            }
-            // CASE 3: Server returned zero words (and didn't set 'updated')
-            else if (data.words && data.words.length === 0) {
-                // If we had no cache, show empty message
-                if (!cachedData) {
-                    list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz sözcük yok. İlk siz ekleyin!</div>';
-                    saveCache([], 0);
+            else if (data.status === 'full') {
+                if (data.words && data.words.length > 0) {
+                    list.innerHTML = '';
+                    appendCardsToDOM(data.words, list, false);
+                    saveCache(data.words, data.total_count);
                 } else {
-                    // had cache and server returned empty unknown-case -> preserve cache
-                    saveCache(words, data.total_count || cachedData.count || 0);
+                    list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz onaylanmış sözcük yok. İlk siz ekleyin!</div>';
+                    saveCache([], 0);
                 }
             }
 
@@ -595,6 +710,7 @@
              }
         }
     }
+
 
     function showCustomAlert(message, type = 'success') {
         const container = document.getElementById('notificationContainer');
@@ -627,7 +743,7 @@
         const word = document.getElementById('inputWord').value.trim();
         const definition = document.getElementById('inputDef').value.trim();
         const nickname = document.getElementById('inputNick').value.trim();
-        const btn = document.querySelector("button:not(#darkModeToggle)"); // Dark mode düğmesi hariç diğer butonu seçer.
+        const btn = document.querySelector(".form-card button"); 
 
         const alphaOnly = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ.,0-9]+$/;
         const alphaWithSpaces = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]*$/;
@@ -669,7 +785,8 @@
                 updateCount(document.getElementById('inputDef'));
                 showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
                 
-                fetchWords();
+                // Fetch all approved words again to refresh the view (but approved list shouldn't change)
+                fetchWords(true);
                 
             } else {
                 const data = await response.json();
