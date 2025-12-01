@@ -23,7 +23,7 @@ class Word(db.Model):
     definition = db.Column(db.String(300), nullable=False)
     author = db.Column(db.String(20), default='Anonymous')
     
-    liked_by = relationship("UserLike", backref="word_rel", cascade="all, delete-orphan", lazy="dynamic")
+    liked_by = db.relationship("UserLike", backref="word_rel", cascade="all, delete-orphan", lazy="dynamic")
     
     status = db.Column(db.String(10), default='pending') 
     timestamp = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
@@ -49,7 +49,31 @@ class UserLike(db.Model):
     __table_args__ = (db.UniqueConstraint('ip_address', 'word_id', name='_user_word_uc'),)
 
 
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    
+    word_id = db.Column(db.Integer, db.ForeignKey('word.id'), nullable=False) 
+    
+    author = db.Column(db.String(50), default='Anonim') 
+    
+    comment = db.Column(db.String(200), nullable=False) 
+    
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
+
+    def to_dict(self):
+        """Frontend'e gönderilmek üzere yorumu sözlük formatına dönüştürür."""
+        return {
+            'id': self.id,
+            'word_id': self.word_id,
+            'author': self.author,
+            'comment': self.comment,
+            'timestamp': self.timestamp.isoformat() 
+        }
+
 user_last_post_time = {}
+
+# YENİ EKLENEN: Yorumlar için hız limitini tutar
+user_last_comment_time = {}
 
 ALPHANUM_WITH_SPACES = re.compile(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]*$')
 
@@ -100,18 +124,16 @@ def toggle_like(word_id):
         if existing_like:
             db.session.delete(existing_like) 
             action = 'unliked'
-            # DÜZELTME 1: Dislike eylemi loglandı
-            log_message = f"DISLIKED: Word ID {word_id} by {client_ip}" 
+            log_message = f"DISLIKED: Word ID {word_id} by {client_ip}"
         else:
             new_like = UserLike(ip_address=client_ip, word_id=word_id)
             db.session.add(new_like) 
             action = 'liked'
-            # DÜZELTME 1: Like eylemi loglandı
-            log_message = f"LIKED: Word ID {word_id} by {client_ip}" 
+            log_message = f"LIKED: Word ID {word_id} by {client_ip}"
             
         db.session.commit()
         
-        print(log_message) # Konsola log yazdırıldı
+        print(log_message)
         
         return jsonify({
             'success': True, 
@@ -177,6 +199,71 @@ def add_word():
     user_last_post_time[ip] = time.time()
 
     return jsonify({'success': True})
+
+
+# YENİ ENDPOINT: Yorum ekleme (Hız limiti eklendi)
+@app.route('/api/comment/add', methods=['POST'])
+def add_comment():
+    ip = get_client_ip()
+    current_time = time.time()
+
+    # HIZ LİMİTİ KONTROLÜ
+    if ip in user_last_comment_time and (current_time - user_last_comment_time.get(ip, 0) < 30):
+        remaining_time = 30 - int(current_time - user_last_comment_time.get(ip, 0))
+        return jsonify({'success': False, 'error': f'Çok hızlı yorum gönderiyorsunuz. Lütfen {remaining_time} saniye bekleyin.'}), 429
+    
+    data = request.get_json()
+    word_id = data.get('word_id', None)
+    author = data.get('author', 'Anonim').strip()
+    comment_text = data.get('comment', '').strip()
+
+    if not word_id or not comment_text:
+        return jsonify({'success': False, 'error': 'Eksik parametreler.'}), 400
+
+    if len(comment_text) > 200:
+        return jsonify({'success': False, 'error': 'Yorum 200 karakterden uzun olamaz.'}), 400
+
+    # Kelimenin varlığını kontrol et
+    word_exists = db.session.get(Word, word_id)
+    if not word_exists:
+         return jsonify({'success': False, 'error': 'Geçersiz sözcük ID.'}), 404
+
+    # HTML kaçış (sanitasyon)
+    clean_author = html.escape(author)[:50]
+    clean_comment = html.escape(comment_text)
+    
+    try:
+        new_comment = Comment(
+            word_id=word_id,
+            author=clean_author,
+            comment=clean_comment
+        )
+        db.session.add(new_comment)
+        db.session.commit()
+        
+        print(f"COMMENT ADDED: Word ID {word_id} by {clean_author}")
+        
+        # BAŞARILI KAYITTAN SONRA ZAMAN DAMGASINI GÜNCELLE
+        user_last_comment_time[ip] = current_time 
+
+        return jsonify({
+            'success': True,
+            'comment': new_comment.to_dict() # Yeni eklenen yorumu geri gönder
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Yorum ekleme hatası: {e}")
+        return jsonify({'success': False, 'error': 'Yorum kaydedilirken sunucu hatası oluştu.'}), 500
+
+# Yorumları çekme endpoint'i (sıralama ASC)
+@app.route('/api/comments/<int:word_id>', methods=['GET'])
+def get_comments(word_id):
+    comments = Comment.query.filter_by(word_id=word_id).order_by(Comment.timestamp.asc()).all()
+    
+    comments_list = [comment.to_dict() for comment in comments]
+    
+    return jsonify({'success': True, 'comments': comments_list})
 
 
 if __name__ == '__main__':

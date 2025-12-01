@@ -45,7 +45,7 @@
         header {
             text-align: center;
             margin-bottom: 40px;
-            margin-top: 20px;
+            margin-top: 50px;
             overflow: hidden;
         }
 
@@ -117,7 +117,7 @@
         .word-card:hover {
             transform: translateY(-5px);
             box-shadow: var(--shadow-hover);
-            border-left-width: 8px;
+            border-left-width: 8px; 
         }
 
         .word-title {
@@ -227,15 +227,16 @@
             .form-card button {
                 width: 100%;
             }
-            h1 { font-size: 3.5rem; }
+            h1 { font-size: 3.5rem; margin-top: 0; } 
             body { padding: 10px; font-size: 16px; }
             .form-card { padding: 20px; }
             .word-card { padding: 20px; }
-            .mode-toggle {
-                top: 10px;
-                left: 10px;
-                padding: 8px 12px;
-                font-size: 0.9rem;
+            
+            /* DÜZELTME: Mobil görünümde başlık ve düğme çakışmasını engelleme */
+            header {
+                padding-top: 80px; 
+                margin-top: 0;
+                margin-bottom: 30px;
             }
         }
 
@@ -300,6 +301,14 @@
             background: var(--accent);
             color: var(--card-bg);
         }
+
+        @media (max-width: 768px) {
+            .mode-toggle {
+                position: absolute; 
+                top: 20px;
+                left: 10px; 
+            }
+        }
         
         /* --- LIKE BUTTON STYLES --- */
         .like-container {
@@ -329,7 +338,6 @@
         }
         
         .like-button:disabled {
-            /* DÜZELTME 2: İmleç stili değiştirildi */
             cursor: default; 
             pointer-events: none; 
             opacity: 0.8;
@@ -355,11 +363,114 @@
             text-align: left;
             transition: color 0.3s;
         }
+        
+        /* --- MORPHING YORUM KUTUSU STİLLERİ --- */
+
+        .full-comment-view {
+            position: absolute; 
+            z-index: 2000; 
+            background: var(--card-bg);
+            padding: 30px 25px; 
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-hover);
+            border-left: 5px solid var(--accent);
+            
+            transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); 
+            
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            opacity: 0; 
+        }
+        
+        .full-comment-view.ready {
+            opacity: 1;
+        }
+
+        /* Animasyon Bitiş Durumu (Tam Ekran) */
+        .full-comment-view.expanded {
+            position: fixed !important;
+            top: 50% !important; 
+            left: 50% !important; 
+            transform: translate(-50%, -50%); 
+            width: min(95vw, 600px) !important; 
+            height: 90vh !important; 
+        }
+
+        /* Yorum Alanı İçeriği */
+        .drawer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px dashed var(--text-muted);
+            padding-bottom: 10px;
+            flex-shrink: 0;
+        }
+        
+        /* İçeriği animasyon bitince gösterme */
+        .comment-section, .comments-list {
+            opacity: 0;
+            transition: opacity 0.3s ease 0.4s; 
+            flex-shrink: 0; 
+        }
+
+        .full-comment-view.expanded .comment-section,
+        .full-comment-view.expanded .comments-list {
+            opacity: 1;
+        }
+        
+        /* Backdrop Stilleri */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); 
+            z-index: 1050; 
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        .modal-backdrop.show {
+            display: block;
+            opacity: 1;
+        }
+        
+        /* Yorum Input Stilleri */
+        #commentAuthor {
+            width: 100%; 
+            padding: 8px 12px; 
+            margin-bottom: 10px;
+            background-color: var(--bg-color);
+            border: 1px solid var(--text-muted); 
+            font-size: 0.95rem;
+            box-sizing: border-box;
+            border-radius: 4px;
+            color: var(--text-main);
+        }
+        
+        .comment-section {
+            flex-direction: column; 
+            gap: 5px;
+        }
+
+        #commentInput { flex-grow: 1; resize: vertical; height: 70px; }
+        .comment-section button { width: 100%; }
+
+        .comments-list { flex-grow: 1; overflow-y: auto; padding-right: 10px; padding-top: 10px;}
+        .comment-item { background: var(--bg-color); padding: 15px; border-radius: 8px; margin-bottom: 10px; font-size: 0.95rem; }
+        .comment-item strong { font-weight: 700; color: var(--accent); margin-right: 8px; }
+
     </style>
 </head>
 <body>
 
     <div class="notification-container" id="notificationContainer"></div>
+
+    <div id="modalBackdrop" class="modal-backdrop" onclick="closeCommentView()"></div> 
 
     <button class="mode-toggle" id="darkModeToggle">Karanlık Mod</button>
     
@@ -402,6 +513,8 @@
     const THEME_KEY = 'userTheme'; 
     const LIKE_COOLDOWN_MS = 1000; 
     const buttonsCooldown = {}; 
+    let currentWordId = null; 
+    let activeCardClone = null;
 
     document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('mainTitle').classList.add('loaded');
@@ -474,7 +587,10 @@
         const button = document.createElement('button');
         button.className = item.is_liked ? 'like-button liked' : 'like-button';
         button.id = `like-btn-${wordId}`;
-        button.onclick = () => likeWord(wordId, button);
+        button.onclick = (e) => {
+            e.stopPropagation(); 
+            likeWord(wordId, button);
+        };
         
         button.innerHTML = `
             <svg class="like-icon" width="24" height="24" viewBox="0 0 24 24">
@@ -502,9 +618,11 @@
 
         button.disabled = true;
         buttonsCooldown[wordId] = now + LIKE_COOLDOWN_MS; 
+        
+        const endpoint = `/api/like/${wordId}`; 
 
         try {
-            const response = await fetch(`/api/like/${wordId}`, {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -536,6 +654,220 @@
         }
     }
 
+    // --- YORUM ANİMASYON MANTIKLARI ---
+    
+    function animateAndOpenCommentView(originalCard, wordId, wordText) {
+        if (activeCardClone) return; 
+            
+        const rect = originalCard.getBoundingClientRect();
+
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        const scrollLeft = window.scrollX || document.documentElement.scrollLeft;
+
+        // 1. Arka planı karart
+        const backdrop = document.getElementById('modalBackdrop');
+        backdrop.style.display = 'block';
+        setTimeout(() => backdrop.classList.add('show'), 10);
+        document.body.style.overflow = 'hidden';
+
+        // 2. Yorum kartının HTML içeriğini oluştur (dinamik olarak)
+        const commentHtml = `
+            <div class="drawer-header">
+                <h2 id="commentTitle">Yorumlar: ${wordText}</h2>
+                <button class="close-btn" onclick="closeCommentView()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="comment-section">
+                <input type="text" id="commentAuthor" maxlength="50" placeholder="Takma adınız (Opsiyonel)">
+                <textarea id="commentInput" rows="3" placeholder="Yorumunuz (Maks. 200 Harf)" maxlength="200"></textarea>
+                <button onclick="submitComment()">Yorum Ekle</button>
+            </div>
+            <div class="comments-list" id="commentsList">
+                </div>
+        `;
+
+        // 3. Klon kartı oluştur ve başlangıç pozisyonunu ayarla
+        activeCardClone = document.createElement('div');
+        activeCardClone.className = 'full-comment-view';
+        activeCardClone.innerHTML = commentHtml;
+
+        // Başlangıç pozisyonuna sayfa kaydırma miktarını EKLE (Sayfa Pozisyonu)
+        activeCardClone.style.top = `${rect.top + scrollTop}px`;
+        activeCardClone.style.left = `${rect.left + scrollLeft}px`;
+        activeCardClone.style.width = `${rect.width}px`;
+        activeCardClone.style.height = `${rect.height}px`;
+
+        document.body.appendChild(activeCardClone);
+        originalCard.style.opacity = '0'; // Orijinal kartı gizle
+        
+        // 4. Klonu hazır hale getir ve animasyonu başlat
+        activeCardClone.classList.add('ready');
+        currentWordId = wordId;
+        
+        // 5. Animasyonu tetikle
+        setTimeout(() => {
+            // Animasyon başlarken kutunun pozisyonunu FIXED olarak ayarla (Ekran Pozisyonu)
+            activeCardClone.style.position = 'fixed';
+            activeCardClone.style.top = `${rect.top}px`;
+            activeCardClone.style.left = `${rect.left}px`;
+            
+            activeCardClone.classList.add('expanded');
+            
+            loadComments(wordId); 
+        }, 50); 
+    }
+
+    function closeCommentView() {
+        if (!activeCardClone) return;
+
+        activeCardClone.classList.remove('expanded');
+        
+        const commentsArea = activeCardClone.querySelector('.comment-section');
+        const commentsList = activeCardClone.querySelector('.comments-list');
+        if (commentsArea) commentsArea.style.opacity = '0';
+        if (commentsList) commentsList.style.opacity = '0';
+
+        setTimeout(() => {
+            const originalCards = document.querySelectorAll('.word-card');
+            
+            const titleText = activeCardClone.querySelector('#commentTitle').textContent.replace('Yorumlar: ', '');
+
+            originalCards.forEach(card => {
+                const cardTitle = card.querySelector('.word-title span');
+                if (cardTitle && cardTitle.textContent === titleText) {
+                    card.style.opacity = '1';
+                }
+            });
+
+            activeCardClone.remove();
+            activeCardClone = null;
+
+            document.getElementById('modalBackdrop').classList.remove('show');
+            document.body.style.overflow = '';
+            setTimeout(() => document.getElementById('modalBackdrop').style.display = 'none', 500);
+
+        }, 500); 
+    }
+
+    async function loadComments(wordId) {
+        const commentsList = activeCardClone.querySelector('#commentsList');
+        commentsList.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: 20px;">Yorumlar yükleniyor...</div>`;
+
+        try {
+            const response = await fetch(`/api/comments/${wordId}`);
+            const data = await response.json();
+            
+            commentsList.innerHTML = ''; 
+
+            if (data.success && data.comments && data.comments.length > 0) {
+                data.comments.forEach(comment => {
+                    const item = document.createElement('div');
+                    item.className = 'comment-item';
+                    
+                    const date = new Date(comment.timestamp);
+                    const timeString = date.toLocaleDateString('tr-TR', { 
+                        year: 'numeric', month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit' 
+                    });
+                    
+                    item.innerHTML = `
+                        <strong>${comment.author || 'Anonim'}:</strong> ${comment.comment}
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top: 5px;">${timeString}</div>
+                    `;
+                    // Yorumlar API'den en eskiden en yeniye (ASC) geldiği için appendChild ile doğru sırayı koruyoruz.
+                    commentsList.appendChild(item); 
+                });
+            } else {
+                commentsList.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: 20px;">Henüz yorum yok. İlk siz yapın!</div>`;
+            }
+
+        } catch (error) {
+            commentsList.innerHTML = `<div style="text-align: center; color: var(--error-color); margin-top: 20px;">Yorumlar yüklenirken bir hata oluştu.</div>`;
+        }
+    }
+
+    function submitComment() {
+        if (!activeCardClone) return;
+
+        const input = activeCardClone.querySelector('#commentInput');
+        const authorInput = activeCardClone.querySelector('#commentAuthor');
+        const commentsList = activeCardClone.querySelector('#commentsList');
+        
+        const commentText = input.value.trim();
+        const author = authorInput.value.trim() || 'Anonim';
+        
+        if (commentText.length === 0) {
+            showCustomAlert("Lütfen bir yorum yazın.", "error");
+            return;
+        }
+        
+        if (commentText.length > 200) {
+            showCustomAlert("Yorum 200 karakterden uzun olamaz.", "error");
+            return;
+        }
+        
+        if (!currentWordId) {
+             showCustomAlert("Hata: Sözcük ID'si bulunamadı.", "error");
+             return;
+        }
+        
+        const submitButton = activeCardClone.querySelector('.comment-section button');
+        submitButton.disabled = true;
+
+        fetch('/api/comment/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ word_id: currentWordId, author: author, comment: commentText })
+        })
+        .then(response => {
+            if (response.status === 429) {
+                // Hız limiti hatası için JSON formatını okumadan mesajı göster
+                return response.json().then(data => { throw new Error(data.error); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                showCustomAlert("Yorum başarıyla eklendi!", "success");
+                input.value = '';
+                
+                const newCommentData = data.comment;
+                const date = new Date(newCommentData.timestamp);
+                const timeString = date.toLocaleDateString('tr-TR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                const newComment = document.createElement('div');
+                newComment.className = 'comment-item';
+                newComment.innerHTML = `
+                    <strong>${newCommentData.author || 'Anonim'}:</strong> ${newCommentData.comment}
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top: 5px;">${timeString}</div>
+                `;
+                
+                if (commentsList.firstElementChild && commentsList.firstElementChild.textContent.includes('Henüz yorum yok')) {
+                    commentsList.innerHTML = '';
+                }
+
+                // DÜZELTME: Yeni yorumu listenin EN ALTINA ekle
+                commentsList.appendChild(newComment); 
+                
+            } else {
+                showCustomAlert(data.error || "Yorum eklenirken hata oluştu.", "error");
+            }
+        })
+        .catch(error => {
+             // Hız limiti hatası mesajını yakalar ve gösterir
+            showCustomAlert(error.message || "Ağ hatası.", "error");
+        })
+        .finally(() => {
+            submitButton.disabled = false;
+        });
+    }
+
+    // --- TEMEL KODLAR ---
+
     function createWordCardElement(item) {
         const card = document.createElement('div');
         card.className = 'word-card fade-in'; 
@@ -545,7 +877,10 @@
             if (!str) return '';
             return parser.parseFromString(str, "text/html").documentElement.textContent;
         };
-
+        
+        card.style.cursor = 'pointer'; 
+        card.onclick = () => animateAndOpenCommentView(card, item.id, decode(item.word)); 
+        
         const titleDiv = document.createElement('div');
         titleDiv.className = 'word-title';
         
