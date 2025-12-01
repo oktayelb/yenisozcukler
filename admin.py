@@ -1,252 +1,234 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
-from flask_sqlalchemy import SQLAlchemy
-from flask import Flask 
-from datetime import datetime
-from sqlalchemy import or_ # Sadece tek bir satırda
+from flask import Flask, render_template, request, jsonify
+import time 
+import html
+import re
+# Düzeltme 1: utcnow() yerine UTC kullanıyoruz
+from datetime import datetime, UTC 
+from flask_sqlalchemy import SQLAlchemy 
+from sqlalchemy.exc import SQLAlchemyError 
+# İlişki tanımlamak için ihtiyacımız var
+from sqlalchemy.orm import relationship, backref 
 
-# --- VERİTABANI VE MODEL TANIMLARI ---
-# Flask uygulaması olmadan SQLAlchemy'yi kullanmak için gerekli boilerplate
 app = Flask(__name__)
-# SQLite dosyasının yolunu tanımla
+
+# --- VERİTABANI AYARLARI ---
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sozluk.db' 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app) 
 
-# Word Modelinin admin.py'de de aynı şekilde tanımlanması GEREKLİDİR.
+PORT = 5000
+
+# --- VERİTABANI MODELİ ---
 class Word(db.Model):
+    # Tablo Adı: Word
     id = db.Column(db.Integer, primary_key=True)
     word = db.Column(db.String(50), nullable=False)
     definition = db.Column(db.String(300), nullable=False)
     author = db.Column(db.String(20), default='Anonymous')
-    likes = db.Column(db.Integer, default=0)
+    # DÜZELTME 2: 'likes' sütunu kaldırıldı. Artık dinamik olarak sayılacak.
+    # likes = db.Column(db.Integer, default=0) 
+    
+    # Yeni İlişki Tanımı: UserLike tablosundaki ilgili kayıtları saymak için 'likes_count' özelliği eklenir.
+    # cascade="all, delete-orphan" ilişkili beğeniler silinirken kelimeyi de korur.
+    liked_by = relationship("UserLike", backref="word_rel", cascade="all, delete-orphan", lazy="dynamic")
+    
     # Status: 'pending' (beklemede) veya 'approved' (onaylanmış)
     status = db.Column(db.String(10), default='pending') 
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    # Düzeltme 1: utcnow() yerine UTC kullanıyoruz
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
 
-    def __repr__(self):
-        return f"<Word {self.id}: {self.word} | Status: {self.status}>"
+    def to_dict(self):
+        """Frontend'e gönderilmek üzere sözcüğü sözlük formatına dönüştürür."""
+        # DÜZELTME 3: likes, liked_by ilişkisinin sayısıyla (count) dinamik olarak hesaplanır.
+        return {
+            'id': self.id,
+            'word': self.word,
+            'def': self.definition,
+            'author': self.author,
+            'likes': self.liked_by.count(), # Dinamik sayım!
+            'timestamp': self.timestamp.isoformat()
+        }
+
+# YENİ MODEL: Kullanıcı beğenilerini kalıcı olarak saklamak için
+class UserLike(db.Model):
+    __tablename__ = 'user_like'
+    id = db.Column(db.Integer, primary_key=True)
+    ip_address = db.Column(db.String(45), nullable=False) 
+    word_id = db.Column(db.Integer, db.ForeignKey('word.id'), nullable=False)
+    # Düzeltme 1: utcnow() yerine UTC kullanıyoruz
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(UTC))
     
-# --- ANA YÖNETİM UYGULAMASI ---
-class AdminApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Sözlük Yönetim Paneli (SQLite DB)")
-        self.root.geometry("800x700") # Boyut artırıldı
+    __table_args__ = (db.UniqueConstraint('ip_address', 'word_id', name='_user_word_uc'),)
+
+
+# Hız sınırlama için kullanılır
+user_last_post_time = {}
+
+# Sadece harf, rakam, boşluk, nokta veya virgül
+ALPHANUM_WITH_SPACES = re.compile(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]*$')
+
+
+def create_tables():
+    """Uygulama bağlamı içinde veritabanı tablosunu oluşturur."""
+    db.create_all()
+
+def get_client_ip():
+    # Güvenlik için X-Forwarded-For başlığını kullanmak daha doğru olabilir, 
+    # ancak yerel çalışma ortamı için remote_addr yeterlidir.
+    return request.remote_addr
+
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+# --- YENİLENEN ENDPOINT: /api/words ---
+@app.route('/api/words', methods=['GET'])
+def get_words():
+    # En yeni onaylanmış sözcükleri (maksimum 50) al
+    approved_words_query = Word.query.filter_by(status='approved').order_by(Word.timestamp.desc())
+
+    client_count = request.args.get('count', type=int)
+    total_count = approved_words_query.count()
+
+    client_ip = get_client_ip()
+    
+    # Beğenilen ID'leri veritabanından çek
+    liked_ids_query = UserLike.query.filter_by(ip_address=client_ip).all()
+    liked_ids = {like.word_id for like in liked_ids_query}
+
+    if client_count is not None and client_count == total_count:
+        return jsonify({'status': 'updated', 'words': [], 'total_count': total_count})
+    
+    elif client_count is None or client_count < total_count:
         
-        # Flask Application Context'i manuel olarak oluştur
-        self.app_context = app.app_context()
-        self.app_context.push()
+        words_list = []
         
-        # Tüm veriyi depolamak için tek bir liste kullanacağız
-        self.all_words = [] 
-        self.load_words()
-
-        # GUI Setup
-        self.setup_ui()
-
-    def load_words(self):
-        # Tüm sözcükleri (pending ve approved) veritabanından çeker
-        self.all_words = Word.query.order_by(Word.timestamp.desc()).all()
+        if client_count is not None and client_count > 0:
+            new_word_count = total_count - client_count
+            new_words_query = approved_words_query.limit(new_word_count)
+            words_list = [word.to_dict() for word in new_words_query.all()]
+            status = 'updated'
         
-        # Her objeye geçici 'action' özniteliği ekle (approved olanlar için delete, pending olanlar için approve/reject)
-        for word in self.all_words:
-            word.action = 'none' 
-            word.ui_ref = None
-
-    def setup_ui(self):
-        # Notebook (Sekmeli Görünüm) oluşturulması
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(pady=10, padx=10, fill="both", expand=True)
-
-        # Sekme 1: Pending Submissions (Onay Bekleyenler)
-        self.pending_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.pending_frame, text='Onay Bekleyenler')
-        self.setup_pending_tab(self.pending_frame)
-
-        # Sekme 2: All Words (Tüm Sözcükler)
-        self.all_frame = ttk.Frame(self.notebook)
-        self.notebook.add(self.all_frame, text='Tüm Sözcükler')
-        self.setup_all_tab(self.all_frame)
-        
-        # Bottom Action Bar
-        action_bar = tk.Frame(self.root, bg="#bdc3c7", height=50)
-        action_bar.pack(fill="x", side="bottom")
-        
-        btn_save = tk.Button(action_bar, text="Değişiklikleri Uygula ve Çık", bg="#27ae60", fg="white", 
-                             font=("Segoe UI", 10, "bold"), padx=20, pady=10,
-                             command=self.on_close)
-        btn_save.pack(pady=10, padx=10, side='right')
-        
-        btn_refresh = tk.Button(action_bar, text="Yenile", bg="#3498db", fg="white", 
-                             font=("Segoe UI", 10, "bold"), padx=20, pady=10,
-                             command=self.refresh_ui)
-        btn_refresh.pack(pady=10, padx=10, side='left')
-
-        self.refresh_ui_title()
-        
-    def refresh_ui_title(self):
-        pending_count = sum(1 for w in self.all_words if w.status == 'pending')
-        all_count = sum(1 for w in self.all_words if w.status == 'approved')
-        self.notebook.tab(0, text=f'Onay Bekleyenler ({pending_count})')
-        self.notebook.tab(1, text=f'Tüm Sözcükler ({all_count})')
-
-
-    def setup_pending_tab(self, parent):
-        # Scrollable Area for pending items
-        self.pending_canvas = tk.Canvas(parent, bg="#ecf0f1")
-        self.pending_scrollbar = ttk.Scrollbar(parent, orient="vertical", command=self.pending_canvas.yview)
-        self.pending_scrollable_frame = tk.Frame(self.pending_canvas, bg="#ecf0f1")
-
-        self.pending_scrollable_frame.bind("<Configure>", lambda e: self.pending_canvas.configure(scrollregion=self.pending_canvas.bbox("all")))
-        self.pending_canvas.create_window((0, 0), window=self.pending_scrollable_frame, anchor="nw")
-        self.pending_canvas.configure(yscrollcommand=self.pending_scrollbar.set)
-
-        self.pending_canvas.pack(side="left", fill="both", expand=True, padx=10, pady=10)
-        self.pending_scrollbar.pack(side="right", fill="y")
-        self.populate_list(self.pending_scrollable_frame, 'pending')
-
-    def setup_all_tab(self, parent):
-        # Scrollable Area for all items
-        self.all_canvas = tk.Canvas(parent, bg="#f4f6f8")
-        self.all_scrollbar = ttk.Scrollbar(parent, orient="vertical", command=self.all_canvas.yview)
-        self.all_scrollable_frame = tk.Frame(self.all_canvas, bg="#f4f6f8")
-
-        self.all_scrollable_frame.bind("<Configure>", lambda e: self.all_canvas.configure(scrollregion=self.all_canvas.bbox("all")))
-        self.all_canvas.create_window((0, 0), window=self.all_scrollable_frame, anchor="nw")
-        self.all_canvas.configure(yscrollcommand=self.all_scrollbar.set)
-
-        self.all_canvas.pack(side="left", fill="both", expand=True, padx=10, pady=10)
-        self.all_scrollbar.pack(side="right", fill="y")
-        self.populate_list(self.all_scrollable_frame, 'approved')
-
-
-    def clear_frame(self, frame):
-        for widget in frame.winfo_children():
-            widget.destroy()
-
-    def populate_list(self, scrollable_frame, list_type):
-        self.clear_frame(scrollable_frame)
-        
-        items_to_show = [w for w in self.all_words if (list_type == 'pending' and w.status == 'pending') or (list_type == 'approved' and w.status == 'approved')]
-        
-        if not items_to_show:
-            lbl = tk.Label(scrollable_frame, text=f"Bu alanda bekleyen sözcük yok.", bg="#ecf0f1" if list_type == 'pending' else "#f4f6f8", fg="#7f8c8d")
-            lbl.pack(pady=20)
-            return
-
-        for submission in items_to_show:
-            # Card Frame
-            card = tk.Frame(scrollable_frame, bg="white", bd=1, relief="solid")
-            card.pack(fill="x", pady=5, padx=5, ipady=5)
-            
-            # Text Info
-            info_frame = tk.Frame(card, bg="white")
-            info_frame.pack(side="left", fill="both", expand=True, padx=10)
-            
-            # Word Title
-            tk.Label(info_frame, text=f"ID: {submission.id} | {submission.word}", font=("Segoe UI", 12, "bold"), bg="white", anchor="w").pack(fill="x")
-            # Definition
-            tk.Label(info_frame, text=submission.definition, font=("Segoe UI", 10), fg="#555", bg="white", wraplength=450, justify="left", anchor="w").pack(fill="x")
-            # Author & Time
-            tk.Label(info_frame, text=f"Ekleyen: {submission.author} - {submission.timestamp.strftime('%Y-%m-%d %H:%M')} | Beğeni: {submission.likes}", font=("Segoe UI", 9, "italic"), fg="#999", bg="white", anchor="w").pack(fill="x")
-
-            # Buttons
-            btn_frame = tk.Frame(card, bg="white")
-            btn_frame.pack(side="right", padx=10)
-
-            if list_type == 'pending':
-                # Onay Bekleyenler için: Onayla ve Reddet
-                btn_yes = tk.Button(btn_frame, text="✔ Onayla", bg="#d4edda", fg="#155724", width=8,
-                                    command=lambda s=submission, c=card: self.mark_action(s, 'approve', c))
-                btn_yes.pack(side="left", padx=2)
-
-                btn_no = tk.Button(btn_frame, text="✖ Reddet", bg="#f8d7da", fg="#721c24", width=8,
-                                    command=lambda s=submission, c=card: self.mark_action(s, 'reject', c))
-                btn_no.pack(side="left", padx=2)
-            
-            elif list_type == 'approved':
-                # Tüm Sözcükler için: Sil
-                btn_delete = tk.Button(btn_frame, text="🗑 Sil", bg="#f8d7da", fg="#721c24", width=8,
-                                    command=lambda s=submission, c=card: self.mark_action(s, 'delete', c))
-                btn_delete.pack(side="left", padx=2)
-
-
-            submission.ui_ref = card
-
-    def mark_action(self, submission, action, card_widget):
-        # Update Logic
-        submission.action = action
-        
-        # Update Visuals
-        new_bg = ""
-        if action == 'approve':
-            new_bg = "#d4edda" # Light Green
-        elif action == 'reject' or action == 'delete':
-            new_bg = "#f8d7da" # Light Red
-        elif action == 'none':
-            new_bg = "white"
-
-        # Görünümü güncelle
-        card_widget.configure(bg=new_bg)
-        for child in card_widget.winfo_children(): 
-            child.configure(bg=new_bg)
-            for sub_child in child.winfo_children():
-                if 'button' not in sub_child.winfo_class().lower():
-                     sub_child.configure(bg=new_bg)
-
-    def refresh_ui(self):
-        # UI'ı tamamen yeniden yüklemeden önce sadece veriyi yeniden çek
-        self.load_words()
-        # Eski çerçeveleri temizle ve yeniden doldur
-        self.setup_pending_tab(self.pending_frame)
-        self.setup_all_tab(self.all_frame)
-        self.refresh_ui_title()
-        messagebox.showinfo("Yenileme", "Veriler veritabanından başarıyla yenilendi.")
-
-    def on_close(self):
-        # Değişiklikleri bul
-        changes = [w for w in self.all_words if w.action != 'none']
-        
-        if not changes:
-            self.app_context.pop() 
-            self.root.destroy()
-            return
-
-        if messagebox.askyesno("Değişiklikleri Kaydet", f"Veritabanına {len(changes)} değişiklik uygulanacak. Devam etmek istiyor musunuz?"):
-            self.apply_changes(changes)
-            self.app_context.pop() 
-            self.root.destroy()
         else:
-            messagebox.showinfo("İşlem İptal Edildi", "Değişiklikler uygulanmadı. Paneli tekrar açtığınızda tüm bekleyen sözcükleri görebilirsiniz.")
-
-    def apply_changes(self, changes):
-        try:
-            for word in changes:
-                if word.action == 'approve':
-                    # Onaylama: status'ü approved yap
-                    word.status = 'approved' 
-                    db.session.add(word) 
-                elif word.action == 'reject' or word.action == 'delete':
-                    # Reddetme veya Silme: kaydı DB'den sil
-                    db.session.delete(word) 
-            
-            db.session.commit() 
-            messagebox.showinfo("Başarılı", f"Toplam {len(changes)} sözcük işlemi başarıyla uygulandı.")
-
-        except Exception as e:
-            db.session.rollback() 
-            messagebox.showerror("Hata", f"Değişiklikler uygulanırken bir veritabanı hatası oluştu: {e}")
-            
-if __name__ == "__main__":
-    # Uygulama çalışmadan önce DB'nin ve tablonun var olduğundan emin olunur.
-    with app.app_context():
-        db.create_all()
+            words_list = [word.to_dict() for word in approved_words_query.limit(50).all()]
+            status = 'full'
         
-    root = tk.Tk()
-    app = AdminApp(root)
+        # Her kelimenin beğenilip beğenilmediği bilgisini ekle
+        for word_data in words_list:
+            word_data['is_liked'] = word_data['id'] in liked_ids
+
+        return jsonify({'status': status, 'words': words_list, 'total_count': total_count})
     
-    # Handle the "X" button on the window
-    root.protocol("WM_DELETE_WINDOW", app.on_close)
+    else:
+        words_list = [word.to_dict() for word in approved_words_query.limit(50).all()]
+        for word_data in words_list:
+            word_data['is_liked'] = word_data['id'] in liked_ids
+            
+        return jsonify({'status': 'full', 'words': words_list, 'total_count': total_count})
+
+
+# --- YENİ ENDPOINT: Oylama Sistemi için ---
+@app.route('/api/like/<int:word_id>', methods=['POST'])
+def toggle_like(word_id):
+    client_ip = get_client_ip()
     
-    root.mainloop()
+    # DÜZELTME 4: Word.query.get() yerine db.session.get() kullanıldı.
+    word_to_update = db.session.get(Word, word_id)
+    if not word_to_update or word_to_update.status != 'approved':
+        return jsonify({'success': False, 'error': 'Geçersiz sözcük.'}), 404
+        
+    try:
+        existing_like = UserLike.query.filter_by(ip_address=client_ip, word_id=word_id).first()
+        
+        if existing_like:
+            # Beğeni Geri Çekme (Unlike)
+            # DÜZELTME 5: Word.likes artık dinamik olduğu için elle azaltmaya gerek yok, 
+            # sadece UserLike kaydını silmek yeterli.
+            db.session.delete(existing_like) 
+            action = 'unliked'
+        else:
+            # Beğenme (Like)
+            # DÜZELTME 5: Word.likes artık dinamik olduğu için elle artırmaya gerek yok, 
+            # sadece UserLike kaydını eklemek yeterli.
+            new_like = UserLike(ip_address=client_ip, word_id=word_id) # timestamp zaten otomatik
+            db.session.add(new_like) 
+            action = 'liked'
+            
+        db.session.commit()
+        
+        # DÜZELTME 6: Beğeni sayısı Commit sonrası dinamic olarak yeniden hesaplanır.
+        return jsonify({
+            'success': True, 
+            'action': action,
+            'new_likes': word_to_update.liked_by.count(), # Dinamik sayıyı döndür
+            'word_id': word_id
+        })
+        
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        print(f"Veritabanı beğeni hatası: {e}")
+        return jsonify({'success': False, 'error': 'Sunucu hatası.'}), 500
+
+
+# --- YENİLENEN ENDPOINT: /api/add ---
+@app.route('/api/add', methods=['POST'])
+def add_word():
+    ip = get_client_ip()
+    current_time = time.time()
+    
+    if ip in user_last_post_time and (current_time - user_last_post_time.get(ip, 0) < 30):
+        return jsonify({'success': False, 'error': 'Çok hızlı gönderiyorsunuz. Lütfen 30 saniye bekleyin.'}), 429
+    
+    data = request.get_json()
+    word = data.get('word', '').strip()
+    definition = data.get('definition', '').strip()
+    nickname = data.get('nickname', '').strip()
+
+    # Doğrulama (Validation)
+    if not word or not ALPHANUM_WITH_SPACES.match(word):
+        return jsonify({'success': False, 'error': 'Sözcük alanı geçersiz.'}), 400
+
+    if nickname and not ALPHANUM_WITH_SPACES.match(nickname):
+        return jsonify({'success': False, 'error': 'Takma ad geçersiz.'}), 400
+
+    if not definition or not ALPHANUM_WITH_SPACES.match(definition):
+        return jsonify({'success': False, 'error': 'Tanım geçersiz.'}), 400
+
+    if not nickname:
+        nickname = 'Anonymous'
+
+    if len(word) > 50 or len(definition) > 300 or len(nickname) > 20:
+        return jsonify({'success': False, 'error': 'Metin çok uzun.'}), 400
+
+    clean_word = html.escape(word)
+    clean_def = html.escape(definition)
+    clean_nick = html.escape(nickname)
+
+    try:
+        new_word_submission = Word(
+            word=clean_word,
+            definition=clean_def,
+            author=clean_nick,
+            status='pending', 
+            # Düzeltme 1: timestamp otomatik olarak UTC'ye ayarlanır
+        )
+        
+        db.session.add(new_word_submission)
+        db.session.commit() 
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Veritabanı hatası: {e}")
+        return jsonify({'success': False, 'error': 'Sözcük kaydedilirken sunucu hatası oluştu.'}), 500
+
+    user_last_post_time[ip] = time.time()
+
+    return jsonify({'success': True})
+
+
+if __name__ == '__main__':
+    with app.app_context():
+        create_tables() 
+    app.run(debug=True, port=PORT)

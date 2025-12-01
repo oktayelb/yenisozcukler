@@ -18,10 +18,9 @@
             --radius: 12px;
             --success-color: #4CAF50;
             --error-color: #f44336;
-            --like-color-active: #E53935; /* Kırmızımsı bir renk */
+            --like-color-active: #E53935; 
         }
 
-        /* --- DARK MODE COLOR DEFINITIONS --- */
         body.dark-mode {
             --bg-color: #2c2c34;
             --card-bg: #3c3c45;
@@ -32,7 +31,6 @@
             --shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.6);
             --like-color-active: #FF7043; 
         }
-        /* --- DARK MODE COLOR DEFINITIONS END --- */
 
         body {
             font-family: 'Merriweather', serif;
@@ -302,7 +300,6 @@
             background: var(--accent);
             color: var(--card-bg);
         }
-        /* --- DARK MODE TOGGLE STYLE END --- */
         
         /* --- LIKE BUTTON STYLES --- */
         .like-container {
@@ -320,7 +317,6 @@
             display: flex;
             align-items: center;
             transition: transform 0.1s ease-out;
-            /* Yalnızca form butonları için tanımlanan yükseklik değerini burada geçersiz kıl */
             height: auto !important; 
         }
         
@@ -333,7 +329,10 @@
         }
         
         .like-button:disabled {
-            cursor: wait;
+            /* DÜZELTME 2: İmleç stili değiştirildi */
+            cursor: default; 
+            pointer-events: none; 
+            opacity: 0.8;
         }
 
         .like-icon {
@@ -356,15 +355,12 @@
             text-align: left;
             transition: color 0.3s;
         }
-        /* --- LIKE BUTTON STYLES END --- */
-
     </style>
 </head>
 <body>
 
     <div class="notification-container" id="notificationContainer"></div>
 
-    <!-- DARK MODE TOGGLE BUTTON -->
     <button class="mode-toggle" id="darkModeToggle">Karanlık Mod</button>
     
     <header>
@@ -403,11 +399,9 @@
     </div>
 
 <script>
-    const CACHE_KEY = 'wordCache';
     const THEME_KEY = 'userTheme'; 
-    // Cooldown matches the 1-second server-side limit
     const LIKE_COOLDOWN_MS = 1000; 
-    const buttonsCooldown = {}; // { word_id: cooldown_timestamp }
+    const buttonsCooldown = {}; 
 
     document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('mainTitle').classList.add('loaded');
@@ -472,19 +466,16 @@
         }
     }
     
-    // --- NEW FUNCTION: Create Like Button ---
     function createLikeButton(item) {
         const wordId = item.id;
         const container = document.createElement('div');
         container.className = 'like-container';
         
         const button = document.createElement('button');
-        // 'is_liked' property is now coming from the backend
         button.className = item.is_liked ? 'like-button liked' : 'like-button';
         button.id = `like-btn-${wordId}`;
         button.onclick = () => likeWord(wordId, button);
         
-        // Heart Icon (SVG)
         button.innerHTML = `
             <svg class="like-icon" width="24" height="24" viewBox="0 0 24 24">
                 <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
@@ -501,19 +492,15 @@
         return container;
     }
     
-    // --- NEW FUNCTION: Like Action ---
     async function likeWord(wordId, button) {
-        // Frontend spam prevention check
         const now = Date.now();
         const lastClick = buttonsCooldown[wordId] || 0;
 
         if (now < lastClick) {
-            // Already in cooldown
             return;
         }
 
         button.disabled = true;
-        // Set cooldown timestamp
         buttonsCooldown[wordId] = now + LIKE_COOLDOWN_MS; 
 
         try {
@@ -543,7 +530,6 @@
         } catch (error) {
             showCustomAlert("Ağ hatası.", "error");
         } finally {
-            // Re-enable button after cooldown ends
             setTimeout(() => {
                  button.disabled = false;
             }, LIKE_COOLDOWN_MS);
@@ -567,7 +553,6 @@
         wordText.textContent = decode(item.word);
         titleDiv.appendChild(wordText);
         
-        // Add Like Button and Counter
         titleDiv.appendChild(createLikeButton(item));
 
         const defDiv = document.createElement('div');
@@ -630,84 +615,28 @@
         });
     }
 
-    function loadCache() {
-        try {
-            const cachedString = localStorage.getItem(CACHE_KEY);
-            if (cachedString) {
-                return JSON.parse(cachedString);
-            }
-        } catch (e) {
-            console.error("Local storage'dan veri yüklenirken hata:", e);
-        }
-        return null;
-    }
-
-    function saveCache(words, totalCount) {
-        try {
-            const data = {
-                words: words,
-                count: totalCount,
-                timestamp: Date.now()
-            };
-            localStorage.setItem(CACHE_KEY, JSON.stringify(data));
-        } catch (e) {
-            console.error("Local storage'a veri kaydedilirken hata:", e);
-        }
-    }
-
-
-    async function fetchWords(forceReload = false) {
+    async function fetchWords() {
         const list = document.getElementById('feedList');
-        let words = [];
-        let cachedData = loadCache();
-        let clientCount = 0;
-        let url = '/api/words';
-
-        if (cachedData && !forceReload) {
-            words = cachedData.words || [];
-            clientCount = cachedData.count || 0;
-            list.innerHTML = '';
-            appendCardsToDOM(words, list, false);
-            url = `/api/words?count=${clientCount}`;
-        } else {
-            list.innerHTML = `<div style="text-align:center; color:#999; margin-top:50px;" id="loadingMessage">Sözcükler yükleniyor...</div>`;
-            url = '/api/words'; 
-        }
+        
+        list.innerHTML = `<div style="text-align:center; color:#999; margin-top:50px;" id="loadingMessage">Sözcükler yükleniyor...</div>`;
+        
+        const url = '/api/words?full=true';
         
         try {
             const response = await fetch(url);
             const data = await response.json();
+            
+            list.innerHTML = '';
 
-            if (data.status === 'updated') {
-                if (data.words && data.words.length > 0) {
-                    appendCardsToDOM(data.words, list, true);
-                    const newWords = [...data.words, ...words];
-                    saveCache(newWords, data.total_count);
-                } else if (!cachedData || forceReload) {
-                    list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz onaylanmış sözcük yok. İlk siz ekleyin!</div>';
-                    saveCache([], data.total_count || 0);
-                } else {
-                    saveCache(words, data.total_count);
-                }
-            }
-            else if (data.status === 'full') {
-                if (data.words && data.words.length > 0) {
-                    list.innerHTML = '';
-                    appendCardsToDOM(data.words, list, false);
-                    saveCache(data.words, data.total_count);
-                } else {
-                    list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz onaylanmış sözcük yok. İlk siz ekleyin!</div>';
-                    saveCache([], 0);
-                }
+            if (data.words && data.words.length > 0) {
+                appendCardsToDOM(data.words, list, false);
+            } else {
+                list.innerHTML = '<div style="text-align:center; color:#ccc;">Henüz onaylanmış sözcük yok. İlk siz ekleyin!</div>';
             }
 
         } catch (e) {
             console.error("Error fetching words", e);
-             if (!cachedData) {
-                 list.innerHTML = '<div style="text-align:center; color:#f44336; margin-top:50px;">Sözcükler yüklenemedi. Ağ bağlantınızı kontrol edin.</div>';
-             } else {
-                 showCustomAlert("Sözlük güncellenemedi. Önbelleklenmiş veri gösteriliyor.", "error");
-             }
+            list.innerHTML = '<div style="text-align:center; color:#f44336; margin-top:50px;">Sözcükler yüklenemedi. Ağ bağlantınızı kontrol edin.</div>';
         }
     }
 
@@ -785,8 +714,7 @@
                 updateCount(document.getElementById('inputDef'));
                 showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
                 
-                // Fetch all approved words again to refresh the view (but approved list shouldn't change)
-                fetchWords(true);
+                fetchWords();
                 
             } else {
                 const data = await response.json();
