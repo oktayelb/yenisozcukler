@@ -9,7 +9,8 @@ SECRET_KEY = 'django-insecure-replace-this-with-a-random-string'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["matter-provided.gl.at.ply.gg",
+                 "147.185.221.224"]
 
 # Application definition
 INSTALLED_APPS = [
@@ -23,7 +24,14 @@ INSTALLED_APPS = [
     'rest_framework', 
     'core',
 ]
+# settings.py
 
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
