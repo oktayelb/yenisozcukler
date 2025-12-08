@@ -10,7 +10,8 @@ SECRET_KEY = 'django-insecure-replace-this-with-a-random-string'
 DEBUG = True
 
 ALLOWED_HOSTS = ["matter-provided.gl.at.ply.gg",
-                 "147.185.221.224"]
+                 "147.185.221.224",
+                 "localhost",]
 
 # Application definition
 INSTALLED_APPS = [
