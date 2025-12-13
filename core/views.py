@@ -7,6 +7,18 @@ from .models import Word, UserLike, Comment
 from .serializers import WordSerializer, CommentSerializer
 
 def get_client_ip(request):
+    # 1. Adım: Cloudflare'den gelen özel başlığa bak (En Güvenlisi)
+    cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
+    
+    if cf_ip:
+        return cf_ip
+
+    # 2. Adım: Eğer Cloudflare başlığı yoksa (örn: kendi bilgisayarında çalışıyorsan)
+    # Standart IP alma yöntemine dön.
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0]
+        
     return request.META.get('REMOTE_ADDR')
 
 @api_view(['GET'])

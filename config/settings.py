@@ -7,10 +7,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-replace-this-with-a-random-string'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ["matter-provided.gl.at.ply.gg",
-                 "147.185.221.224",
+ALLOWED_HOSTS = ["yenisozcukler.com",
                  "localhost",]
 
 # Application definition
@@ -21,11 +20,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # --- ADD THESE TWO LINES ---
     'rest_framework', 
     'core',
 ]
-# settings.py
+
 
 CACHES = {
     'default': {
@@ -37,6 +35,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'core.middleware.CloudflareSecurityMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
