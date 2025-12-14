@@ -15,7 +15,7 @@ class WordSerializer(serializers.ModelSerializer):
     class Meta:
         model = Word
         
-        fields = ['id', 'word', 'author', 'likes', 'timestamp', 'is_liked']
+        fields = ['id', 'word', 'author', 'likes', 'timestamp', 'is_liked','is_profane']
 
     def get_is_liked(self, obj):
 

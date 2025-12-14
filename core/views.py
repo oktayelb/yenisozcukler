@@ -75,8 +75,14 @@ def add_word(request):
     word_text = data.get('word', '').strip()
     definition = data.get('definition', '').strip()
     nickname = data.get('nickname', '').strip()
-
-    Word.objects.create(word=word_text, definition=definition, author=nickname, status='pending')
+    is_profane = data.get('is_profane', False)
+    Word.objects.create(
+        word=word_text, 
+        definition=definition, 
+        author=nickname, 
+        status='pending',
+        is_profane=is_profane
+        )
     return Response({'success': True})
 
 @ratelimit(key='ip', rate='1/15s', method='POST', block=False)

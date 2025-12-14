@@ -5,7 +5,7 @@ class Word(models.Model):
         ('pending', 'Pending'),
         ('approved', 'Approved'),
     ]
-
+    is_profane = models.BooleanField(default=False)
     word = models.CharField(max_length=50)
     definition = models.CharField(max_length=300)
     author = models.CharField(max_length=20, default='Anonymous')
