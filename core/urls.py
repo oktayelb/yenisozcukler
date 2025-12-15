@@ -11,3 +11,6 @@ urlpatterns = [
     path('api/comment', views.add_comment, name='add_comment'),
     path('api/comments/<int:word_id>', views.get_comments, name='get_comments'),
 ]
+
+
+##git commit test

@@ -182,7 +182,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: var(--card-bg); /* Kart rengiyle aynı kaplama */
+            background-color: var(--card-bg);
             z-index: 10;
             display: flex;
             flex-direction: column;
@@ -191,10 +191,9 @@
             border-radius: var(--radius);
             cursor: pointer;
             transition: opacity 0.3s ease;
-            border: 1px dashed var(--card-bg); /* Dikkat çekmesi için çerçeve */
+            border: 1px dashed var(--card-bg);
         }
 
-        /* Sansürlü kartın altındaki gerçek içerik bulanıklaşsın */
         .word-card.is-profane-content .word-title,
         .word-card.is-profane-content .word-def,
         .word-card.is-profane-content .word-author {
@@ -555,6 +554,62 @@
             }
             .drawer-header h2 { font-size: 1.2rem; }
         }
+
+        /* --- ABOUT MODAL STYLES --- */
+        .about-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); 
+            backdrop-filter: blur(5px);
+            z-index: 3000; /* Higher than everything else */
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; 
+            transition: opacity 0.3s ease;
+        }
+
+        .about-overlay.show { opacity: 1; pointer-events: auto; }
+
+        .about-box {
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            width: 90%; 
+            max-width: 700px; 
+            padding: 40px; 
+            border-radius: var(--radius);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.4);
+            border-top: 6px solid var(--accent);
+            transform: translateY(20px) scale(0.98); 
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            max-height: 85vh; 
+            overflow-y: auto;
+        }
+
+        .about-overlay.show .about-box { transform: translateY(0) scale(1); }
+
+        .about-heading {
+            font-family: 'Caveat', cursive;
+            font-size: 3rem;
+            margin-top: 0;
+            margin-bottom: 25px;
+            color: var(--accent);
+            text-align: center;
+            transform: rotate(-2deg);
+        }
+
+        .about-section-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            color: var(--text-main);
+            border-bottom: 2px dashed rgba(142, 127, 127, 0.2);
+            padding-bottom: 5px;
+        }
+
+        .about-text {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: var(--text-muted);
+        }
     </style>
 </head>
 <body>
@@ -610,6 +665,39 @@
             <div style="text-align:center; color:#999; margin-top:50px;" id="loadingMessage">Sözcükler yükleniyor...</div>
         </div>
     </div>
+
+    <div id="aboutModal" class="about-overlay" onclick="closeAboutInfo(event)">
+        <div class="about-box">
+            <div class="drawer-header" style="border:none; padding:0; margin-bottom:10px;">
+                <div style="flex-grow:1;"></div>
+                <button class="close-btn" onclick="closeAboutInfo(event, true)">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <h2 class="about-heading">Bu Site Nedir?</h2>
+            
+            <div class="about-text">
+                <div class="about-section-title">Misyonumuz</div>
+                <p>
+                    Amacımız, dilimizin zenginliklerini korumak ve modern ya da eski alıntı sözcükler yerine
+                    yeni türetilen Türkçe sözcükleri modern bir platformda toplamaktır.
+                </p>
+
+                <div class="about-section-title">Vizyonumuz</div>
+                <p>
+                    Gelecek nesillere, yaşayan ve sürekli gelişen bir Türkçe sözlük mirası bırakmayı hedefliyoruz.
+                    Kullanıcı katkılarıyla büyüyen, yaşayan bir dil ekosistemi oluşturuyoruz.
+                </p>
+
+                <div class="about-section-title">Nasıl Çalışır?</div>
+                <p>
+                    Sözcüklerinizi "Katkıda Bulun" formunu kullanarak ekleyebilirsiniz. 
+                </p>
+            </div>
+        </div>
+    </div>
+
 <script>
 const THEME_KEY = 'userTheme'; 
 const LIKE_COOLDOWN_MS = 1000; 
@@ -650,7 +738,17 @@ function toggleDarkMode() {
 }
 
 function showAboutInfo() {
-    showCustomAlert("Bu proje, unutulmuş veya yeni türetilmiş Türkçe sözcükleri bir araya getirmek için tasarlanmıştır.", "success");
+    const modal = document.getElementById('aboutModal');
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden'; 
+}
+
+function closeAboutInfo(event, forceClose = false) {
+    const modal = document.getElementById('aboutModal');
+    if (forceClose || event.target === modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = ''; 
+    }
 }
 
 function updateCount(field) {
@@ -732,7 +830,6 @@ async function likeWord(wordId, button) {
 function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef) { 
     if (activeCardClone) return; 
     
-    // Eğer kartın üzerinde hala "kılıf" (profane-wrapper) varsa açılmasın
     if (originalCard.querySelector('.profane-wrapper')) {
         return;
     }
@@ -897,11 +994,9 @@ function createWordCardElement(item) {
     const parser = new DOMParser();
     const decode = (str) => { if (!str) return ''; return parser.parseFromString(str, "text/html").documentElement.textContent; };
     
-    // --- YENİ EKLENEN KISIM: Profane (Sansür) Mantığı ---
     if (item.is_profane) {
-        card.classList.add('is-profane-content'); // İçeriği bulanıklaştıracak sınıf
+        card.classList.add('is-profane-content'); 
 
-        // Kılıf (Overlay) Elementi
         const profaneOverlay = document.createElement('div');
         profaneOverlay.className = 'profane-wrapper';
         profaneOverlay.innerHTML = `
@@ -909,9 +1004,8 @@ function createWordCardElement(item) {
             <div class="profane-warning">Görmek için tıkla</div>
         `;
         
-        // Kılıfa basınca açılma mantığı
         profaneOverlay.onclick = (e) => {
-            e.stopPropagation(); // Kartın ana tıklamasını (yorum penceresini) engelle
+            e.stopPropagation(); 
             profaneOverlay.style.opacity = '0';
             setTimeout(() => {
                 profaneOverlay.remove();
@@ -920,7 +1014,6 @@ function createWordCardElement(item) {
         };
         card.appendChild(profaneOverlay);
     }
-    // --- BİTİŞ ---
     
     card.style.cursor = 'pointer'; 
     card.onclick = () => animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def));    
@@ -1007,14 +1100,12 @@ async function submitWord() {
     const wordInput = document.getElementById('inputWord');
     const defInput = document.getElementById('inputDef');
     const nickInput = document.getElementById('inputNick');
-    // YENİ: Checkbox seçimi
     const profaneInput = document.getElementById('inputProfane');
     const btn = document.querySelector(".form-card button");
 
     const word = wordInput.value.trim();
     const definition = defInput.value.trim();
     const nickname = nickInput.value.trim();
-    // YENİ: Checkbox durumu
     const isProfane = profaneInput.checked;
 
     const alphaWithSpaces = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]*$/;
@@ -1031,13 +1122,12 @@ async function submitWord() {
         const response = await fetch('/api/add', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            // YENİ: is_profane gönderimi
             body: JSON.stringify({ word, definition, nickname, is_profane: isProfane })
         });
 
         if (response.ok) {
             wordInput.value = ''; defInput.value = ''; nickInput.value = '';
-            profaneInput.checked = false; // Checkbox sıfırla
+            profaneInput.checked = false; 
             updateCount(defInput);
             showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
             fetchWords();
