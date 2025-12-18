@@ -4,13 +4,14 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# Not: Canlı ortamda bu anahtarı environment variable'dan çekmelisin.
 SECRET_KEY = 'django-insecure-replace-this-with-a-random-string'
 
 # SECURITY WARNING: don't run with debug turned on in production!
+# Statik dosyaların (CSS/JS) localhost'ta görünmesi için True yapıldı.
 DEBUG = False
 
-ALLOWED_HOSTS = ["yenisozcukler.com",
-                 "localhost",]
+ALLOWED_HOSTS = ["yenisozcukler.com", "localhost", "127.0.0.1"]
 
 # Application definition
 INSTALLED_APPS = [
@@ -24,18 +25,21 @@ INSTALLED_APPS = [
     'core',
 ]
 
-
+# Geliştirme için yerel bellek cache'i yeterlidir.
+# İleride Redis'e geçilebilir.
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
         'LOCATION': 'unique-snowflake',
     }
 }
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'core.middleware.CloudflareSecurityMiddleware',
+    'core.middleware.CloudflareSecurityMiddleware', # Senin özel middleware'in
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -78,15 +82,24 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Internationalization
-LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+LANGUAGE_CODE = 'tr-tr' # Türkçe karakterler ve formatlar için tr-tr yapıldı
+TIME_ZONE = 'Europe/Istanbul' # Saat dilimi düzeltildi
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
-STATIC_URL = 'static/'
-import os 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+# --- STATIC FILES (CSS, JavaScript, Images) AYARLARI ---
+
+STATIC_URL = '/static/'
+
+# 1. Geliştirme ortamında statik dosyaların nerede aranacağı:
+# Django, 'core/static' klasörüne bakması gerektiğini buradan anlayacak.
+STATICFILES_DIRS = [
+    BASE_DIR  / "static",
+]
+
+# 2. collectstatic komutu çalıştırıldığında tüm dosyaların toplanacağı yer:
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -96,5 +109,8 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
+        # Public API olduğu için boş bırakıldı, view bazlı kontrol var.
     ]
 }
+
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
