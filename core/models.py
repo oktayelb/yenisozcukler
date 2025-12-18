@@ -14,7 +14,7 @@ class Word(models.Model):
     
     # db_index=True eklendi: Ana sayfada sürekli zamana göre sıralama yapıldığı için performansı artırır.
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
-
+    likes_count = models.IntegerField(default=0)
     def __str__(self):
         return self.word
 

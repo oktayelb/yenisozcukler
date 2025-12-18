@@ -5,38 +5,43 @@ from django.shortcuts import get_object_or_404
 from django_ratelimit.decorators import ratelimit
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
-from django.db.models import Count  # Count importu eklendi
+from django.db.models import F  # F ifadesi import edildi (Race condition için)
+from django.db import transaction # Transaction import edildi
 from .models import Word, UserLike, Comment
 from .serializers import (
     WordSerializer, CommentSerializer, 
     WordCreateSerializer, CommentCreateSerializer
 )
 
+# GÜVENLİK GÜNCELLEMESİ (B Şıkkı):
+# Sadece Cloudflare IP'sine güveniyoruz. Eğer sunucun Cloudflare arkasında değilse
+# bu kod çalışmaz (None döner). Cloudflare kullanıyorsan en güvenli yöntem budur.
+# Çünkü X-Forwarded-For başlığı taklit edilebilir (spoofing), ama CF-Connecting-IP
+# başlığı Cloudflare tarafından zorla eklenir ve değiştirilemez.
 def get_client_ip(request):
-    cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
-    if cf_ip:
-        return cf_ip
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        return x_forwarded_for.split(',')[0]
-    return request.META.get('REMOTE_ADDR')
+    return request.META.get('HTTP_CF_CONNECTING_IP')
 
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([])
 def get_words(request):
     page_number = request.GET.get('page', 1)
+    
+    # GÜVENLİK GÜNCELLEMESİ (A Şıkkı):
+    # Kullanıcı ne kadar büyük sayı gönderirse göndersin, maksimum 50 alabilir.
+    # Bu, veritabanının kilitlenmesini ve aşırı bellek tüketimini (DoS) engeller.
+
     limit = int(request.GET.get('limit', 20))
+    limit = min(limit, 50)  # Max limit 50'ye sabitlendi.
+
 
     # PERFORMANS GÜNCELLEMESİ:
-    # 1. annotate: Like sayılarını ana sorguda hesaplar.
-    # 2. only: Sadece ihtiyacımız olan sütunları çeker (SQL SELECT optimizasyonu).
+    # 1. annotate() KALDIRILDI: Artık her sorguda 'UserLike' tablosunu saymıyoruz.
+    # 2. likes_count EKLENDİ: Doğrudan modeldeki sayısal alanı çekiyoruz (O(1) complexity).
     words_queryset = Word.objects.filter(status='approved')\
-        .annotate(annotated_likes=Count('likes'))\
-        .only('id', 'word', 'definition', 'author', 'timestamp', 'is_profane')\
+        .only('id', 'word', 'definition', 'author', 'timestamp', 'is_profane', 'likes_count')\
         .order_by('-timestamp')
     
-    # Cache kullanımı (Count sorgusu ağır olabileceği için önbelleğe alınması iyidir)
     cache_key = 'total_approved_words_count'
     total_count = cache.get(cache_key)
     if total_count is None:
@@ -55,6 +60,7 @@ def get_words(request):
     
     if client_ip and words_page:
         page_word_ids = [w.id for w in words_page]
+        # IP'ye göre kullanıcının beğendiklerini çekiyoruz
         liked_word_ids = set(UserLike.objects.filter(
             ip_address=client_ip, 
             word_id__in=page_word_ids
@@ -71,25 +77,42 @@ def get_words(request):
 @api_view(['POST'])
 @authentication_classes([]) 
 @permission_classes([])
+# PERFORMANS VE TUTARLILIK GÜNCELLEMESİ:
+# atomic() bloğu, işlemlerin bir bütün olarak yapılmasını sağlar.
+@transaction.atomic 
 def toggle_like(request, word_id):
     client_ip = get_client_ip(request)
     if not client_ip:
+        # Cloudflare başlığı yoksa işlem reddedilir.
         return Response({'success': False, 'error': 'IP adresi alınamadı.'}, status=400)
     
-    word = get_object_or_404(Word, id=word_id)
+    # select_for_update(): Bu satırı işlem bitene kadar kilitler. 
+    # Aynı anda iki kişi beğenirse biri bekler, yarış durumu (race condition) oluşmaz.
+    word = get_object_or_404(Word.objects.select_for_update(), id=word_id)
+    
     if word.status != 'approved':
         return Response({'success': False, 'error': 'Geçersiz sözcük'}, status=404)
     
+    # Beğeni var mı kontrol et
     existing_like = UserLike.objects.filter(ip_address=client_ip, word=word).first()
     
     if existing_like:
         existing_like.delete()
+        # F() ifadesi: Python belleğindeki değeri DEĞİL, veritabanındaki o anki değeri kullanır.
+        # Bu sayede "likes_count" hatasız güncellenir.
+        word.likes_count = F('likes_count') - 1
         action = 'unliked'
     else:
         UserLike.objects.create(ip_address=client_ip, word=word)
+        word.likes_count = F('likes_count') + 1
         action = 'liked'
+    
+    word.save()
+    
+    # F() kullandıktan sonra güncel sayısal değeri almak için refresh şarttır.
+    word.refresh_from_db()
         
-    return Response({'success': True, 'action': action, 'new_likes': word.likes.count(), 'word_id': word.id})
+    return Response({'success': True, 'action': action, 'new_likes': word.likes_count, 'word_id': word.id})
 
 @ratelimit(key='ip', rate='1/15s', method='POST', block=False)
 @api_view(['POST'])
@@ -102,6 +125,10 @@ def add_word(request):
     serializer = WordCreateSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save(status='pending')
+        
+
+        cache.delete('total_approved_words_count')
+        
         return Response({'success': True})
     else:
         first_error = next(iter(serializer.errors.values()))[0]
@@ -137,7 +164,11 @@ def add_comment(request):
 @permission_classes([])
 def get_comments(request, word_id):
     page = request.GET.get('page', 1)
+    
+    # Burada da Pagination Limit Güvenliği eklendi
     limit = int(request.GET.get('limit', 10))
+    limit = min(limit, 20) # Yorumlar için max limit 20
+
 
     comments_qs = Comment.objects.filter(word_id=word_id).order_by('timestamp')
     paginator = Paginator(comments_qs, limit)

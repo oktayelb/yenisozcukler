@@ -10,9 +10,9 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = ['id', 'word', 'author', 'comment', 'timestamp']
 
 class WordSerializer(serializers.ModelSerializer):
-    # GÜNCELLEME: source='annotated_likes' olarak değiştirildi.
-    # Artık veritabanını sorgulamıyor, View'dan gelen hazır veriyi okuyor.
-    likes = serializers.IntegerField(source='annotated_likes', read_only=True)
+    # PERFORMANS GÜNCELLEMESİ: Artık 'annotated_likes' yerine
+    # doğrudan modeldeki 'likes_count' alanını okuyoruz. Çok daha hızlı.
+    likes = serializers.IntegerField(source='likes_count', read_only=True)
     is_liked = serializers.SerializerMethodField()
 
     class Meta:
@@ -29,7 +29,7 @@ class WordSerializer(serializers.ModelSerializer):
         return data
 
 # --- YAZMA (WRITE/CREATE) SERIALIZERS ---
-
+# (Bu kısımda değişiklik yok, aynen kalabilir)
 class WordCreateSerializer(serializers.ModelSerializer):
     nickname = serializers.CharField(source='author', required=False, allow_blank=True, max_length=50)
     
@@ -64,7 +64,6 @@ class CommentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['word_id', 'author', 'comment']
-        # EKLEMEN GEREKEN KISIM:
         extra_kwargs = {
             'author': {'required': False, 'allow_blank': True}
         }
@@ -78,6 +77,4 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_author(self, value):
-        # extra_kwargs sayesinde artık buraya boş string ("") düşebilir.
-        # Senin mantığın burada devreye girip onu "Anonim" yapar.
         return value.strip() if value else "Anonim"
