@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from django_ratelimit.decorators import ratelimit
 from .models import Word, UserLike, Comment
 from .serializers import WordSerializer, CommentSerializer
-
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 def get_client_ip(request):
     # 1. Adım: Cloudflare'den gelen özel başlığa bak (En Güvenlisi)
     cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
@@ -25,16 +25,47 @@ def get_client_ip(request):
 @authentication_classes([])
 @permission_classes([])
 def get_words(request):
-    approved_words = Word.objects.filter(status='approved').order_by('-timestamp')[:50]
-    total_count = Word.objects.filter(status='approved').count()
-    
+    # 1. Grab parameters from the URL (e.g. ?page=2&limit=20)
+    page_number = request.GET.get('page', 1)
+    limit = request.GET.get('limit', 20)
+
+    # 2. Get the full queryset (lazy evaluation, doesn't hit DB yet)
+    words_queryset = Word.objects.filter(status='approved').order_by('-timestamp')
+    total_count = words_queryset.count() # Ideally cache this later
+
+    # 3. Apply Pagination
+    paginator = Paginator(words_queryset, limit)
+
+    try:
+        words_page = paginator.page(page_number)
+    except PageNotAnInteger:
+        # If page is not an integer, deliver first page.
+        words_page = paginator.page(1)
+    except EmptyPage:
+        # If page is out of range, deliver empty list (or last page)
+        # For infinite scroll, empty list is usually safer to stop the frontend
+        words_page = []
+
+    # 4. Check Likes for *only* the words on this specific page
     client_ip = get_client_ip(request)
     liked_word_ids = set()
-    if client_ip:
-        liked_word_ids = set(UserLike.objects.filter(ip_address=client_ip).values_list('word_id', flat=True))
+    
+    if client_ip and words_page:
+        # Get IDs of words on this page to optimize the query
+        page_word_ids = [w.id for w in words_page]
+        liked_word_ids = set(UserLike.objects.filter(
+            ip_address=client_ip, 
+            word_id__in=page_word_ids
+        ).values_list('word_id', flat=True))
 
-    serializer = WordSerializer(approved_words, many=True, context={'liked_ids': liked_word_ids})
-    return Response({'status': 'full', 'words': serializer.data, 'total_count': total_count})
+    # 5. Serialize
+    serializer = WordSerializer(words_page, many=True, context={'liked_ids': liked_word_ids})
+    
+    return Response({
+        'status': 'full', 
+        'words': serializer.data, 
+        'total_count': total_count
+    })
 
 @api_view(['POST'])
 @authentication_classes([]) 
@@ -59,7 +90,7 @@ def toggle_like(request, word_id):
         
     return Response({'success': True, 'action': action, 'new_likes': word.likes.count(), 'word_id': word.id})
 
-@ratelimit(key='ip', rate='1/15s', method='POST', block=False)
+@ratelimit(key='ip', rate='14/15s', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([]) 
 @permission_classes([])

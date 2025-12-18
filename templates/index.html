@@ -352,7 +352,7 @@
             font-size: 0.95rem; border-left: 3px solid var(--accent);
             transition: all 0.3s ease; animation: slideInComment 0.4s ease;
         }
-        .comment-item:hover { transform: translateX(5px); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+        .comment-item:hover { transform: translateY(-2px); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
         @keyframes slideInComment { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
         .comment-item strong { font-weight: 700; color: var(--accent); margin-right: 8px; }
 
@@ -645,7 +645,6 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef) {
     clone.style.height = rect.height + 'px';
     clone.style.position = 'fixed'; 
 
-    // GÜNCELLEME: Textarea'ya onkeydown eventi eklendi
     const fullContentHTML = `
         <div class="drawer-header">
             <div style="flex-grow: 1; padding-right: 15px;">
@@ -715,7 +714,6 @@ function closeCommentView() {
     }, 500); 
 }
 
-// YENİ EKLENEN FONKSİYON: ENTER TUŞU İLE GÖNDERME
 function handleCommentEnter(event) {
     if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault(); 
@@ -880,6 +878,7 @@ function createWordCardElement(item) {
     return card;
 }
 
+// *** GÜNCELLENEN FONKSİYON ***
 function appendCardsToDOM(words, listElement, prepend = false) {
     const spinner = listElement.querySelector('.spinner');
     if (spinner) { spinner.remove(); }
@@ -892,7 +891,8 @@ function appendCardsToDOM(words, listElement, prepend = false) {
 
     words.forEach(item => {
         const card = createWordCardElement(item);
-        if (prepend || listElement.children.length === 0) { cardsToAnimate.push(card); }
+        // Değişiklik: Artık şartsız olarak her kartı animasyon listesine ekliyoruz.
+        cardsToAnimate.push(card); 
         fragment.appendChild(card); 
     });
 
@@ -901,11 +901,18 @@ function appendCardsToDOM(words, listElement, prepend = false) {
         else { listElement.appendChild(fragment); }
     } else { listElement.appendChild(fragment); }
     
+    // Animasyonu tetikle
     cardsToAnimate.forEach((card, index) => {
-        if (card.classList.contains('fade-in')) {
-            const delay = index * 80;
-            setTimeout(() => { card.classList.remove('fade-in'); card.classList.add('show'); }, delay);
-        }
+        // requestAnimationFrame kullanarak DOM'un güncellenmesini garanti altına alıyoruz
+        requestAnimationFrame(() => {
+            if (card.classList.contains('fade-in')) {
+                const delay = index * 80;
+                setTimeout(() => { 
+                    card.classList.remove('fade-in'); 
+                    card.classList.add('show'); 
+                }, delay);
+            }
+        });
     });
 }
 
@@ -936,7 +943,8 @@ async function fetchWords(page) {
         if (data.words && data.words.length > 0) {
             appendCardsToDOM(data.words, list, false);
             
-            if (data.words.length >= ITEMS_PER_PAGE) {
+            // Eğer dönen veri sayısı limitin altındaysa artık daha fazla yükle butonu görünmemeli
+            if (data.words.length >= ITEMS_PER_PAGE && (!data.total_count || (page * ITEMS_PER_PAGE < data.total_count))) {
                 loadMoreContainer.style.display = 'block';
             } else {
                 loadMoreContainer.style.display = 'none';
