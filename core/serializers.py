@@ -10,15 +10,14 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = ['id', 'word', 'author', 'comment', 'timestamp']
 
 class WordSerializer(serializers.ModelSerializer):
-    likes = serializers.IntegerField(source='likes.count', read_only=True)
+    # GÜNCELLEME: source='annotated_likes' olarak değiştirildi.
+    # Artık veritabanını sorgulamıyor, View'dan gelen hazır veriyi okuyor.
+    likes = serializers.IntegerField(source='annotated_likes', read_only=True)
     is_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Word
         fields = ['id', 'word', 'author', 'likes', 'timestamp', 'is_liked', 'is_profane', 'definition'] 
-        # Not: Modelde 'definition' alanı var, ancak sen to_representation ile 'def' olarak dönüyordun.
-        # Frontend'i bozmamak için aşağıda map edeceğiz veya model field ismini kullanacağız.
-        # Clean code için model field ismini kullanmak daha iyidir ama frontend uyumu için 'to_representation'ı koruyoruz.
 
     def get_is_liked(self, obj):
         liked_ids = self.context.get('liked_ids', set())
@@ -51,11 +50,13 @@ class WordCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_nickname(self, value):
+        if not value or not value.strip():
+            return "Anonim"
         if value:
             value = value.strip()
             if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]*$', value):
                 raise serializers.ValidationError("Takma ad geçersiz karakterler içeriyor.")
-        return value if value else "Anonim"
+        return value 
 
 class CommentCreateSerializer(serializers.ModelSerializer):
     word_id = serializers.IntegerField()
@@ -63,6 +64,10 @@ class CommentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['word_id', 'author', 'comment']
+        # EKLEMEN GEREKEN KISIM:
+        extra_kwargs = {
+            'author': {'required': False, 'allow_blank': True}
+        }
 
     def validate_comment(self, value):
         value = value.strip()
@@ -73,4 +78,6 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate_author(self, value):
+        # extra_kwargs sayesinde artık buraya boş string ("") düşebilir.
+        # Senin mantığın burada devreye girip onu "Anonim" yapar.
         return value.strip() if value else "Anonim"

@@ -8,8 +8,7 @@ class Word(models.Model):
     is_profane = models.BooleanField(default=False)
     word = models.CharField(max_length=50)
     definition = models.CharField(max_length=300)
-    author = models.CharField(max_length=20, default='Anonymous')
-    
+    author = models.CharField(max_length=50, default='Anonim')    
     # db_index=True eklendi: Sık sık 'status=approved' filtresi kullandığımız için sorguları hızlandırır.
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending', db_index=True)
     

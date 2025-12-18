@@ -4,7 +4,8 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django_ratelimit.decorators import ratelimit
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.core.cache import cache  # Cache importu
+from django.core.cache import cache
+from django.db.models import Count  # Count importu eklendi
 from .models import Word, UserLike, Comment
 from .serializers import (
     WordSerializer, CommentSerializer, 
@@ -27,9 +28,15 @@ def get_words(request):
     page_number = request.GET.get('page', 1)
     limit = int(request.GET.get('limit', 20))
 
-    words_queryset = Word.objects.filter(status='approved').order_by('-timestamp')
+    # PERFORMANS GÜNCELLEMESİ:
+    # 1. annotate: Like sayılarını ana sorguda hesaplar.
+    # 2. only: Sadece ihtiyacımız olan sütunları çeker (SQL SELECT optimizasyonu).
+    words_queryset = Word.objects.filter(status='approved')\
+        .annotate(annotated_likes=Count('likes'))\
+        .only('id', 'word', 'definition', 'author', 'timestamp', 'is_profane')\
+        .order_by('-timestamp')
     
-    # 1. PERFORMANS: Cache kullanımı (5 dakika boyunca sayıyı tutar)
+    # Cache kullanımı (Count sorgusu ağır olabileceği için önbelleğe alınması iyidir)
     cache_key = 'total_approved_words_count'
     total_count = cache.get(cache_key)
     if total_count is None:
@@ -84,7 +91,7 @@ def toggle_like(request, word_id):
         
     return Response({'success': True, 'action': action, 'new_likes': word.likes.count(), 'word_id': word.id})
 
-@ratelimit(key='ip', rate='14/15s', method='POST', block=False)
+@ratelimit(key='ip', rate='1/15s', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([]) 
 @permission_classes([])
@@ -92,13 +99,11 @@ def add_word(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
 
-    # 2. CLEAN CODE: Validasyon mantığı Serializer'a taşındı
     serializer = WordCreateSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save(status='pending') # Default status ataması
+        serializer.save(status='pending')
         return Response({'success': True})
     else:
-        # İlk hatayı döndür
         first_error = next(iter(serializer.errors.values()))[0]
         return Response({'success': False, 'error': first_error}, status=400)
 
@@ -122,7 +127,6 @@ def add_comment(request):
             author=serializer.validated_data['author'],
             comment=serializer.validated_data['comment']
         )
-        # Yanıt için Read Serializer kullanıyoruz
         return Response({'success': True, 'comment': CommentSerializer(new_comment).data}, status=201)
     else:
         first_error = next(iter(serializer.errors.values()))[0]
@@ -132,7 +136,6 @@ def add_comment(request):
 @authentication_classes([]) 
 @permission_classes([])
 def get_comments(request, word_id):
-    # 3. PERFORMANS: Yorumlar için sayfalama (Pagination)
     page = request.GET.get('page', 1)
     limit = int(request.GET.get('limit', 10))
 
@@ -149,6 +152,6 @@ def get_comments(request, word_id):
     return Response({
         'success': True, 
         'comments': serializer.data,
-        'has_next': comments_page.has_next() if isinstance(comments_page, (list, object)) and hasattr(comments_page, 'has_next') else False,
+        'has_next': comments_page.has_next() if hasattr(comments_page, 'has_next') else False,
         'next_page_number': comments_page.next_page_number() if hasattr(comments_page, 'has_next') and comments_page.has_next() else None
     })
