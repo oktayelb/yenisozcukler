@@ -39,7 +39,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
 
     def validate_word(self, value):
         value = value.strip()
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]+$', value):
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.-,0-9]+$', value):
             raise serializers.ValidationError("Sözcük sadece harf, rakam ve temel noktalama işaretleri içerebilir.")
         return value
 
