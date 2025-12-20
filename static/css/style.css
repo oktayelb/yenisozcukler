@@ -1,5 +1,5 @@
 :root {
-    /* --- CSS DEĞİŞKENLERİ --- */
+    /* --- CSS VARIABLES --- */
     --font-heading: 'Caveat', cursive;
     --font-body: 'Merriweather', serif;
     
@@ -13,7 +13,10 @@
     --radius: 12px;
     --success-color: #4CAF50;
     --error-color: #f44336;
+    
+    /* Vote Colors */
     --like-color-active: #E53935; 
+    --dislike-color-active: #5C6BC0; 
 }
 
 body.dark-mode {
@@ -25,6 +28,7 @@ body.dark-mode {
     --shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     --shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.6);
     --like-color-active: #FF7043; 
+    --dislike-color-active: #7986CB;
 }
 
 body {
@@ -37,7 +41,7 @@ body {
     transition: background-color 0.3s, color 0.3s;
 }
 
-/* --- SPINNER STİLLERİ --- */
+/* --- SPINNER STYLES --- */
 .spinner {
     border: 4px solid rgba(0, 0, 0, 0.1);
     width: 36px;
@@ -58,7 +62,6 @@ body.dark-mode .spinner { border: 4px solid rgba(255, 255, 255, 0.1); border-lef
 }
 .load-more-btn:hover { background: var(--accent); color: var(--card-bg); }
 
-/* YENİ EKLENEN STİL: Yorumlar için Load More */
 .load-more-comments-btn {
     background: none; border: none; color: var(--accent);
     font-size: 0.9rem; font-weight: bold; cursor: pointer;
@@ -215,7 +218,7 @@ input:focus, textarea:focus {
     header { padding-top: 80px; margin-top: 0; margin-bottom: 30px; }
 }
 
-/* --- Z-INDEX DÜZELTMESİ --- */
+/* --- Z-INDEX FIX --- */
 .notification-container {
     position: fixed; top: 20px; right: 20px;
     z-index: 4000;
@@ -233,21 +236,38 @@ input:focus, textarea:focus {
 .custom-alert-success { border-left: 6px solid var(--success-color); }
 .custom-alert-error { border-left: 6px solid var(--error-color); }
 
-.like-container { display: flex; align-items: center; gap: 8px; user-select: none; }
-.like-button {
-    background: none; border: none; cursor: pointer; padding: 5px;
-    display: flex; align-items: center; transition: transform 0.1s ease-out; height: auto !important; 
-}
-.like-button:hover:not(:disabled) { transform: scale(1.1); }
-.like-button:active:not(:disabled) { transform: scale(0.95); }
-.like-button:disabled { cursor: default; pointer-events: none; opacity: 0.8; }
-.like-icon { fill: none; stroke: var(--text-muted); stroke-width: 2; transition: fill 0.3s, stroke 0.3s; }
-.like-button.liked .like-icon { fill: var(--like-color-active); stroke: var(--like-color-active); }
-.like-count {
-    font-size: 1.1rem; font-weight: 700; color: var(--text-muted);
-    min-width: 20px; text-align: left; transition: color 0.3s;
+/* --- REUSABLE VOTE SYSTEM (NEW) --- */
+.vote-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(142, 127, 127, 0.08);
+    padding: 3px 6px;
+    border-radius: 20px;
+    width: fit-content;
+    border: 1px solid rgba(142, 127, 127, 0.1);
 }
 
+.vote-btn {
+    background: none; border: none; cursor: pointer; padding: 4px;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.1s ease-out; color: var(--text-muted);
+}
+.vote-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; transition: fill 0.3s, stroke 0.3s; }
+.vote-btn:hover:not(:disabled) { transform: scale(1.15); color: var(--text-main); }
+.vote-btn:active:not(:disabled) { transform: scale(0.9); }
+.vote-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Active States */
+.vote-btn.like.active svg { fill: var(--like-color-active); stroke: var(--like-color-active); }
+.vote-btn.dislike.active svg { fill: var(--dislike-color-active); stroke: var(--dislike-color-active); }
+
+.vote-score {
+    font-size: 0.95rem; font-weight: 700; color: var(--text-muted);
+    min-width: 20px; text-align: center; margin: 0 4px; user-select: none;
+}
+
+/* Modal and Comment View Styles */
 .full-comment-view {
     position: fixed; z-index: 2000; background: var(--card-bg);
     border-radius: var(--radius); box-shadow: var(--shadow-hover);
@@ -353,10 +373,10 @@ input:focus, textarea:focus {
     background: var(--bg-color); padding: 15px; border-radius: 8px; margin-bottom: 10px; 
     font-size: 0.95rem; border-left: 3px solid var(--accent);
     transition: all 0.3s ease; animation: slideInComment 0.4s ease;
+    display: flex; flex-direction: column; gap: 6px; /* Added gap for better spacing */
 }
 .comment-item:hover { transform: translateY(-2px); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
 @keyframes slideInComment { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
-.comment-item strong { font-weight: 700; color: var(--accent); margin-right: 8px; }
 
 @media (max-width: 768px) {
     .full-comment-view.expanded {

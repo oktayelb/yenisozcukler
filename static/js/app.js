@@ -1,6 +1,4 @@
 const THEME_KEY = 'userTheme'; 
-const LIKE_COOLDOWN_MS = 1000; 
-const buttonsCooldown = {}; 
 let currentWordId = null; 
 let activeCardClone = null;
 
@@ -8,7 +6,7 @@ let currentPage = 1;
 const ITEMS_PER_PAGE = 20; 
 let isLoading = false;
 
-// --- YORUMLAR İÇİN EKLENEN DEĞİŞKENLER ---
+// --- COMMENTS VARIABLES ---
 let currentCommentPage = 1;
 const COMMENTS_PER_PAGE = 10;
 let currentWordCommentsHasNext = false;
@@ -77,61 +75,100 @@ function allowOnlyLetters(event, allowSpaces) {
     if (regex.test(key)) { return true; } else { event.preventDefault(); return false; }
 }
 
-function createLikeButton(item) {
-    const wordId = item.id;
-    const container = document.createElement('div');
-    container.className = 'like-container';
-    
-    const button = document.createElement('button');
-    button.className = item.is_liked ? 'like-button liked' : 'like-button';
-    button.id = `like-btn-${wordId}`;
-    button.onclick = (e) => {
-        e.stopPropagation(); 
-        likeWord(wordId, button);
-    };
-    
-    button.innerHTML = `
-        <svg class="like-icon" width="24" height="24" viewBox="0 0 24 24">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
-    `;
-    
-    const countSpan = document.createElement('span');
-    countSpan.className = 'like-count';
-    countSpan.id = `like-count-${wordId}`;
-    countSpan.textContent = item.likes || 0;
+/* --- REUSABLE VOTE SYSTEM LOGIC --- */
 
-    container.appendChild(button);
-    container.appendChild(countSpan);
+// Generic function to create the Vote UI
+// entityType: 'word' or 'comment'
+// data: object containing { id, likes, dislikes, is_liked, is_disliked }
+function createVoteControls(entityType, data) {
+    const container = document.createElement('div');
+    container.className = 'vote-container';
+    
+    // Calculate initial net score
+    const netScore = (data.likes || 0) - (data.dislikes || 0);
+
+    // --- LIKE BUTTON ---
+    const likeBtn = document.createElement('button');
+    likeBtn.className = `vote-btn like ${data.is_liked ? 'active' : ''}`;
+    likeBtn.innerHTML = `
+        <svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+    `;
+    likeBtn.onclick = (e) => {
+        e.stopPropagation();
+        handleVote(entityType, data.id, 'like', container);
+    };
+
+    // --- SCORE DISPLAY ---
+    const scoreSpan = document.createElement('span');
+    scoreSpan.className = 'vote-score';
+    scoreSpan.innerText = netScore;
+
+    // --- DISLIKE BUTTON ---
+    const dislikeBtn = document.createElement('button');
+    dislikeBtn.className = `vote-btn dislike ${data.is_disliked ? 'active' : ''}`;
+    dislikeBtn.innerHTML = `
+        <svg viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path></svg>
+    `;
+    dislikeBtn.onclick = (e) => {
+        e.stopPropagation();
+        handleVote(entityType, data.id, 'dislike', container);
+    };
+
+    container.appendChild(likeBtn);
+    container.appendChild(scoreSpan);
+    container.appendChild(dislikeBtn);
+
     return container;
 }
 
-async function likeWord(wordId, button) {
-    const now = Date.now();
-    const lastClick = buttonsCooldown[wordId] || 0;
-    if (now < lastClick) { return; }
-    button.disabled = true;
-    buttonsCooldown[wordId] = now + LIKE_COOLDOWN_MS; 
+// Generic API Handler
+async function handleVote(entityType, entityId, action, container) {
+    const likeBtn = container.querySelector('.like');
+    const dislikeBtn = container.querySelector('.dislike');
+    const scoreSpan = container.querySelector('.vote-score');
     
+    // Prevent spamming
+    if (likeBtn.disabled || dislikeBtn.disabled) return;
+    likeBtn.disabled = true;
+    dislikeBtn.disabled = true;
+
+    // Endpoint format: /api/vote/word/123 or /api/vote/comment/456
+    const endpoint = `/api/vote/${entityType}/${entityId}`;
+
     try {
-        const response = await fetch(`/api/like/${wordId}`, {
+        const response = await fetch(endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: action })
         });
+
         if (response.ok) {
             const data = await response.json();
-            const countElement = document.getElementById(`like-count-${wordId}`);
-            if (countElement) { countElement.textContent = data.new_likes; }
-            if (data.action === 'liked') { button.classList.add('liked'); } 
-            else if (data.action === 'unliked') { button.classList.remove('liked'); }
+            
+            // Update UI State based on server response
+            // Expected data: { new_score: 10, user_action: 'liked' | 'disliked' | 'none' }
+            scoreSpan.innerText = data.new_score;
+            
+            // Reset classes
+            likeBtn.classList.remove('active');
+            dislikeBtn.classList.remove('active');
+
+            if (data.user_action === 'liked') {
+                likeBtn.classList.add('active');
+            } else if (data.user_action === 'disliked') {
+                dislikeBtn.classList.add('active');
+            }
         } else {
-            const data = await response.json();
-            showCustomAlert(data.error || "Oylama başarısız.", "error");
+            const err = await response.json();
+            showCustomAlert(err.error || "İşlem başarısız.", "error");
         }
     } catch (error) {
-        showCustomAlert("Ağ hatası.", "error");
+        showCustomAlert("Bağlantı hatası.", "error");
     } finally {
-        setTimeout(() => { button.disabled = false; }, LIKE_COOLDOWN_MS);
+        setTimeout(() => {
+            likeBtn.disabled = false;
+            dislikeBtn.disabled = false;
+        }, 500); 
     }
 }
 
@@ -144,8 +181,11 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef) {
 
     const rect = originalCard.getBoundingClientRect();
     const originalContentClone = originalCard.cloneNode(true);
-    const likeBtn = originalContentClone.querySelector('.like-container');
-    if(likeBtn) likeBtn.remove();
+    
+    // Remove the vote controls from the header in the detailed view to keep it clean
+    const voteControls = originalContentClone.querySelector('.vote-container');
+    if(voteControls) voteControls.remove();
+    
     const cleanOriginalHTML = originalContentClone.innerHTML;
 
     const backdrop = document.getElementById('modalBackdrop');
@@ -241,23 +281,41 @@ function createCommentElement(commentData) {
     const item = document.createElement('div');
     item.className = 'comment-item';
     
-    const date = new Date(commentData.timestamp);
-    const timeString = date.toLocaleDateString('tr-TR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    // --- Header (Author + Date) ---
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
     
     const strong = document.createElement('strong');
-    strong.textContent = (commentData.author || 'Anonim') + ':';
+    strong.textContent = commentData.author || 'Anonim';
     
-    const textNode = document.createTextNode(' ' + commentData.comment);
+    const date = new Date(commentData.timestamp);
+    const timeString = date.toLocaleDateString('tr-TR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const timeSpan = document.createElement('span');
+    timeSpan.style.fontSize = '0.75rem';
+    timeSpan.style.color = 'var(--text-muted)';
+    timeSpan.textContent = timeString;
+
+    header.appendChild(strong);
+    header.appendChild(timeSpan);
+
+    // --- Body (Content) ---
+    const body = document.createElement('div');
+    body.textContent = commentData.comment;
     
-    const timeDiv = document.createElement('div');
-    timeDiv.style.fontSize = '0.75rem';
-    timeDiv.style.color = 'var(--text-muted)';
-    timeDiv.style.marginTop = '5px';
-    timeDiv.textContent = timeString;
+    // --- Footer (Vote Controls) ---
+    const footer = document.createElement('div');
+    footer.style.display = 'flex';
+    footer.style.justifyContent = 'flex-end'; // Right align votes for comments
+    footer.style.marginTop = '4px';
+
+    // Inject Reusable Vote Controls for Comment
+    footer.appendChild(createVoteControls('comment', commentData));
+
+    item.appendChild(header);
+    item.appendChild(body);
+    item.appendChild(footer);
     
-    item.appendChild(strong);
-    item.appendChild(textNode);
-    item.appendChild(timeDiv);
     return item;
 }
 
@@ -340,7 +398,16 @@ function submitComment() {
             input.value = '';
             document.getElementById('liveCharCount').innerText = '0/200'; 
             
-            const newItem = createCommentElement(data.comment);
+            // Ensure comment has default vote data since it's new
+            const newCommentData = {
+                ...data.comment,
+                likes: 0,
+                dislikes: 0,
+                is_liked: false,
+                is_disliked: false
+            };
+            
+            const newItem = createCommentElement(newCommentData);
             
             if (commentsList.firstElementChild && commentsList.firstElementChild.textContent.includes('Henüz yorum yok')) { 
                 commentsList.innerHTML = ''; 
@@ -394,7 +461,8 @@ function createWordCardElement(item) {
     wordText.textContent = decode(item.word);
     titleDiv.appendChild(wordText);
     
-    titleDiv.appendChild(createLikeButton(item));
+    // Inject Reusable Vote Controls for Word
+    titleDiv.appendChild(createVoteControls('word', item));
 
     const defDiv = document.createElement('div');
     defDiv.className = 'word-def';
