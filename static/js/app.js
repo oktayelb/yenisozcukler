@@ -27,6 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     darkModeToggle.addEventListener('click', toggleDarkMode);
     
+    // --- LOGO SETUP ---
+    const mainLogo = document.querySelector('.logo-card');
+    if (mainLogo) {
+        mainLogo.classList.add('theme-default');
+        mainLogo.onclick = (e) => handleLogoClick(e, mainLogo);
+    }
+
     fetchWords(currentPage);
 });
 
@@ -78,13 +85,10 @@ function allowOnlyLetters(event, allowSpaces) {
 /* --- REUSABLE VOTE SYSTEM LOGIC --- */
 
 // Generic function to create the Vote UI
-// entityType: 'word' or 'comment'
-// data: object containing { id, likes, dislikes, is_liked, is_disliked }
 function createVoteControls(entityType, data) {
     const container = document.createElement('div');
     container.className = 'vote-container';
     
-    // Calculate initial net score
     const netScore = (data.likes || 0) - (data.dislikes || 0);
 
     // --- LIKE BUTTON ---
@@ -127,12 +131,10 @@ async function handleVote(entityType, entityId, action, container) {
     const dislikeBtn = container.querySelector('.dislike');
     const scoreSpan = container.querySelector('.vote-score');
     
-    // Prevent spamming
     if (likeBtn.disabled || dislikeBtn.disabled) return;
     likeBtn.disabled = true;
     dislikeBtn.disabled = true;
 
-    // Endpoint format: /api/vote/word/123 or /api/vote/comment/456
     const endpoint = `/api/vote/${entityType}/${entityId}`;
 
     try {
@@ -144,12 +146,8 @@ async function handleVote(entityType, entityId, action, container) {
 
         if (response.ok) {
             const data = await response.json();
-            
-            // Update UI State based on server response
-            // Expected data: { new_score: 10, user_action: 'liked' | 'disliked' | 'none' }
             scoreSpan.innerText = data.new_score;
             
-            // Reset classes
             likeBtn.classList.remove('active');
             dislikeBtn.classList.remove('active');
 
@@ -182,7 +180,6 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef) {
     const rect = originalCard.getBoundingClientRect();
     const originalContentClone = originalCard.cloneNode(true);
     
-    // Remove the vote controls from the header in the detailed view to keep it clean
     const voteControls = originalContentClone.querySelector('.vote-container');
     if(voteControls) voteControls.remove();
     
@@ -281,7 +278,7 @@ function createCommentElement(commentData) {
     const item = document.createElement('div');
     item.className = 'comment-item';
     
-    // --- Header (Author + Date) ---
+    // --- Header ---
     const header = document.createElement('div');
     header.style.display = 'flex';
     header.style.justifyContent = 'space-between';
@@ -299,17 +296,16 @@ function createCommentElement(commentData) {
     header.appendChild(strong);
     header.appendChild(timeSpan);
 
-    // --- Body (Content) ---
+    // --- Body ---
     const body = document.createElement('div');
     body.textContent = commentData.comment;
     
-    // --- Footer (Vote Controls) ---
+    // --- Footer ---
     const footer = document.createElement('div');
     footer.style.display = 'flex';
-    footer.style.justifyContent = 'flex-end'; // Right align votes for comments
+    footer.style.justifyContent = 'flex-end'; 
     footer.style.marginTop = '4px';
 
-    // Inject Reusable Vote Controls for Comment
     footer.appendChild(createVoteControls('comment', commentData));
 
     item.appendChild(header);
@@ -398,7 +394,6 @@ function submitComment() {
             input.value = '';
             document.getElementById('liveCharCount').innerText = '0/200'; 
             
-            // Ensure comment has default vote data since it's new
             const newCommentData = {
                 ...data.comment,
                 likes: 0,
@@ -461,7 +456,6 @@ function createWordCardElement(item) {
     wordText.textContent = decode(item.word);
     titleDiv.appendChild(wordText);
     
-    // Inject Reusable Vote Controls for Word
     titleDiv.appendChild(createVoteControls('word', item));
 
     const defDiv = document.createElement('div');
@@ -625,3 +619,127 @@ async function submitWord() {
     } catch (error) { showCustomAlert("Ağ hatası: Sunucuya ulaşılamadı.", "error"); } 
     finally { btn.disabled = false; btn.innerText = "Sözlüğe Ekle"; }
 }
+
+/* --- LOGO MENU & SWAP SYSTEM --- */
+
+let isMenuOpen = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+    // ... Diğer başlatma kodların ...
+    
+    // Logo Sistemini Başlat
+    initLogoSystem();
+});
+
+// Sistemi kuran ana fonksiyon
+function initLogoSystem() {
+    const wrapper = document.querySelector('.logo-wrapper');
+    const originalCard = document.querySelector('.logo-card');
+    
+    if (!wrapper || !originalCard) return;
+
+    // 1. Orijinal kartı yapılandır (Merkez - Krem)
+    originalCard.classList.add('pos-center', 'theme-default');
+    // ID'leri temizle (Çakışma olmasın)
+    cleanIds(originalCard);
+    
+    // 2. Sol Kartı Üret (Mavi)
+    const leftCard = originalCard.cloneNode(true);
+    leftCard.className = 'logo-card pos-left theme-blue';
+    cleanIds(leftCard);
+    
+    // 3. Sağ Kartı Üret (Yeşil)
+    const rightCard = originalCard.cloneNode(true);
+    rightCard.className = 'logo-card pos-right theme-green';
+    cleanIds(rightCard);
+
+    // Kartları DOM'a ekle (Grid sayesinde üst üste binecekler)
+    wrapper.appendChild(leftCard);
+    wrapper.appendChild(rightCard);
+
+    // Tüm kartlara tıklama olayı ekle
+    const allCards = wrapper.querySelectorAll('.logo-card');
+    allCards.forEach(card => {
+        card.onclick = (e) => handleCardClick(e, card);
+    });
+
+    // Dışarı tıklamayı dinle
+    document.addEventListener('click', handleOutsideClick);
+}
+
+function handleCardClick(event, clickedCard) {
+    event.stopPropagation(); // Event yayılmasını durdur
+
+    // 1. Eğer tıklanan kart MERKEZDEYSE: Menüyü Aç/Kapat
+    if (clickedCard.classList.contains('pos-center')) {
+        toggleMenu();
+    } 
+    // 2. Eğer tıklanan kart YANLARDAYSA (Sol veya Sağ): Swap Yap
+    else if (isMenuOpen && (clickedCard.classList.contains('pos-left') || clickedCard.classList.contains('pos-right'))) {
+        performSwap(clickedCard);
+    }
+}
+
+function toggleMenu() {
+    const wrapper = document.querySelector('.logo-wrapper');
+    const centerCard = wrapper.querySelector('.pos-center');
+    const sideCards = wrapper.querySelectorAll('.pos-left, .pos-right');
+
+    if (isMenuOpen) {
+        // Kapat
+        centerCard.classList.remove('menu-open');
+        sideCards.forEach(card => card.classList.remove('visible'));
+        isMenuOpen = false;
+    } else {
+        // Aç
+        centerCard.classList.add('menu-open');
+        sideCards.forEach(card => card.classList.add('visible'));
+        isMenuOpen = true;
+    }
+}
+
+function performSwap(clickedCard) {
+    const wrapper = document.querySelector('.logo-wrapper');
+    const currentCenter = wrapper.querySelector('.pos-center');
+    
+    // Tıklanan kartın pozisyonunu al (pos-left veya pos-right)
+    let clickedPosClass = clickedCard.classList.contains('pos-left') ? 'pos-left' : 'pos-right';
+
+    // --- SWAP İŞLEMİ ---
+    // 1. Tıklanan kart merkeze geçer
+    clickedCard.classList.remove(clickedPosClass, 'visible');
+    clickedCard.classList.add('pos-center');
+
+    // 2. Eski merkez kart, tıklananın yerine geçer
+    currentCenter.classList.remove('pos-center', 'menu-open');
+    currentCenter.classList.add(clickedPosClass);
+
+    // 3. Menüyü kapat (Diğer kartları da gizle)
+    const allSideCards = wrapper.querySelectorAll('.pos-left, .pos-right');
+    allSideCards.forEach(card => card.classList.remove('visible'));
+
+    isMenuOpen = false;
+    
+    console.log("Logo değişti! Yeni merkez: ", clickedCard.className);
+}
+
+function handleOutsideClick(event) {
+    const wrapper = document.querySelector('.logo-wrapper');
+    // Eğer menü açıksa ve tıklanan yer wrapper değilse kapat
+    if (isMenuOpen && wrapper && !wrapper.contains(event.target)) {
+        toggleMenu(); // Kapatır
+    }
+}
+
+// Helper: ID çakışmalarını önlemek için ID'leri siler
+function cleanIds(element) {
+    element.removeAttribute('id');
+    const children = element.querySelectorAll('[id]');
+    children.forEach(child => child.removeAttribute('id'));
+    // onclick attribute'unu sil (JS ile ekliyoruz)
+    element.removeAttribute('onclick');
+}
+
+/* --- Diğer App Kodların Buradan Devam Eder --- */
+// (loadMoreWords, fetchWords vb. buranın altında kalacak)
+// ...

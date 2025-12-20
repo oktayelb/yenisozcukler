@@ -96,24 +96,159 @@ body.dark-mode .spinner { border: 4px solid rgba(255, 255, 255, 0.1); border-lef
     .header-btn { font-size: 0.85rem; padding: 8px 12px; }
 }
 
-header { text-align: center; margin-bottom: 40px; margin-top: 50px; overflow: hidden; }
-
-h1 {
-    font-family: var(--font-heading);
-    font-size: 4.5rem; margin: 0; color: var(--text-main);
-    transform: rotate(-2deg); opacity: 0;
-    transform: translateY(-20px) rotate(-5deg);
-    transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+header { 
+    text-align: center; 
+    margin-bottom: 40px; 
+    margin-top: 50px; 
+    padding: 10px;
 }
-h1.loaded { opacity: 1; transform: translateY(0) rotate(-2deg); }
 
-.subtitle {
-    font-family: var(--font-heading);
-    font-size: 1.7rem; color: var(--text-muted); margin-top: -10px;
-    display: block; opacity: 0; transition: opacity 1s ease 0.3s;
+/* --- LOGO SYSTEM (SWAP & GRID) --- */
+
+.logo-wrapper {
+    display: inline-grid; /* Grid kullanarak kartları üst üste çakıştıracağız */
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    justify-items: center;
+    align-items: center;
+    
+    position: relative;
+    z-index: 1000;
+    /* Yanlara açılan kartların görünmesi için taşmaya izin ver */
+    overflow: visible; 
 }
-.subtitle.loaded { opacity: 1; }
 
+/* Tüm Logo Kartlarının Ortak Stili */
+.logo-card {
+    /* Tüm kartlar aynı grid hücresinde üst üste başlar */
+    grid-column: 1 / 2;
+    grid-row: 1 / 2;
+    
+    background: var(--card-bg);
+    padding: 20px 50px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(142, 127, 127, 0.3);
+    
+    width: max-content; /* İçerik kadar genişlik */
+    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+    
+    cursor: pointer;
+    user-select: none;
+    box-sizing: border-box;
+    
+    /* Varsayılan olarak hepsi merkezde ve gizli (arkada) */
+    opacity: 0; 
+    z-index: 0;
+    transform: translate(0, 0) scale(0.9);
+    pointer-events: none; /* Arkadakilere tıklanamasın */
+}
+
+.logo-card:hover {
+    box-shadow: var(--shadow-hover);
+}
+
+/* --- POZİSYON VE DURUM SINIFLARI --- */
+
+/* 1. MERKEZ KART (Aktif Logo) */
+.logo-card.pos-center {
+    opacity: 1;
+    z-index: 20;
+    transform: translate(0, 0) scale(1);
+    pointer-events: auto; /* Tıklanabilir */
+}
+
+/* Menü açıkken merkez kartın efekti */
+.logo-card.pos-center.menu-open {
+    border-color: var(--accent);
+}
+
+/* 2. SOL KART (Menü Açıkken) */
+.logo-card.pos-left.visible {
+    opacity: 1;
+    z-index: 10;
+    transform: translateX(-110%) rotate(-3deg) scale(0.95);
+    pointer-events: auto;
+}
+
+/* 3. SAĞ KART (Menü Açıkken) */
+.logo-card.pos-right.visible {
+    opacity: 1;
+    z-index: 10;
+    transform: translateX(110%) rotate(3deg) scale(0.95);
+    pointer-events: auto;
+}
+
+/* --- RENKLER (Test İçin) --- */
+.theme-default { background-color: #fdfbf7 !important; } /* Krem */
+.theme-blue    { background-color: #e3f2fd !important; } /* Mavi */
+.theme-green   { background-color: #e8f5e9 !important; } /* Yeşil */
+
+/* Dark Mode Uyumu */
+body.dark-mode .theme-default { background-color: #3c3c45 !important; }
+body.dark-mode .theme-blue    { background-color: #152b39 !important; }
+body.dark-mode .theme-green   { background-color: #1b3320 !important; }
+
+/* İçerik Stilleri (Tıklamayı engelleme) */
+.logo-card h1, .logo-card .subtitle {
+    pointer-events: none; /* Tıklama eventini ebeveyne (karta) geçir */
+}
+
+/* Yazı stilleri */
+.logo-card h1 {
+    font-family: var(--font-heading);
+    font-size: 4.5rem; margin: 0; line-height: 1.1;
+    color: var(--text-main); transform: rotate(-2deg);
+}
+
+.logo-card .subtitle {
+    font-family: var(--font-heading);
+    font-size: 1.7rem; color: var(--text-muted);
+    margin-top: 5px; display: block;
+}
+
+/* Mobil Düzenleme (Alt alta açılma) */
+@media (max-width: 768px) {
+    .logo-card.pos-left.visible { transform: translateY(110%); }
+    .logo-card.pos-right.visible { transform: translateY(220%); }
+}
+
+/* --- DEBUG / THEME COLORS --- */
+.theme-default { background-color: #fdfbf7 !important; } /* Krem */
+.theme-blue    { background-color: #e3f2fd !important; } /* Mavi */
+.theme-green   { background-color: #e8f5e9 !important; } /* Yeşil */
+
+/* Dark mode uyumu */
+body.dark-mode .theme-default { background-color: #3c3c45 !important; }
+body.dark-mode .theme-blue    { background-color: #152b39 !important; }
+body.dark-mode .theme-green   { background-color: #1b3320 !important; }
+
+/* İçerik Stilleri */
+.logo-card h1 {
+    font-family: var(--font-heading);
+    font-size: 4.5rem; 
+    margin: 0; 
+    line-height: 1.1;
+    color: var(--text-main); 
+    transform: rotate(-2deg);
+    pointer-events: none; /* Tıklamayı üstteki karta geçir */
+}
+
+.logo-card .subtitle {
+    font-family: var(--font-heading);
+    font-size: 1.7rem; color: var(--text-muted);
+    margin-top: 5px; 
+    display: block;
+    pointer-events: none;
+}
+
+/* Mobil için düzenleme */
+@media (max-width: 768px) {
+    .logo-card.clone.open-left { transform: translateY(110%); }
+    .logo-card.clone.open-right { transform: translateY(220%); }
+}
+
+/* --- OTHER STYLES --- */
 .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
 .feed-container { display: flex; flex-direction: column; gap: 20px; }
 
@@ -211,7 +346,10 @@ input:focus, textarea:focus {
 @media (max-width: 768px) {
     .form-fields { grid-template-columns: 1fr; }
     .form-card button { width: 100%; }
+    
+    .logo-card { padding: 20px 20px; }
     h1 { font-size: 3.5rem; margin-top: 0; } 
+    
     body { padding: 10px; font-size: 16px; }
     .form-card { padding: 20px; }
     .word-card { padding: 20px; }
@@ -236,7 +374,7 @@ input:focus, textarea:focus {
 .custom-alert-success { border-left: 6px solid var(--success-color); }
 .custom-alert-error { border-left: 6px solid var(--error-color); }
 
-/* --- REUSABLE VOTE SYSTEM (NEW) --- */
+/* --- REUSABLE VOTE SYSTEM --- */
 .vote-container {
     display: flex;
     align-items: center;
@@ -373,7 +511,7 @@ input:focus, textarea:focus {
     background: var(--bg-color); padding: 15px; border-radius: 8px; margin-bottom: 10px; 
     font-size: 0.95rem; border-left: 3px solid var(--accent);
     transition: all 0.3s ease; animation: slideInComment 0.4s ease;
-    display: flex; flex-direction: column; gap: 6px; /* Added gap for better spacing */
+    display: flex; flex-direction: column; gap: 6px; 
 }
 .comment-item:hover { transform: translateY(-2px); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
 @keyframes slideInComment { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
