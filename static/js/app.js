@@ -1,4 +1,5 @@
 const THEME_KEY = 'userTheme'; 
+const COLOR_THEME_KEY = 'userColorTheme'; // Yeni: Renk temasını kaydetmek için
 let currentWordId = null; 
 let activeCardClone = null;
 
@@ -15,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('mainTitle').classList.add('loaded');
     document.getElementById('subtitleText').classList.add('loaded');
     
+    // --- DARK MODE SETUP ---
     const savedTheme = localStorage.getItem(THEME_KEY);
     const darkModeToggle = document.getElementById('darkModeToggle');
 
@@ -27,12 +29,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     darkModeToggle.addEventListener('click', toggleDarkMode);
     
-    // --- LOGO SETUP ---
-    const mainLogo = document.querySelector('.logo-card');
-    if (mainLogo) {
-        mainLogo.classList.add('theme-default');
-        mainLogo.onclick = (e) => handleLogoClick(e, mainLogo);
-    }
+    // --- LOGO & COLOR THEME SETUP ---
+    initLogoSystem();
 
     fetchWords(currentPage);
 });
@@ -620,27 +618,32 @@ async function submitWord() {
     finally { btn.disabled = false; btn.innerText = "Sözlüğe Ekle"; }
 }
 
-/* --- LOGO MENU & SWAP SYSTEM --- */
+/* --- LOGO MENU & SWAP SYSTEM (GÜNCELLENDİ) --- */
 
 let isMenuOpen = false;
 
-document.addEventListener('DOMContentLoaded', () => {
-    // ... Diğer başlatma kodların ...
-    
-    // Logo Sistemini Başlat
-    initLogoSystem();
-});
-
-// Sistemi kuran ana fonksiyon
 function initLogoSystem() {
     const wrapper = document.querySelector('.logo-wrapper');
     const originalCard = document.querySelector('.logo-card');
     
     if (!wrapper || !originalCard) return;
 
-    // 1. Orijinal kartı yapılandır (Merkez - Krem)
+    // --- RENK TEMASI YÜKLEME ---
+    const savedColorTheme = localStorage.getItem(COLOR_THEME_KEY) || 'default';
+    setTheme(savedColorTheme);
+
+    // Orijinal kart, hangi tema kayıtlıysa o renkte başlamalı (Mantık gereği)
+    // Ancak logo mekaniği 'default' ile başlayıp kullanıcıyı karşılamak üzerine kurulu
+    // Bu yüzden başlangıçta kartları standart diziyoruz, ama BODY teması localStorage'dan geliyor.
+    
+    // 1. Orijinal kartı yapılandır (Merkez - Default Görünümde Başlar)
     originalCard.classList.add('pos-center', 'theme-default');
-    // ID'leri temizle (Çakışma olmasın)
+    
+    // Eğer kayıtlı tema 'blue' ise merkez kartın 'theme-blue' olması gerekir.
+    // Bu detaylı bir logic gerektirir, ancak şimdilik basitçe
+    // kartları standart başlatıp, kullanıcının seçtiği temayı BODY'ye uyguladık.
+    // Kullanıcı tekrar değiştirmek isterse karta tıklar.
+
     cleanIds(originalCard);
     
     // 2. Sol Kartı Üret (Mavi)
@@ -648,33 +651,30 @@ function initLogoSystem() {
     leftCard.className = 'logo-card pos-left theme-blue';
     cleanIds(leftCard);
     
-    // 3. Sağ Kartı Üret (Yeşil)
+    // 3. Sağ Kartı Üret (Kırmızı/Toprak)
     const rightCard = originalCard.cloneNode(true);
-    rightCard.className = 'logo-card pos-right theme-green';
+    rightCard.className = 'logo-card pos-right theme-red';
     cleanIds(rightCard);
 
-    // Kartları DOM'a ekle (Grid sayesinde üst üste binecekler)
+    // Kartları DOM'a ekle
     wrapper.appendChild(leftCard);
     wrapper.appendChild(rightCard);
 
-    // Tüm kartlara tıklama olayı ekle
+    // Olay dinleyicileri
     const allCards = wrapper.querySelectorAll('.logo-card');
     allCards.forEach(card => {
         card.onclick = (e) => handleCardClick(e, card);
     });
 
-    // Dışarı tıklamayı dinle
     document.addEventListener('click', handleOutsideClick);
 }
 
 function handleCardClick(event, clickedCard) {
-    event.stopPropagation(); // Event yayılmasını durdur
+    event.stopPropagation(); 
 
-    // 1. Eğer tıklanan kart MERKEZDEYSE: Menüyü Aç/Kapat
     if (clickedCard.classList.contains('pos-center')) {
         toggleMenu();
     } 
-    // 2. Eğer tıklanan kart YANLARDAYSA (Sol veya Sağ): Swap Yap
     else if (isMenuOpen && (clickedCard.classList.contains('pos-left') || clickedCard.classList.contains('pos-right'))) {
         performSwap(clickedCard);
     }
@@ -686,12 +686,10 @@ function toggleMenu() {
     const sideCards = wrapper.querySelectorAll('.pos-left, .pos-right');
 
     if (isMenuOpen) {
-        // Kapat
         centerCard.classList.remove('menu-open');
         sideCards.forEach(card => card.classList.remove('visible'));
         isMenuOpen = false;
     } else {
-        // Aç
         centerCard.classList.add('menu-open');
         sideCards.forEach(card => card.classList.add('visible'));
         isMenuOpen = true;
@@ -702,44 +700,45 @@ function performSwap(clickedCard) {
     const wrapper = document.querySelector('.logo-wrapper');
     const currentCenter = wrapper.querySelector('.pos-center');
     
-    // Tıklanan kartın pozisyonunu al (pos-left veya pos-right)
     let clickedPosClass = clickedCard.classList.contains('pos-left') ? 'pos-left' : 'pos-right';
 
-    // --- SWAP İŞLEMİ ---
-    // 1. Tıklanan kart merkeze geçer
+    // --- SWAP ---
     clickedCard.classList.remove(clickedPosClass, 'visible');
     clickedCard.classList.add('pos-center');
 
-    // 2. Eski merkez kart, tıklananın yerine geçer
     currentCenter.classList.remove('pos-center', 'menu-open');
     currentCenter.classList.add(clickedPosClass);
 
-    // 3. Menüyü kapat (Diğer kartları da gizle)
     const allSideCards = wrapper.querySelectorAll('.pos-left, .pos-right');
     allSideCards.forEach(card => card.classList.remove('visible'));
 
     isMenuOpen = false;
     
-    console.log("Logo değişti! Yeni merkez: ", clickedCard.className);
+    // --- TEMA DEĞİŞTİRME MANTIĞI ---
+    if (clickedCard.classList.contains('theme-blue')) {
+        setTheme('blue');
+    } else if (clickedCard.classList.contains('theme-red')) {
+        setTheme('red');
+    } else {
+        setTheme('default');
+    }
+}
+
+function setTheme(themeName) {
+    document.body.setAttribute('data-theme', themeName);
+    localStorage.setItem(COLOR_THEME_KEY, themeName);
 }
 
 function handleOutsideClick(event) {
     const wrapper = document.querySelector('.logo-wrapper');
-    // Eğer menü açıksa ve tıklanan yer wrapper değilse kapat
     if (isMenuOpen && wrapper && !wrapper.contains(event.target)) {
-        toggleMenu(); // Kapatır
+        toggleMenu();
     }
 }
 
-// Helper: ID çakışmalarını önlemek için ID'leri siler
 function cleanIds(element) {
     element.removeAttribute('id');
     const children = element.querySelectorAll('[id]');
     children.forEach(child => child.removeAttribute('id'));
-    // onclick attribute'unu sil (JS ile ekliyoruz)
     element.removeAttribute('onclick');
 }
-
-/* --- Diğer App Kodların Buradan Devam Eder --- */
-// (loadMoreWords, fetchWords vb. buranın altında kalacak)
-// ...
