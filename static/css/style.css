@@ -5,7 +5,7 @@
     --radius: 12px;
     --success-color: #4CAF50;
     --error-color: #f44336;
-    --transition-speed: 0.5s; /* Renk geçiş hızı */
+    --transition-speed: 0.5s;
 }
 
 /* ========================================
@@ -37,55 +37,91 @@ body.dark-mode[data-theme="default"] {
     --dislike-color-active: #7986CB;
 }
 
-/* --- 2. MAVİ TEMA (BLUE / COOL) --- */
-body[data-theme="blue"] {
-    --bg-color: #e8eff3;
-    --card-bg: #f5f9fc;
-    --text-main: #1d2b36;
-    --text-muted: #546e7a;
-    --accent: #455a64;
-    --shadow: 0 4px 15px rgba(40, 50, 60, 0.1);
-    --shadow-hover: 0 8px 25px rgba(40, 50, 60, 0.15);
-    --like-color-active: #29b6f6;
-    --dislike-color-active: #7e57c2;
-}
-body.dark-mode[data-theme="blue"] {
-    --bg-color: #1b2228;
-    --card-bg: #263238;
-    --text-main: #eceff1;
-    --text-muted: #90a4ae;
-    --accent: #80cbc4;
-    --shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-    --shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.7);
-    --like-color-active: #4fc3f7;
-    --dislike-color-active: #9575cd;
-}
-
-/* --- 3. KIRMIZI/TOPRAK TEMA (RED / WARM) --- */
+/* --- 2. KIRMIZI TEMA (RED / COMIC / SKETCH STYLE) --- */
+/* Bu tema logodaki "küfürlü/sert" havayı tüm siteye yayar */
 body[data-theme="red"] {
-    --bg-color: #f7f3f3;
-    --card-bg: #fffbfb;
-    --text-main: #3e2723;
-    --text-muted: #8d6e63;
-    --accent: #a1887f;
-    --shadow: 0 4px 15px rgba(62, 39, 35, 0.1);
-    --shadow-hover: 0 8px 25px rgba(62, 39, 35, 0.15);
+    --bg-color: #d32f2f; /* Logonun ana kırmızısı */
+    --card-bg: #ffffff;
+    --text-main: #1a1a1a;
+    --text-muted: #555;
+    --accent: #1a1a1a; /* Vurgular siyah */
+    
+    /* Sert, bulanık olmayan çizgi roman gölgesi */
+    --shadow: 6px 6px 0px #1a1a1a; 
+    --shadow-hover: 10px 10px 0px #1a1a1a;
+    
     --like-color-active: #d32f2f;
-    --dislike-color-active: #5d4037;
-}
-body.dark-mode[data-theme="red"] {
-    --bg-color: #282222;
-    --card-bg: #3e2e2e;
-    --text-main: #efebe9;
-    --text-muted: #bcaaa4;
-    --accent: #e6ee9c; 
-    --shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-    --shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.7);
-    --like-color-active: #ef5350;
-    --dislike-color-active: #8d6e63;
+    --dislike-color-active: #1a1a1a;
+    
+    /* Arka plan için noktalı doku (Halftone Pattern) */
+    background-image: radial-gradient(circle, #b71c1c 20%, transparent 20%),
+                      radial-gradient(circle, transparent 20%, #b71c1c 20%, transparent 30%);
+    background-size: 20px 20px;
+    background-position: 0 0, 10px 10px;
+    background-attachment: fixed;
 }
 
-/* --- GENEL BODY --- */
+body.dark-mode[data-theme="red"] {
+    --bg-color: #4a0000;
+    --card-bg: #2c0000;
+    --text-main: #ffcece;
+    --text-muted: #cc8e8e;
+    --accent: #ff0000;
+    --shadow: 6px 6px 0px #000000;
+    --shadow-hover: 10px 10px 0px #000000;
+    
+    background-image: radial-gradient(circle, #220000 20%, transparent 20%),
+                      radial-gradient(circle, transparent 20%, #220000 20%, transparent 30%);
+}
+
+/* --- KIRMIZI TEMA İÇİN ÖZEL STİL OVERRIDE'LARI --- */
+/* Tüm kutuları "kutu gibi" yap, yumuşaklığı kaldır */
+body[data-theme="red"] .word-card,
+body[data-theme="red"] .form-card,
+body[data-theme="red"] .header-btn,
+body[data-theme="red"] .full-comment-view,
+body[data-theme="red"] .custom-alert,
+body[data-theme="red"] input,
+body[data-theme="red"] textarea {
+    border: 3px solid #1a1a1a !important; 
+    border-radius: 8px !important;
+    box-shadow: var(--shadow) !important;
+}
+
+body[data-theme="red"] .word-card {
+    border-left: 3px solid #1a1a1a !important; /* Varsayılan renkli şeridi iptal et */
+}
+
+/* Kırmızı temada butonlar sarı uyarı şeridi gibi olsun */
+body[data-theme="red"] .form-card button,
+body[data-theme="red"] .header-btn:hover,
+body[data-theme="red"] .vote-btn:hover:not(:disabled) {
+    background-color: #ffeb3b; /* Uyarı Sarısı */
+    color: #000;
+    border: 3px solid #000 !important;
+    font-weight: 900;
+    text-transform: uppercase;
+    box-shadow: 4px 4px 0px rgba(0,0,0,1) !important;
+    transform: translate(-2px, -2px);
+}
+body[data-theme="red"] .header-btn {
+    background-color: #fff;
+    color: #000;
+}
+
+/* Başlıkları hafif yamuk yap (El yazısı havası) */
+body[data-theme="red"] h1, 
+body[data-theme="red"] h2, 
+body[data-theme="red"] .form-title {
+    text-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+    transform: rotate(-1deg);
+    display: inline-block;
+}
+
+/* ========================================
+   GENEL BODY & LAYOUT
+   ========================================
+*/
 body {
     font-family: var(--font-body);
     background-color: var(--bg-color);
@@ -96,7 +132,7 @@ body {
     transition: background-color var(--transition-speed), color var(--transition-speed);
 }
 
-/* --- SPINNER STYLES --- */
+/* --- SPINNER --- */
 .spinner {
     border: 4px solid rgba(0, 0, 0, 0.1);
     width: 36px;
@@ -127,6 +163,7 @@ body.dark-mode .spinner { border: 4px solid rgba(255, 255, 255, 0.1); border-lef
 .load-more-comments-btn:hover { text-decoration: underline; color: var(--text-main); }
 
 
+/* --- HEADER & CONTROLS --- */
 .header-controls {
     position: absolute; top: 20px; left: 20px; display: flex; gap: 10px; z-index: 1000;
 }
@@ -158,7 +195,10 @@ header {
     padding: 10px;
 }
 
-/* --- LOGO SYSTEM (SWAP & GRID) --- */
+/* ========================================
+   LOGO SİSTEMİ (SWAP & GRID)
+   ========================================
+*/
 
 .logo-wrapper {
     display: inline-grid; 
@@ -166,118 +206,120 @@ header {
     grid-template-rows: 1fr;
     justify-items: center;
     align-items: center;
-    
     position: relative;
     z-index: 1000;
-    overflow: visible; 
+    overflow: visible;
 }
 
 /* Tüm Logo Kartlarının Ortak Stili */
 .logo-card {
     grid-column: 1 / 2;
     grid-row: 1 / 2;
-    
     background: var(--card-bg);
     padding: 20px 50px;
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     border: 1px solid rgba(142, 127, 127, 0.3);
-    
     width: max-content; 
     transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
-    
     cursor: pointer;
     user-select: none;
     box-sizing: border-box;
-    
     opacity: 0; 
     z-index: 0;
     transform: translate(0, 0) scale(0.9);
     pointer-events: none; 
 }
 
-.logo-card:hover {
-    box-shadow: var(--shadow-hover);
-}
+.logo-card:hover { box-shadow: var(--shadow-hover); }
 
 /* --- POZİSYON VE DURUM SINIFLARI --- */
-
-/* 1. MERKEZ KART (Aktif Logo) */
 .logo-card.pos-center {
-    opacity: 1;
-    z-index: 20;
+    opacity: 1; z-index: 20;
     transform: translate(0, 0) scale(1);
     pointer-events: auto; 
 }
-
-/* Menü açıkken merkez kartın efekti */
+/* Menü açıkken merkez kart SOLA KAYAR */
 .logo-card.pos-center.menu-open {
+    transform: translateX(-60%) scale(0.95) rotate(-2deg) !important;
     border-color: var(--accent);
 }
-
-/* 2. SOL KART (Menü Açıkken) */
-.logo-card.pos-left.visible {
-    opacity: 1;
-    z-index: 10;
-    transform: translateX(-110%) rotate(-3deg) scale(0.95);
-    pointer-events: auto;
-}
-
-/* 3. SAĞ KART (Menü Açıkken) */
+/* SAĞ KART (Menü Açıkken) - SAĞA GELİR */
 .logo-card.pos-right.visible {
-    opacity: 1;
-    z-index: 10;
-    transform: translateX(110%) rotate(3deg) scale(0.95);
+    opacity: 1; z-index: 25;
+    transform: translateX(60%) scale(0.95) rotate(2deg) !important; 
     pointer-events: auto;
 }
 
-/* --- LOGO KART RENKLERİ --- */
-
-/* Aydınlık Mod (Light Mode) Varsayılanları */
+/* --- LOGO KART TEMALARI --- */
 .theme-default { background-color: #fdfbf7 !important; }
 
-/* Mavi Kart */
-.theme-blue { 
-    background-color: #e0e5e9 !important;
-    border-color: #b0bec5 !important;
+/* RED CARD THEME (COMIC / SKETCH STYLE) */
+.logo-card.theme-red { 
+    background-color: #d32f2f !important; /* Canlı Kırmızı */
+    border: 4px solid #1a1a1a !important; 
+    border-radius: 2% 6% 5% 4% / 1% 1% 2% 4% !important; 
+    overflow: visible;
+    box-shadow: 8px 8px 0px #1a1a1a !important; 
+    background-image: radial-gradient(circle, #b71c1c 20%, transparent 20%),
+                      radial-gradient(circle, transparent 20%, #b71c1c 20%, transparent 30%);
+    background-size: 15px 15px;
+    background-position: 0 0, 7px 7px;
+    transform: rotate(-2deg); 
 }
 
-/* Kırmızı/Toprak Kart */
-.theme-red { 
-    background-color: #dbbfbf !important;
-    border-color: #ad9c9c !important;
+.logo-card.theme-red h1 {
+    font-weight: 900;
+    color: #fff !important;
+    -webkit-text-stroke: 2px #1a1a1a; 
+    text-shadow: 4px 4px 0px #000;
+    transform: rotate(-1deg) scale(1.05);
+    position: relative;
+    letter-spacing: 2px;
 }
 
-/* --- DARK MODE LOGO KART RENKLERİ (DÜZELTİLDİ) --- */
-/* Bu bölüm kullanıcının dark modu açtığında GÖRECEĞİ logo kartı renkleridir */
+.logo-card.theme-red h1::after {
+    content: "#!@&?";
+    position: absolute; top: -35px; right: -25px;
+    font-size: 0.5em; color: #ffeb3b; 
+    -webkit-text-stroke: 1.5px #000;
+    text-shadow: 3px 3px 0px #b71c1c;
+    transform: rotate(15deg);
+    font-family: 'Courier New', monospace;
+    animation: flicker 2s infinite;
+}
 
-/* Varsayılan */
+.logo-card.theme-red .subtitle {
+    font-family: sans-serif !important;
+    text-transform: uppercase; font-weight: 900; letter-spacing: 1px;
+    font-size: 0.8rem !important;
+    background: #1a1a1a; color: #ffeb3b !important;
+    padding: 6px 12px; transform: rotate(2deg);
+    display: inline-block; margin-top: 15px !important;
+    border-radius: 4px; box-shadow: 3px 3px 0px rgba(0,0,0,0.3);
+}
+
+/* Dark mode version of Logo Cards */
 body.dark-mode .theme-default { background-color: #3c3c45 !important; }
-
-/* Mavi Kart - Artık daha belirgin bir gece mavisi */
-body.dark-mode .theme-blue { 
-    background-color: #1f2a38 !important; 
+body.dark-mode .logo-card.theme-red { 
+    background-color: #8b0000 !important; 
+    border-color: #000 !important;
+    background-image: radial-gradient(circle, #a50000 20%, transparent 20%),
+                      radial-gradient(circle, transparent 20%, #8b0000 20%, transparent 30%);
+}
+body[data-theme="red"] .logo-card.theme-default {
+    border: 3px solid #1a1a1a !important;
+    box-shadow: var(--shadow) !important;
 }
 
-/* Kırmızı Kart - Yeşil yerine artık koyu bordo/kırmızı */
-body.dark-mode .theme-red { 
-    background-color: #3e2020 !important; 
-}
+.logo-card h1, .logo-card .subtitle { pointer-events: none; }
 
-
-/* İçerik Stilleri (Tıklamayı engelleme) */
-.logo-card h1, .logo-card .subtitle {
-    pointer-events: none; 
-}
-
-/* Yazı stilleri */
 .logo-card h1 {
     font-family: var(--font-heading);
     font-size: 4.5rem; margin: 0; line-height: 1.1;
     color: var(--text-main); transform: rotate(-2deg);
     user-select: none;
 }
-
 .logo-card .subtitle {
     font-family: var(--font-heading);
     font-size: 1.7rem; color: var(--text-muted);
@@ -285,22 +327,23 @@ body.dark-mode .theme-red {
     user-select: none;
 }
 
-/* Mobil Düzenleme */
 @media (max-width: 768px) {
-    .logo-card.pos-left.visible { transform: translateY(110%); }
-    .logo-card.pos-right.visible { transform: translateY(220%); }
-    
+    .logo-card.pos-center.menu-open { transform: translateY(-60%) scale(0.9) !important; }
+    .logo-card.pos-right.visible { transform: translateY(60%) scale(0.9) !important; }
     .logo-card { padding: 20px 20px; }
     h1 { font-size: 3.5rem; margin-top: 0; } 
-    
+    .logo-card.theme-red { border-radius: 12px !important; transform: none !important; }
+    .logo-card.theme-red h1::after { right: -10px; top: -25px; font-size: 0.4em; }
     body { padding: 10px; font-size: 16px; }
     .form-card { padding: 20px; }
     .word-card { padding: 20px; }
     header { padding-top: 80px; margin-top: 0; margin-bottom: 30px; }
 }
 
-
-/* --- OTHER STYLES --- */
+/* ========================================
+   İÇERİK KARTLARI (WORDS, FORMS)
+   ========================================
+*/
 .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
 .feed-container { display: flex; flex-direction: column; gap: 20px; }
 
@@ -400,7 +443,7 @@ input:focus, textarea:focus {
     .form-card button { width: 100%; }
 }
 
-/* --- Z-INDEX FIX --- */
+/* --- NOTIFICATIONS --- */
 .notification-container {
     position: fixed; top: 20px; right: 20px;
     z-index: 4000;
@@ -420,13 +463,9 @@ input:focus, textarea:focus {
 
 /* --- REUSABLE VOTE SYSTEM --- */
 .vote-container {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    background: rgba(142, 127, 127, 0.08);
-    padding: 3px 6px;
-    border-radius: 20px;
-    width: fit-content;
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(142, 127, 127, 0.08); padding: 3px 6px;
+    border-radius: 20px; width: fit-content;
     border: 1px solid rgba(142, 127, 127, 0.1);
 }
 
@@ -440,7 +479,6 @@ input:focus, textarea:focus {
 .vote-btn:active:not(:disabled) { transform: scale(0.9); }
 .vote-btn:disabled { opacity: 0.5; cursor: default; }
 
-/* Active States */
 .vote-btn.like.active svg { fill: var(--like-color-active); stroke: var(--like-color-active); }
 .vote-btn.dislike.active svg { fill: var(--dislike-color-active); stroke: var(--dislike-color-active); }
 
@@ -449,7 +487,7 @@ input:focus, textarea:focus {
     min-width: 20px; text-align: center; margin: 0 4px; user-select: none;
 }
 
-/* Modal and Comment View Styles */
+/* --- MODAL & COMMENTS --- */
 .full-comment-view {
     position: fixed; z-index: 2000; background: var(--card-bg);
     border-radius: var(--radius); box-shadow: var(--shadow-hover);
@@ -598,3 +636,9 @@ input:focus, textarea:focus {
     padding-bottom: 5px;
 }
 .about-text { font-size: 1.1rem; line-height: 1.8; color: var(--text-muted); }
+
+/* --- ANIMATIONS --- */
+@keyframes flicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; transform: rotate(10deg) scale(1.1); }
+}
