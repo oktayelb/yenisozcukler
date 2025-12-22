@@ -23,13 +23,25 @@ def get_words(request):
     page_number = request.GET.get('page', 1)
     limit = int(request.GET.get('limit', 20))
     limit = min(limit, 50)
+    
+    # Yeni parametre: mode
+    mode = request.GET.get('mode', 'all') 
 
+    # Temel sorgu
     words_queryset = Word.objects.filter(status='approved')\
         .only('id', 'word', 'definition', 'author', 'timestamp', 'is_profane', 'score')\
         .order_by('-timestamp')
     
-    cache_key = 'total_approved_words_count'
+    # EĞER mod 'profane' ise sadece +18 olanları getir
+    if mode == 'profane':
+        words_queryset = words_queryset.filter(is_profane=True)
+
+    else :  
+        words_queryset = words_queryset.filter(is_profane=False)
+    # Cache key artık moda göre değişmeli, yoksa sayılar karışır
+    cache_key = f'total_approved_words_count_{mode}'
     total_count = cache.get(cache_key)
+    
     if total_count is None:
         total_count = words_queryset.count()
         cache.set(cache_key, total_count, 60 * 5)
@@ -41,11 +53,10 @@ def get_words(request):
         words_page = []
 
     client_ip = get_client_ip(request)
-    user_votes = {} # { word_id: 1 veya -1 }
+    user_votes = {}
     
     if client_ip and words_page:
         page_word_ids = [w.id for w in words_page]
-        # values('word_id', 'value') olarak çekiyoruz
         votes = WordVote.objects.filter(
             ip_address=client_ip, 
             word_id__in=page_word_ids
@@ -61,7 +72,6 @@ def get_words(request):
         'words': serializer.data, 
         'total_count': total_count
     })
-
 @api_view(['GET'])
 @authentication_classes([]) 
 @permission_classes([])

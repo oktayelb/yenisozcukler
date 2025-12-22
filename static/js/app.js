@@ -501,6 +501,7 @@ function appendCardsToDOM(words, listElement, prepend = false) {
     });
 }
 
+// --- GÜNCELLENEN KISIM BAŞLANGIÇ ---
 async function fetchWords(page) {
     if (isLoading) return;
     isLoading = true;
@@ -509,6 +510,10 @@ async function fetchWords(page) {
     const loadMoreContainer = document.getElementById('loadMoreContainer');
     const loadMoreBtn = loadMoreContainer.querySelector('button');
     
+    // Temaya göre mod belirle
+    const currentTheme = localStorage.getItem(COLOR_THEME_KEY);
+    const mode = currentTheme === 'red' ? 'profane' : 'all';
+
     if (page === 1) {
         list.innerHTML = `<div class="spinner"></div>`;
         loadMoreContainer.style.display = 'none';
@@ -517,7 +522,8 @@ async function fetchWords(page) {
         loadMoreBtn.disabled = true;
     }
 
-    const url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}`;
+    // URL'e mode parametresini ekle
+    const url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}`;
     
     try {
         const response = await fetch(url);
@@ -552,6 +558,7 @@ async function fetchWords(page) {
         loadMoreBtn.disabled = false;
     }
 }
+// --- GÜNCELLENEN KISIM BİTİŞ ---
 
 function loadMoreWords() {
     currentPage++;
@@ -639,10 +646,9 @@ function initLogoSystem() {
     cardDefault.className = 'logo-card theme-default';
     cardRed.className = 'logo-card theme-red';
 
-    // --- YENİ: Kırmızı kartın yazısını "leetspeak" yap ---
+    // Kırmızı kartın yazısını "leetspeak" yap
     const redH1 = cardRed.querySelector('h1');
     if (redH1) redH1.textContent = 'Yeni Sözcükler';
-    // -----------------------------------------------------
 
     // 4. Konumlandırma Mantığı
     if (savedColorTheme === 'red') {
@@ -665,7 +671,7 @@ function initLogoSystem() {
 function handleCardClick(event, clickedCard) {
     event.stopPropagation(); 
 
-    // Merkezdeki karta tıklandıysa menüyü aç/kapa (DÜRTME YOK, DİREKT AÇILIŞ)
+    // Merkezdeki karta tıklandıysa menüyü aç/kapa
     if (clickedCard.classList.contains('pos-center')) {
         toggleMenu();
     } 
@@ -691,6 +697,7 @@ function toggleMenu() {
     }
 }
 
+// --- GÜNCELLENEN KISIM BAŞLANGIÇ ---
 function performSwap(clickedCard) {
     const wrapper = document.querySelector('.logo-wrapper');
     const currentCenter = wrapper.querySelector('.pos-center');
@@ -704,13 +711,18 @@ function performSwap(clickedCard) {
 
     isMenuOpen = false;
     
-    // TEMA DEĞİŞTİRME
+    // TEMA DEĞİŞTİRME VE LİSTE YENİLEME
     if (clickedCard.classList.contains('theme-red')) {
         setTheme('red');
     } else {
         setTheme('default');
     }
+
+    // Listeyi sıfırla ve yeniden çek
+    currentPage = 1;
+    fetchWords(currentPage);
 }
+// --- GÜNCELLENEN KISIM BİTİŞ ---
 
 function setTheme(themeName) {
     document.body.setAttribute('data-theme', themeName);

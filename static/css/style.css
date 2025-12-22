@@ -1,125 +1,110 @@
-/* --- TEMEL AYARLAR & FONTLAR --- */
-:root {
-    --font-heading: 'Caveat', cursive;
-    --font-body: 'Merriweather', serif;
-    --radius: 12px;
-    --success-color: #4CAF50;
-    --error-color: #f44336;
-    --transition-speed: 0.5s;
-}
-
 /* ========================================
-   TEMA SİSTEMİ (Değişkenler)
+   1. TEMEL DEĞİŞKENLER & KONFİGÜRASYON
    ========================================
 */
+:root {
+    /* --- FONTLAR --- */
+    --font-heading: 'Caveat', cursive;
+    --font-body: 'Merriweather', serif;
 
-/* --- 1. VARSAYILAN TEMA (KREM / DEFAULT) --- */
-body[data-theme="default"] {
+    /* --- LAYOUT & SPACING (Standart Boşluklar) --- */
+    --radius: 12px;
+    --spacing-xs: 5px;
+    --spacing-sm: 10px;
+    --spacing-md: 20px;
+    --spacing-lg: 30px;
+    --spacing-xl: 50px;
+
+    /* --- Z-INDEX MAP (Katman Yönetimi) --- */
+    --z-negative: -1;
+    --z-base: 1;
+    --z-card-profane: 10;
+    --z-logo-center: 20;
+    --z-logo-side: 25;
+    --z-header: 1000;
+    --z-modal-backdrop: 1050;
+    --z-drawer: 2000;
+    --z-overlay: 3000;
+    --z-notification: 4000;
+
+    /* --- ANİMASYON --- */
+    --transition-fast: 0.2s ease;
+    --transition-normal: 0.3s ease;
+    --transition-slow: 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+
+    /* --- RENKLER (Varsayılan - Default) --- */
     --bg-color: #f4f1ea;
     --card-bg: #fdfbf7;
     --text-main: #2c2c2c;
     --text-muted: #5d5c61;
     --accent: #8e7f7f;
-    --shadow: 0 4px 15px rgba(60, 50, 40, 0.1);
-    --shadow-hover: 0 8px 25px rgba(60, 50, 40, 0.15);
+    --border-light: rgba(142, 127, 127, 0.3); /* Genel ince çerçeve rengi */
+    
+    /* --- DURUM RENKLERİ --- */
+    --success-color: #4CAF50;
+    --error-color: #f44336;
     --like-color-active: #E53935;
     --dislike-color-active: #5C6BC0;
+
+    /* --- GÖLGELER --- */
+    --shadow-sm: 0 4px 15px rgba(60, 50, 40, 0.1);
+    --shadow-lg: 0 8px 25px rgba(60, 50, 40, 0.15);
 }
-body.dark-mode[data-theme="default"] {
+
+/* ========================================
+   2. TEMA YÖNETİMİ (THEME ENGINE)
+   ========================================
+*/
+
+/* --- DARK MODE OVERRIDES --- */
+body.dark-mode {
     --bg-color: #2c2c34;
     --card-bg: #3c3c45;
     --text-main: #f0f0f0;
     --text-muted: #a0a0a0;
     --accent: #b8a9a9;
-    --shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
-    --shadow-hover: 0 8px 25px rgba(0, 0, 0, 0.6);
+    --border-light: rgba(255, 255, 255, 0.1);
+    
+    --shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 25px rgba(0, 0, 0, 0.6);
+    
     --like-color-active: #FF7043;
     --dislike-color-active: #7986CB;
 }
 
-/* --- 2. KIRMIZI TEMA (RED / COMIC / SKETCH STYLE) --- */
-/* Bu tema logodaki "küfürlü/sert" havayı tüm siteye yayar */
+/* --- RED THEME (Sadece Değişkenleri Değiştirir) --- */
 body[data-theme="red"] {
-    --bg-color: #d32f2f; /* Logonun ana kırmızısı */
-    --card-bg: #ffffff;
-    --text-main: #1a1a1a;
-    --text-muted: #555;
-    --accent: #1a1a1a; /* Vurgular siyah */
+    --bg-color: #7f1d1d; /* Bordo */
+    --card-bg: #fff5f5;
+    --text-main: #2b0b0b;
+    --text-muted: #7f4f4f;
+    --accent: #b91c1c; /* Uyarı Kırmızısı */
+    --border-light: rgba(185, 28, 28, 0.15);
     
-    /* Sert, bulanık olmayan çizgi roman gölgesi */
-    --shadow: 6px 6px 0px #1a1a1a; 
-    --shadow-hover: 10px 10px 0px #1a1a1a;
+    --shadow-sm: 0 4px 20px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.35);
     
     --like-color-active: #d32f2f;
     --dislike-color-active: #1a1a1a;
     
-    /* Arka plan için noktalı doku (Halftone Pattern) */
-    background-image: radial-gradient(circle, #b71c1c 20%, transparent 20%),
-                      radial-gradient(circle, transparent 20%, #b71c1c 20%, transparent 30%);
-    background-size: 20px 20px;
-    background-position: 0 0, 10px 10px;
-    background-attachment: fixed;
+    background-image: none; /* Varsa deseni kaldır */
 }
 
+/* --- DARK RED THEME --- */
 body.dark-mode[data-theme="red"] {
-    --bg-color: #4a0000;
-    --card-bg: #2c0000;
-    --text-main: #ffcece;
+    --bg-color: #2a0505;
+    --card-bg: #3f1010;
+    --text-main: #ffdada;
     --text-muted: #cc8e8e;
-    --accent: #ff0000;
-    --shadow: 6px 6px 0px #000000;
-    --shadow-hover: 10px 10px 0px #000000;
+    --accent: #ff5252;
+    --border-light: #450a0a;
     
-    background-image: radial-gradient(circle, #220000 20%, transparent 20%),
-                      radial-gradient(circle, transparent 20%, #220000 20%, transparent 30%);
-}
-
-/* --- KIRMIZI TEMA İÇİN ÖZEL STİL OVERRIDE'LARI --- */
-/* Tüm kutuları "kutu gibi" yap, yumuşaklığı kaldır */
-body[data-theme="red"] .word-card,
-body[data-theme="red"] .form-card,
-body[data-theme="red"] .header-btn,
-body[data-theme="red"] .full-comment-view,
-body[data-theme="red"] .custom-alert,
-body[data-theme="red"] input,
-body[data-theme="red"] textarea {
-    border: 3px solid #1a1a1a !important; 
-    border-radius: 8px !important;
-    box-shadow: var(--shadow) !important;
-}
-
-body[data-theme="red"] .word-card {
-    border-left: 3px solid #1a1a1a !important; /* Varsayılan renkli şeridi iptal et */
-}
-
-/* Kırmızı temada butonlar sarı uyarı şeridi gibi olsun */
-body[data-theme="red"] .form-card button,
-body[data-theme="red"] .header-btn:hover,
-body[data-theme="red"] .vote-btn:hover:not(:disabled) {
-    background-color: #ffeb3b; /* Uyarı Sarısı */
-    color: #000;
-    border: 3px solid #000 !important;
-    font-weight: 900;
-    text-transform: uppercase;
-    box-shadow: 4px 4px 0px rgba(0,0,0,1) !important;
-    transform: translate(-2px, -2px);
-}
-body[data-theme="red"] .header-btn {
-    background-color: #fff;
-    color: #000;
-}
-
-/* Başlıkları hafif yamuk yap (El yazısı havası) */
-body[data-theme="red"] h1, 
-body[data-theme="red"] h2, 
-body[data-theme="red"] .form-title {
-    text-shadow: 2px 2px 0px rgba(0,0,0,0.2);
-    transform: rotate(-1deg);
-    display: inline-block;
+    --shadow-sm: 0 4px 20px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.8);
 }
 
 /* ========================================
-   GENEL BODY & LAYOUT
+   3. GLOBAL STİLLER & RESET
    ========================================
 */
 body {
@@ -127,9 +112,27 @@ body {
     background-color: var(--bg-color);
     color: var(--text-main);
     margin: 0;
-    padding: 20px;
+    padding: var(--spacing-md);
     font-size: 18px;
-    transition: background-color var(--transition-speed), color var(--transition-speed);
+    transition: background-color var(--transition-slow), color var(--transition-slow);
+}
+
+/* --- GLOBAL SCROLLBAR (Tüm alanlar için standart) --- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: transparent; 
+}
+::-webkit-scrollbar-thumb {
+    background-color: var(--accent);
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-muted);
 }
 
 /* --- SPINNER --- */
@@ -140,66 +143,79 @@ body {
     border-radius: 50%;
     border-left-color: var(--accent);
     animation: spin 1s linear infinite;
-    margin: 20px auto;
+    margin: var(--spacing-md) auto;
 }
-body.dark-mode .spinner { border: 4px solid rgba(255, 255, 255, 0.1); border-left-color: var(--accent); }
+body.dark-mode .spinner { 
+    border: 4px solid rgba(255, 255, 255, 0.1); 
+    border-left-color: var(--accent); 
+}
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-.load-more-container { text-align: center; margin-top: 20px; margin-bottom: 40px; }
-.load-more-btn {
-    background: transparent; border: 2px solid var(--accent); color: var(--accent);
-    padding: 10px 25px; border-radius: 30px; font-weight: bold; cursor: pointer;
-    font-family: var(--font-body); transition: all 0.3s;
+/* ========================================
+   4. HEADER & CONTROLS
+   ========================================
+*/
+header { 
+    text-align: center; 
+    margin-bottom: 40px; 
+    margin-top: 50px; 
+    padding: var(--spacing-sm);
 }
-.load-more-btn:hover { background: var(--accent); color: var(--card-bg); }
 
-.load-more-comments-btn {
-    background: none; border: none; color: var(--accent);
-    font-size: 0.9rem; font-weight: bold; cursor: pointer;
-    padding: 10px; width: 100%; text-align: center;
-    margin-top: 10px; text-decoration: none;
-    transition: color 0.2s;
+.header-controls, .header-controls-right {
+    position: absolute; 
+    top: var(--spacing-md); 
+    display: flex; 
+    gap: var(--spacing-sm); 
+    z-index: var(--z-header);
 }
-.load-more-comments-btn:hover { text-decoration: underline; color: var(--text-main); }
+.header-controls { left: var(--spacing-md); }
+.header-controls-right { right: var(--spacing-md); }
 
-
-/* --- HEADER & CONTROLS --- */
-.header-controls {
-    position: absolute; top: 20px; left: 20px; display: flex; gap: 10px; z-index: 1000;
-}
-.header-controls-right {
-    position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 1000;
-}
+/* Ortak Buton Stili */
 .header-btn {
-    background: var(--card-bg); color: var(--text-main); border: 1px solid var(--text-muted);
-    padding: 10px 15px; border-radius: var(--radius); cursor: pointer;
-    font-size: 0.95rem; font-weight: bold; transition: all 0.3s;
-    box-shadow: var(--shadow); display: flex; align-items: center; gap: 6px;
+    background: var(--card-bg); 
+    color: var(--text-main); 
+    border: 1px solid var(--text-muted);
+    padding: 10px 15px; 
+    border-radius: var(--radius); 
+    cursor: pointer;
+    font-size: 0.95rem; 
+    font-weight: bold; 
+    transition: all var(--transition-normal);
+    box-shadow: var(--shadow-sm); 
+    display: flex; 
+    align-items: center; 
+    gap: 6px;
 }
 .header-btn:hover {
-    background: var(--accent); color: var(--card-bg); transform: translateY(-2px);
-    box-shadow: var(--shadow-hover);
+    background: var(--accent); 
+    color: var(--card-bg); 
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
 }
 .header-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
+
+/* Kırmızı Tema Buton Override - Sadece yapısal farklar */
+body[data-theme="red"] .header-btn {
+    border-color: var(--border-light);
+}
+body[data-theme="red"] .header-btn:hover {
+    background-color: var(--accent); /* Variable zaten kırmızı */
+    color: #fff;
+}
 
 @media (max-width: 768px) {
     .header-controls { top: 20px; left: 10px; }
     .header-controls-right { top: 20px; right: 10px; }
     .header-btn { font-size: 0.85rem; padding: 8px 12px; }
-}
-
-header { 
-    text-align: center; 
-    margin-bottom: 40px; 
-    margin-top: 50px; 
-    padding: 10px;
+    header { padding-top: 80px; margin-top: 0; margin-bottom: 30px; }
 }
 
 /* ========================================
-   LOGO SİSTEMİ (SWAP & GRID)
+   5. LOGO SİSTEMİ (Card Swap Logic)
    ========================================
 */
-
 .logo-wrapper {
     display: inline-grid; 
     grid-template-columns: 1fr;
@@ -207,21 +223,20 @@ header {
     justify-items: center;
     align-items: center;
     position: relative;
-    z-index: 1000;
+    z-index: var(--z-header);
     overflow: visible;
 }
 
-/* Tüm Logo Kartlarının Ortak Stili */
 .logo-card {
     grid-column: 1 / 2;
     grid-row: 1 / 2;
     background: var(--card-bg);
     padding: 20px 50px;
     border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    border: 1px solid rgba(142, 127, 127, 0.3);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-light);
     width: max-content; 
-    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+    transition: all var(--transition-slow);
     cursor: pointer;
     user-select: none;
     box-sizing: border-box;
@@ -230,101 +245,80 @@ header {
     transform: translate(0, 0) scale(0.9);
     pointer-events: none; 
 }
+.logo-card:hover { box-shadow: var(--shadow-lg); }
 
-.logo-card:hover { box-shadow: var(--shadow-hover); }
-
-/* --- POZİSYON VE DURUM SINIFLARI --- */
-.logo-card.pos-center {
-    opacity: 1; z-index: 20;
-    transform: translate(0, 0) scale(1);
-    pointer-events: auto; 
-}
-/* Menü açıkken merkez kart SOLA KAYAR */
-.logo-card.pos-center.menu-open {
-    transform: translateX(-60%) scale(0.95) rotate(-2deg) !important;
-    border-color: var(--accent);
-}
-/* SAĞ KART (Menü Açıkken) - SAĞA GELİR */
-.logo-card.pos-right.visible {
-    opacity: 1; z-index: 25;
-    transform: translateX(60%) scale(0.95) rotate(2deg) !important; 
-    pointer-events: auto;
-}
-
-/* --- LOGO KART TEMALARI --- */
-.theme-default { background-color: #fdfbf7 !important; }
-
-/* RED CARD THEME (COMIC / SKETCH STYLE) */
-.logo-card.theme-red { 
-    background-color: #d32f2f !important; /* Canlı Kırmızı */
-    border: 4px solid #1a1a1a !important; 
-    border-radius: 2% 6% 5% 4% / 1% 1% 2% 4% !important; 
-    overflow: visible;
-    box-shadow: 8px 8px 0px #1a1a1a !important; 
-    background-image: radial-gradient(circle, #b71c1c 20%, transparent 20%),
-                      radial-gradient(circle, transparent 20%, #b71c1c 20%, transparent 30%);
-    background-size: 15px 15px;
-    background-position: 0 0, 7px 7px;
-    transform: rotate(-2deg); 
-}
-
-.logo-card.theme-red h1 {
-    font-weight: 900;
-    color: #fff !important;
-    -webkit-text-stroke: 2px #1a1a1a; 
-    text-shadow: 4px 4px 0px #000;
-    transform: rotate(-1deg) scale(1.05);
-    position: relative;
-    letter-spacing: 2px;
-}
-
-.logo-card.theme-red h1::after {
-    content: "#!@&?";
-    position: absolute; top: -35px; right: -25px;
-    font-size: 0.5em; color: #ffeb3b; 
-    -webkit-text-stroke: 1.5px #000;
-    text-shadow: 3px 3px 0px #b71c1c;
-    transform: rotate(15deg);
-    font-family: 'Courier New', monospace;
-    animation: flicker 2s infinite;
-}
-
-.logo-card.theme-red .subtitle {
-    font-family: sans-serif !important;
-    text-transform: uppercase; font-weight: 900; letter-spacing: 1px;
-    font-size: 0.8rem !important;
-    background: #1a1a1a; color: #ffeb3b !important;
-    padding: 6px 12px; transform: rotate(2deg);
-    display: inline-block; margin-top: 15px !important;
-    border-radius: 4px; box-shadow: 3px 3px 0px rgba(0,0,0,0.3);
-}
-
-/* Dark mode version of Logo Cards */
-body.dark-mode .theme-default { background-color: #3c3c45 !important; }
-body.dark-mode .logo-card.theme-red { 
-    background-color: #8b0000 !important; 
-    border-color: #000 !important;
-    background-image: radial-gradient(circle, #a50000 20%, transparent 20%),
-                      radial-gradient(circle, transparent 20%, #8b0000 20%, transparent 30%);
-}
-body[data-theme="red"] .logo-card.theme-default {
-    border: 3px solid #1a1a1a !important;
-    box-shadow: var(--shadow) !important;
-}
-
-.logo-card h1, .logo-card .subtitle { pointer-events: none; }
-
+/* Başlıklar */
 .logo-card h1 {
     font-family: var(--font-heading);
     font-size: 4.5rem; margin: 0; line-height: 1.1;
     color: var(--text-main); transform: rotate(-2deg);
-    user-select: none;
+    pointer-events: none;
 }
 .logo-card .subtitle {
     font-family: var(--font-heading);
     font-size: 1.7rem; color: var(--text-muted);
     margin-top: 5px; display: block;
-    user-select: none;
+    pointer-events: none;
+}
+
+/* --- POZİSYON VE DURUM SINIFLARI --- */
+.logo-card.pos-center {
+    opacity: 1; z-index: var(--z-logo-center);
+    transform: translate(0, 0) scale(1);
+    pointer-events: auto; 
+}
+.logo-card.pos-center.menu-open {
+    transform: translateX(-60%) scale(0.95) rotate(-2deg) !important;
+    border-color: var(--accent);
+}
+.logo-card.pos-right.visible {
+    opacity: 1; z-index: var(--z-logo-side);
+    transform: translateX(60%) scale(0.95) rotate(2deg) !important; 
+    pointer-events: auto;
+}
+
+/* --- KIRMIZI TEMA LOGO ÖZELLİKLERİ --- */
+.logo-card.theme-default { background-color: var(--card-bg) !important; }
+
+/* Kırmızı kartın "Görsel" özelleştirmeleri */
+.logo-card.theme-red { 
+    background-color: #b91c1c !important; 
+    border-color: rgba(0, 0, 0, 0.5) !important; /* Çerçeve belirginleştirildi */
+    box-shadow: 0 10px 25px rgba(185, 28, 28, 0.4) !important;
+    transform: translate(0, 0) scale(0.9);
+}
+/* Dark mode red theme card */
+body.dark-mode .logo-card.theme-red { 
+    background-color: #7f1d1d !important; 
+    border-color: #450a0a !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.6) !important;
+}
+
+/* Kırmızı Tema: Yazı Efektleri */
+.logo-card.theme-red h1 {
+    font-weight: 700;
+    color: #fff !important;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    transform: none; 
+    letter-spacing: normal;
+    -webkit-text-stroke: 0;
+}
+.logo-card.theme-red h1::after {
+    content: "#!@&?";
+    position: absolute; top: -15px; right: -20px;
+    font-size: 0.4em; color: #fcd34d; 
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    transform: rotate(10deg);
+}
+.logo-card.theme-red .subtitle {
+    font-family: sans-serif !important;
+    text-transform: uppercase; font-weight: 700;
+    font-size: 0.75rem !important;
+    background: rgba(0, 0, 0, 0.25);
+    color: #fff !important;
+    padding: 5px 12px; transform: none; 
+    display: inline-block; margin-top: 10px !important;
+    border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);
 }
 
 @media (max-width: 768px) {
@@ -332,47 +326,47 @@ body[data-theme="red"] .logo-card.theme-default {
     .logo-card.pos-right.visible { transform: translateY(60%) scale(0.9) !important; }
     .logo-card { padding: 20px 20px; }
     h1 { font-size: 3.5rem; margin-top: 0; } 
-    .logo-card.theme-red { border-radius: 12px !important; transform: none !important; }
-    .logo-card.theme-red h1::after { right: -10px; top: -25px; font-size: 0.4em; }
-    body { padding: 10px; font-size: 16px; }
-    .form-card { padding: 20px; }
-    .word-card { padding: 20px; }
-    header { padding-top: 80px; margin-top: 0; margin-bottom: 30px; }
+    .logo-card.theme-red { transform: none !important; }
+    .logo-card.theme-red h1::after { right: -10px; top: -15px; font-size: 0.4em; }
 }
 
 /* ========================================
-   İÇERİK KARTLARI (WORDS, FORMS)
+   6. İÇERİK KARTLARI (MAIN CONTENT)
    ========================================
 */
 .container { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
 .feed-container { display: flex; flex-direction: column; gap: 20px; }
 
 .word-card {
-    background: var(--card-bg); padding: 30px 25px; border-radius: var(--radius);
-    box-shadow: var(--shadow); border: 1px solid rgba(142, 127, 127, 0.3); 
-    border-left: 5px solid var(--accent); position: relative;
+    background: var(--card-bg); 
+    padding: var(--spacing-lg) 25px; 
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm); 
+    border: 1px solid var(--border-light);
+    border-left: 5px solid var(--accent); /* Otomatik tema rengini alır */
+    position: relative;
     transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease, border-left-width 0.3s ease, opacity 0.5s ease;
     will-change: transform, opacity; 
 }
 
 .word-card.fade-in { opacity: 0; transform: translateY(50px); }
 .word-card.show { opacity: 1; transform: translateY(0); }
-.word-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-hover); border-left-width: 8px; }
+.word-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); border-left-width: 8px; }
 
+/* Profane (Sansür) İçeriği */
 .profane-wrapper {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background-color: var(--card-bg); z-index: 10; display: flex;
-    flex-direction: column; justify-content: center; align-items: center;
+    background-color: var(--card-bg); 
+    z-index: var(--z-card-profane); 
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
     border-radius: var(--radius); cursor: pointer; transition: opacity 0.3s ease;
     border: 1px dashed var(--card-bg);
 }
-
 .word-card.is-profane-content .word-title,
 .word-card.is-profane-content .word-def,
 .word-card.is-profane-content .word-author {
     filter: blur(8px); opacity: 0.3; pointer-events: none; 
 }
-
 .profane-badge {
     background-color: var(--error-color); color: white; padding: 8px 16px;
     border-radius: 8px; font-weight: bold; font-size: 1.4rem;
@@ -380,25 +374,24 @@ body[data-theme="red"] .logo-card.theme-default {
 }
 .profane-warning { color: var(--text-muted); font-size: 1rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1.5px; }
 
-.checkbox-wrapper {
-    display: flex; align-items: center; gap: 12px; margin-top: 5px; margin-bottom: 10px;
-    grid-column: 1 / -1; background: rgba(142, 127, 127, 0.05);
-    padding: 10px; border-radius: 6px;
+/* İçerik Metinleri */
+.word-title { 
+    font-size: 1.6rem; font-weight: 700; margin-bottom: 10px; 
+    color: var(--text-main); display: flex; justify-content: space-between; align-items: center; 
 }
-.checkbox-wrapper input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; margin: 0; padding: 0; accent-color: var(--error-color); }
-.checkbox-label { font-size: 0.95rem; color: var(--text-muted); cursor: pointer; user-select: none; margin: 0; text-transform: none; letter-spacing: normal; font-weight: bold; }
-
-.word-title { font-size: 1.6rem; font-weight: 700; margin-bottom: 10px; color: var(--text-main); display: flex; justify-content: space-between; align-items: center; }
 .word-def { font-size: 1.2rem; line-height: 1.7; color: var(--text-muted); white-space: pre-wrap; }
-
 .word-author {
     margin-top: 15px; font-size: 0.95rem; color: #999; text-align: right;
     font-style: italic; border-top: 1px dashed #ddd; padding-top: 8px;
 }
 body.dark-mode .word-author { color: #a0a0a0; border-top: 1px dashed #555; }
 
+/* ========================================
+   7. FORM & INPUTS
+   ========================================
+*/
 .form-card {
-    background: var(--card-bg); padding: 30px; border-radius: var(--radius);
+    background: var(--card-bg); padding: var(--spacing-lg); border-radius: var(--radius);
     box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-top: 4px solid var(--accent);
 }
 
@@ -406,6 +399,8 @@ body.dark-mode .word-author { color: #a0a0a0; border-top: 1px dashed #555; }
     font-family: var(--font-heading);
     font-size: 2.3rem; margin-bottom: 20px; color: var(--accent);
 }
+/* Kırmızı temada başlık düz */
+body[data-theme="red"] .form-title { transform: none; text-shadow: none; }
 
 .form-fields { display: grid; grid-template-columns: 1fr 2fr 1fr auto; gap: 15px; align-items: end; }
 .form-group { margin-bottom: 0; }
@@ -427,46 +422,56 @@ input:focus, textarea:focus {
     border-color: var(--accent); background-color: var(--card-bg);
     box-shadow: 0 0 0 3px rgba(142, 127, 127, 0.2);
 }
+/* Kırmızı temada focus rengi */
+body[data-theme="red"] input:focus, 
+body[data-theme="red"] textarea:focus {
+    box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.15);
+}
 
 .form-card button {
     padding: 15px 30px; background-color: var(--text-main); color: var(--card-bg);
     border: none; font-size: 1.05rem; cursor: pointer; border-radius: 6px;
     font-weight: bold; transition: all 0.2s; white-space: nowrap; height: 47px;
 }
-.form-card button:hover { background-color: var(--accent); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); }
+.form-card button:hover { 
+    background-color: var(--accent); 
+    transform: translateY(-1px); 
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); 
+}
+
+/* Kırmızı Tema Buton Özel Yapısı */
+body[data-theme="red"] .form-card button {
+    background-color: var(--accent); color: #fff;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    box-shadow: 0 4px 10px rgba(185, 28, 28, 0.4);
+}
+body[data-theme="red"] .form-card button:hover { background-color: #991b1b; }
 
 .char-limit { font-size: 0.8rem; color: var(--text-muted); text-align: right; margin-top: 4px; position: absolute; bottom: -20px; right: 0; }
 .def-wrapper { position: relative; padding-bottom: 20px; }
+
+.checkbox-wrapper {
+    display: flex; align-items: center; gap: 12px; margin-top: 5px; margin-bottom: 10px;
+    grid-column: 1 / -1; background: rgba(142, 127, 127, 0.05);
+    padding: 10px; border-radius: 6px;
+}
+.checkbox-wrapper input[type="checkbox"] { width: 22px; height: 22px; cursor: pointer; margin: 0; padding: 0; accent-color: var(--error-color); }
+.checkbox-label { font-size: 0.95rem; color: var(--text-muted); cursor: pointer; user-select: none; margin: 0; font-weight: bold; }
 
 @media (max-width: 768px) {
     .form-fields { grid-template-columns: 1fr; }
     .form-card button { width: 100%; }
 }
 
-/* --- NOTIFICATIONS --- */
-.notification-container {
-    position: fixed; top: 20px; right: 20px;
-    z-index: 4000;
-    display: flex; flex-direction: column; gap: 10px;
-}
-
-.custom-alert {
-    background-color: var(--card-bg); color: var(--text-main); padding: 15px 25px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); border-radius: var(--radius);
-    font-size: 1rem; font-weight: 700; opacity: 0;
-    transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
-    transform: translateX(100%); min-width: 250px; cursor: pointer;
-}
-.custom-alert.show { opacity: 1; transform: translateX(0); }
-.custom-alert-success { border-left: 6px solid var(--success-color); }
-.custom-alert-error { border-left: 6px solid var(--error-color); }
-
-/* --- REUSABLE VOTE SYSTEM --- */
+/* ========================================
+   8. ETKİLEŞİM & OYLAMA (VOTING)
+   ========================================
+*/
 .vote-container {
     display: flex; align-items: center; gap: 4px;
     background: rgba(142, 127, 127, 0.08); padding: 3px 6px;
     border-radius: 20px; width: fit-content;
-    border: 1px solid rgba(142, 127, 127, 0.1);
+    border: 1px solid var(--border-light);
 }
 
 .vote-btn {
@@ -487,10 +492,39 @@ input:focus, textarea:focus {
     min-width: 20px; text-align: center; margin: 0 4px; user-select: none;
 }
 
-/* --- MODAL & COMMENTS --- */
+/* Yükleme Butonları */
+.load-more-container { text-align: center; margin-top: 20px; margin-bottom: 40px; }
+.load-more-btn {
+    background: transparent; border: 2px solid var(--accent); color: var(--accent);
+    padding: 10px 25px; border-radius: 30px; font-weight: bold; cursor: pointer;
+    font-family: var(--font-body); transition: all 0.3s;
+}
+.load-more-btn:hover { background: var(--accent); color: var(--card-bg); }
+
+.load-more-comments-btn {
+    background: none; border: none; color: var(--accent);
+    font-size: 0.9rem; font-weight: bold; cursor: pointer;
+    padding: 10px; width: 100%; text-align: center;
+    margin-top: 10px; text-decoration: none;
+    transition: color 0.2s;
+}
+.load-more-comments-btn:hover { text-decoration: underline; color: var(--text-main); }
+
+/* ========================================
+   9. MODAL & YORUMLAR (COMMENTS DRAWER)
+   ========================================
+*/
+.modal-backdrop {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0); backdrop-filter: blur(0px);
+    z-index: var(--z-modal-backdrop); display: none;
+    transition: background-color 0.4s ease, backdrop-filter 0.4s ease;
+}
+.modal-backdrop.show { display: block; background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); }
+
 .full-comment-view {
-    position: fixed; z-index: 2000; background: var(--card-bg);
-    border-radius: var(--radius); box-shadow: var(--shadow-hover);
+    position: fixed; z-index: var(--z-drawer); background: var(--card-bg);
+    border-radius: var(--radius); box-shadow: var(--shadow-lg);
     border-left: 5px solid var(--accent);
     transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);    
     display: flex; flex-direction: column; overflow: hidden; transform-origin: center center;
@@ -498,14 +532,15 @@ input:focus, textarea:focus {
 
 .view-layer-placeholder {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    padding: 30px 25px; opacity: 1; transition: opacity 0.3s ease-out;
+    padding: var(--spacing-lg) 25px; opacity: 1; transition: opacity 0.3s ease-out;
     pointer-events: none; box-sizing: border-box;
 }
 .view-layer-full {
     opacity: 0; display: flex; flex-direction: column; height: 100%;
-    padding: 30px 25px; transition: opacity 0.4s ease-in 0.1s;
+    padding: var(--spacing-lg) 25px; transition: opacity 0.4s ease-in 0.1s;
     width: 100%; box-sizing: border-box;
 }
+
 .full-comment-view.expanded {
     top: 50% !important; left: 50% !important; transform: translate(-50%, -50%) !important; 
     width: min(95vw, 600px) !important; height: 90vh !important;
@@ -529,13 +564,6 @@ input:focus, textarea:focus {
 }
 .close-btn:hover { background: var(--accent); color: var(--card-bg); transform: rotate(90deg); }
 
-.modal-backdrop {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background-color: rgba(0, 0, 0, 0); backdrop-filter: blur(0px);
-    z-index: 1050; display: none;
-    transition: background-color 0.4s ease, backdrop-filter 0.4s ease;
-}
-.modal-backdrop.show { display: block; background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); }
 .comment-section { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
 
 .custom-comment-wrapper {
@@ -545,10 +573,9 @@ input:focus, textarea:focus {
     position: relative; margin-bottom: 15px; flex-shrink: 0;
 }
 .custom-comment-wrapper:focus-within {
-    border-color: var(--accent); box-shadow: 0 4px 15px rgba(142, 127, 127, 0.15);
+    border-color: var(--accent); box-shadow: var(--shadow-sm);
     background-color: var(--card-bg); transform: translateY(-2px);
 }
-
 .custom-comment-header {
     display: flex; align-items: center; border-bottom: 1px dashed rgba(142, 127, 127, 0.3);
     padding: 8px 15px; background-color: rgba(142, 127, 127, 0.05);
@@ -584,10 +611,6 @@ input:focus, textarea:focus {
     flex-grow: 1; overflow-y: auto; padding-right: 10px; padding-top: 10px;
     scrollbar-width: thin; scrollbar-color: var(--accent) var(--bg-color);
 }
-.comments-list::-webkit-scrollbar { width: 8px; }
-.comments-list::-webkit-scrollbar-track { background: var(--bg-color); border-radius: 4px; }
-.comments-list::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 4px; }
-.comments-list::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 .comment-item { 
     background: var(--bg-color); padding: 15px; border-radius: 8px; margin-bottom: 10px; 
@@ -598,18 +621,14 @@ input:focus, textarea:focus {
 .comment-item:hover { transform: translateY(-2px); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
 @keyframes slideInComment { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
 
-@media (max-width: 768px) {
-    .full-comment-view.expanded {
-        width: 100vw !important; height: 100vh !important; border-radius: 0 !important;
-        top: 0 !important; left: 0 !important; transform: none !important;
-    }
-    .drawer-header h2 { font-size: 1.2rem; }
-}
-
+/* ========================================
+   10. ABOUT OVERLAY
+   ========================================
+*/
 .about-overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     background-color: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);
-    z-index: 3000; display: flex; justify-content: center; align-items: center;
+    z-index: var(--z-overlay); display: flex; justify-content: center; align-items: center;
     opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
 }
 .about-overlay.show { opacity: 1; pointer-events: auto; }
@@ -637,8 +656,31 @@ input:focus, textarea:focus {
 }
 .about-text { font-size: 1.1rem; line-height: 1.8; color: var(--text-muted); }
 
-/* --- ANIMATIONS --- */
-@keyframes flicker {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; transform: rotate(10deg) scale(1.1); }
+/* ========================================
+   11. BİLDİRİMLER (NOTIFICATIONS)
+   ========================================
+*/
+.notification-container {
+    position: fixed; top: 20px; right: 20px;
+    z-index: var(--z-notification);
+    display: flex; flex-direction: column; gap: 10px;
+}
+
+.custom-alert {
+    background-color: var(--card-bg); color: var(--text-main); padding: 15px 25px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); border-radius: var(--radius);
+    font-size: 1rem; font-weight: 700; opacity: 0;
+    transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+    transform: translateX(100%); min-width: 250px; cursor: pointer;
+}
+.custom-alert.show { opacity: 1; transform: translateX(0); }
+.custom-alert-success { border-left: 6px solid var(--success-color); }
+.custom-alert-error { border-left: 6px solid var(--error-color); }
+
+@media (max-width: 768px) {
+    .full-comment-view.expanded {
+        width: 100vw !important; height: 100vh !important; border-radius: 0 !important;
+        top: 0 !important; left: 0 !important; transform: none !important;
+    }
+    .drawer-header h2 { font-size: 1.2rem; }
 }
