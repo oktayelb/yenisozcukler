@@ -31,26 +31,27 @@ class Comment(models.Model):
         return f"{self.author}: {self.comment[:20]}"
 
 
-
-
-# --- VOTE MODELLERİ (GÜNCELLENDİ) ---
+# --- VOTE MODELLERİ (GÜNCELLENDİ: FIX B) ---
 
 class WordVote(models.Model):
-    # ARTIK INTEGER: 1 (Like) veya -1 (Dislike)
     VALUE_CHOICES = [
         (1, 'Like'),
         (-1, 'Dislike')
     ]
     
-    ip_address = models.GenericIPAddressField()
-    word = models.ForeignKey(Word, on_delete=models.CASCADE, related_name='votes')
+    # IP is kept for security/logs, but not for unique constraint
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
     
-    # Değişiklik burada: CharField yerine SmallIntegerField
+    # FIX B: Use session_id for uniqueness to solve NAT issues
+    session_id = models.CharField(max_length=40, db_index=True)
+    
+    word = models.ForeignKey(Word, on_delete=models.CASCADE, related_name='votes')
     value = models.SmallIntegerField(choices=VALUE_CHOICES)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('ip_address', 'word')
+        # FIX B: Unique per session, not per IP
+        unique_together = ('session_id', 'word')
 
 class CommentVote(models.Model):
     VALUE_CHOICES = [
@@ -58,12 +59,15 @@ class CommentVote(models.Model):
         (-1, 'Dislike')
     ]
     
-    ip_address = models.GenericIPAddressField()
-    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='votes')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
     
-    # Değişiklik burada
+    # FIX B: Use session_id for uniqueness
+    session_id = models.CharField(max_length=40, db_index=True)
+    
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='votes')
     value = models.SmallIntegerField(choices=VALUE_CHOICES)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('ip_address', 'comment')
+        # FIX B: Unique per session, not per IP
+        unique_together = ('session_id', 'comment')

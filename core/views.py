@@ -7,14 +7,29 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
 from django.db.models import F
 from django.db import transaction
+import uuid
+
 from .models import Word, Comment, WordVote, CommentVote
 from .serializers import (
     WordSerializer, CommentSerializer, 
     WordCreateSerializer, CommentCreateSerializer
 )
 
+# --- YARDIMCI FONKSİYONLAR ---
+
 def get_client_ip(request):
-    return request.META.get('HTTP_CF_CONNECTING_IP')
+    cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
+    if cf_ip:
+        return cf_ip
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
+def get_or_create_session_id(request):
+    return request.COOKIES.get('user_id') or str(uuid.uuid4())
+
+# --- OKUMA (READ) ENDPOINTLERİ ---
 
 @api_view(['GET'])
 @authentication_classes([])
@@ -23,22 +38,18 @@ def get_words(request):
     page_number = request.GET.get('page', 1)
     limit = int(request.GET.get('limit', 20))
     limit = min(limit, 50)
-    
-    # Yeni parametre: mode
     mode = request.GET.get('mode', 'all') 
 
-    # Temel sorgu
+    # Temel Sorgu
     words_queryset = Word.objects.filter(status='approved')\
         .only('id', 'word', 'definition', 'author', 'timestamp', 'is_profane', 'score')\
         .order_by('-timestamp')
     
-    # EĞER mod 'profane' ise sadece +18 olanları getir
     if mode == 'profane':
         words_queryset = words_queryset.filter(is_profane=True)
-
-    else :  
+    else:  
         words_queryset = words_queryset.filter(is_profane=False)
-    # Cache key artık moda göre değişmeli, yoksa sayılar karışır
+        
     cache_key = f'total_approved_words_count_{mode}'
     total_count = cache.get(cache_key)
     
@@ -52,26 +63,42 @@ def get_words(request):
     except (PageNotAnInteger, EmptyPage):
         words_page = []
 
-    client_ip = get_client_ip(request)
+    # --- OYLARI GETİRME (DÜZELTİLDİ) ---
+    session_id = request.COOKIES.get('user_id')
     user_votes = {}
     
-    if client_ip and words_page:
-        page_word_ids = [w.id for w in words_page]
-        votes = WordVote.objects.filter(
-            ip_address=client_ip, 
-            word_id__in=page_word_ids
-        ).values('word_id', 'value')
-        
-        for v in votes:
-            user_votes[v['word_id']] = v['value']
+    try:
+        if session_id and words_page:
+            page_word_ids = [w.id for w in words_page]
+            
+            # DÜZELTME: values('word_id') yerine values('word') kullanıldı.
+            votes = WordVote.objects.filter(
+                session_id=session_id, 
+                word_id__in=page_word_ids
+            ).values('word', 'value')
+            
+            # DÜZELTME: v['word'] kullanılarak maplendi.
+            for v in votes:
+                user_votes[v['word']] = v['value']
+                
+    except Exception as e:
+        # Hata varsa terminalde görelim
+        print(f"Word Vote Fetch Error: {e}")
+        pass
 
     serializer = WordSerializer(words_page, many=True, context={'user_votes': user_votes})
     
-    return Response({
+    response = Response({
         'status': 'full', 
         'words': serializer.data, 
         'total_count': total_count
     })
+    
+    if not session_id:
+        response.set_cookie('user_id', str(uuid.uuid4()), max_age=31536000, httponly=True)
+        
+    return response
+
 @api_view(['GET'])
 @authentication_classes([]) 
 @permission_classes([])
@@ -88,26 +115,39 @@ def get_comments(request, word_id):
     except (EmptyPage, PageNotAnInteger):
         comments_page = []
 
-    client_ip = get_client_ip(request)
+    session_id = request.COOKIES.get('user_id')
     user_votes = {} 
 
-    if client_ip and comments_page:
-        page_comment_ids = [c.id for c in comments_page]
-        votes = CommentVote.objects.filter(
-            ip_address=client_ip,
-            comment_id__in=page_comment_ids
-        ).values('comment_id', 'value')
+    try:
+        if session_id and comments_page:
+            page_comment_ids = [c.id for c in comments_page]
+            
+            # DÜZELTME: values('comment_id') yerine values('comment')
+            votes = CommentVote.objects.filter(
+                session_id=session_id,
+                comment_id__in=page_comment_ids
+            ).values('comment', 'value')
 
-        for v in votes:
-            user_votes[v['comment_id']] = v['value']
+            for v in votes:
+                user_votes[v['comment']] = v['value']
+    except Exception as e:
+        print(f"Comment Vote Fetch Error: {e}")
+        pass
 
     serializer = CommentSerializer(comments_page, many=True, context={'user_votes': user_votes})
     
-    return Response({
+    response = Response({
         'success': True, 
         'comments': serializer.data,
         'has_next': comments_page.has_next() if hasattr(comments_page, 'has_next') else False
     })
+    
+    if not session_id:
+        response.set_cookie('user_id', str(uuid.uuid4()), max_age=31536000, httponly=True)
+
+    return response
+
+# --- YAZMA (WRITE) ENDPOINTLERİ ---
 
 @api_view(['POST'])
 @authentication_classes([]) 
@@ -115,18 +155,14 @@ def get_comments(request, word_id):
 @transaction.atomic 
 def vote(request, entity_type, entity_id):
     client_ip = get_client_ip(request)
-    if not client_ip:
-        return Response({'error': 'IP adresi alınamadı.'}, status=400)
-
+    session_id = get_or_create_session_id(request)
+    
     action = request.data.get('action') 
     if action not in ['like', 'dislike']:
         return Response({'error': 'Geçersiz işlem.'}, status=400)
 
-    # STRING -> INTEGER DÖNÜŞÜMÜ
-    # like ise +1, dislike ise -1
     vote_val = 1 if action == 'like' else -1
 
-    # Model Sınıflarını Belirle
     if entity_type == 'word':
         ModelClass = Word
         VoteClass = WordVote
@@ -138,50 +174,42 @@ def vote(request, entity_type, entity_id):
     else:
         return Response({'error': 'Geçersiz tip.'}, status=404)
 
-    # Veriyi kilitle (Lock)
     obj = get_object_or_404(ModelClass.objects.select_for_update(), id=entity_id)
     
     if entity_type == 'word' and obj.status != 'approved':
         return Response({'error': 'Geçersiz içerik.'}, status=404)
 
-    filter_kwargs = {'ip_address': client_ip, lookup_field: obj}
+    filter_kwargs = {'session_id': session_id, lookup_field: obj}
     existing_vote = VoteClass.objects.filter(**filter_kwargs).first()
 
     response_action = 'none'
 
     if existing_vote:
         if existing_vote.value == vote_val:
-            # AYNI OYU TEKRARLAMA (Örn: +1 varken tekrar +1) -> Oyu Sil
             existing_vote.delete()
-            # Matematik: Skordan oy değerini çıkar (vote_val 1 ise -1 yapar, -1 ise +1 yapar)
             obj.score = F('score') - vote_val
             response_action = 'none'
         else:
-            # OY DEĞİŞTİRME (SWITCH) (Örn: -1'den 1'e)
             existing_vote.value = vote_val
             existing_vote.save()
-            
-            # Matematik: Fark 2 birimdir. 
-            # -1'den +1'e geçiş için +2 eklenmeli.
-            # +1'den -1'e geçiş için -2 çıkarılmalı.
-            # Bu da (vote_val * 2) demektir.
             obj.score = F('score') + (vote_val * 2)
-            
             response_action = 'liked' if vote_val == 1 else 'disliked'
     else:
-        # YENİ OY
-        VoteClass.objects.create(value=vote_val, **filter_kwargs)
+        VoteClass.objects.create(value=vote_val, ip_address=client_ip, **filter_kwargs)
         obj.score = F('score') + vote_val
         response_action = 'liked' if vote_val == 1 else 'disliked'
 
     obj.save()
     obj.refresh_from_db()
 
-    return Response({
+    response = Response({
         'success': True, 
         'new_score': obj.score, 
         'user_action': response_action 
     })
+    response.set_cookie('user_id', session_id, max_age=31536000, httponly=True)
+    
+    return response
 
 @ratelimit(key='ip', rate='1/15s', method='POST', block=False)
 @api_view(['POST'])
@@ -194,7 +222,8 @@ def add_word(request):
     serializer = WordCreateSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save(status='pending')
-        cache.delete('total_approved_words_count')
+        cache.delete('total_approved_words_count_all')
+        cache.delete('total_approved_words_count_profane')
         return Response({'success': True})
     else:
         first_error = next(iter(serializer.errors.values()))[0]
@@ -208,9 +237,7 @@ def add_comment(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
 
-    ip = get_client_ip(request)
-    if not ip:
-        return Response({'success': False, 'error': 'IP Hatası.'}, status=400)
+    ip = get_client_ip(request) # IP is checked for rate limiting only
     
     serializer = CommentCreateSerializer(data=request.data)
     if serializer.is_valid():

@@ -75,8 +75,15 @@ function allowOnlyLetters(event, allowSpaces) {
     if (event.ctrlKey && ['a', 'c', 'x', 'v'].includes(key.toLowerCase())) {
         return true;
     }
+    
     let regex;
-    if (allowSpaces) { regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]$/; } else { regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜ.,0-9]$/; }
+    // UPDATED REGEX: Added âîûÂÎÛ and - (hyphen)
+    if (allowSpaces) { 
+        regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9\-]$/; 
+    } else { 
+        regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ.,0-9\-]$/; 
+    }
+    
     if (regex.test(key)) { return true; } else { event.preventDefault(); return false; }
 }
 
@@ -501,7 +508,6 @@ function appendCardsToDOM(words, listElement, prepend = false) {
     });
 }
 
-// --- GÜNCELLENEN KISIM BAŞLANGIÇ ---
 async function fetchWords(page) {
     if (isLoading) return;
     isLoading = true;
@@ -510,7 +516,6 @@ async function fetchWords(page) {
     const loadMoreContainer = document.getElementById('loadMoreContainer');
     const loadMoreBtn = loadMoreContainer.querySelector('button');
     
-    // Temaya göre mod belirle
     const currentTheme = localStorage.getItem(COLOR_THEME_KEY);
     const mode = currentTheme === 'red' ? 'profane' : 'all';
 
@@ -522,7 +527,6 @@ async function fetchWords(page) {
         loadMoreBtn.disabled = true;
     }
 
-    // URL'e mode parametresini ekle
     const url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}`;
     
     try {
@@ -558,7 +562,6 @@ async function fetchWords(page) {
         loadMoreBtn.disabled = false;
     }
 }
-// --- GÜNCELLENEN KISIM BİTİŞ ---
 
 function loadMoreWords() {
     currentPage++;
@@ -585,15 +588,22 @@ async function submitWord() {
     const wordInput = document.getElementById('inputWord');
     const defInput = document.getElementById('inputDef');
     const nickInput = document.getElementById('inputNick');
-    const profaneInput = document.getElementById('inputProfane');
+    // const profaneInput = ... (BU SATIRI VE CHECKBOX REFERANSLARINI KALDIRDIK)
     const btn = document.querySelector(".form-card button");
 
     const word = wordInput.value.trim();
     const definition = defInput.value.trim();
     const nickname = nickInput.value.trim();
-    const isProfane = profaneInput.checked;
+    
+    // --- YENİ MANTIK: PROFANE DURUMUNU TEMADAN AL ---
+    const currentTheme = localStorage.getItem(COLOR_THEME_KEY);
+    const isProfane = (currentTheme === 'red'); 
+    // ------------------------------------------------
 
-    if (word.length === 0 || definition.length === 0) { showCustomAlert("Lütfen Sözcük ve Tanım alanlarını doldurun.", "error"); return; }
+    if (word.length === 0 || definition.length === 0) { 
+        showCustomAlert("Lütfen Sözcük ve Tanım alanlarını doldurun.", "error"); 
+        return; 
+    }
 
     btn.disabled = true;
     btn.innerText = "Kaydediliyor...";
@@ -606,17 +616,31 @@ async function submitWord() {
         });
 
         if (response.ok) {
-            wordInput.value = ''; defInput.value = ''; nickInput.value = '';
-            profaneInput.checked = false; 
+            wordInput.value = ''; 
+            defInput.value = ''; 
+            nickInput.value = '';
+            // profaneInput.checked = false; (BU SATIRI DA SİLDİK)
+            
             updateCount(defInput);
-            showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
+            
+            // Kullanıcıya verdiği içeriğin türüne göre uygun mesaj
+            if (isProfane) {
+                showCustomAlert("Sözcük (Argo/+18) gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
+            } else {
+                showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
+            }
             
         } else {
             const data = await response.json();
             showCustomAlert(data.error || "Sözcük kaydedilirken bir hata oluştu.", "error");
         }
-    } catch (error) { showCustomAlert("Ağ hatası: Sunucuya ulaşılamadı.", "error"); } 
-    finally { btn.disabled = false; btn.innerText = "Sözlüğe Ekle"; }
+    } catch (error) { 
+        showCustomAlert("Ağ hatası: Sunucuya ulaşılamadı.", "error"); 
+    } 
+    finally { 
+        btn.disabled = false; 
+        btn.innerText = "Sözlüğe Ekle"; 
+    }
 }
 
 /* --- LOGO MENU & SWAP SYSTEM (2 KARTLI SİSTEM) --- */
@@ -635,22 +659,18 @@ function initLogoSystem() {
     
     setTheme(savedColorTheme);
 
-    // 2. Kart Nesnelerini Hazırla
     const cardDefault = originalCard;
     const cardRed = originalCard.cloneNode(true); 
 
     cleanIds(cardDefault);
     cleanIds(cardRed);
 
-    // 3. Stilleri Ata
     cardDefault.className = 'logo-card theme-default';
     cardRed.className = 'logo-card theme-red';
 
-    // Kırmızı kartın yazısını "leetspeak" yap
     const redH1 = cardRed.querySelector('h1');
     if (redH1) redH1.textContent = 'Yeni Sözcükler';
 
-    // 4. Konumlandırma Mantığı
     if (savedColorTheme === 'red') {
         cardRed.classList.add('pos-center');
         cardDefault.classList.add('pos-right'); 
@@ -671,11 +691,9 @@ function initLogoSystem() {
 function handleCardClick(event, clickedCard) {
     event.stopPropagation(); 
 
-    // Merkezdeki karta tıklandıysa menüyü aç/kapa
     if (clickedCard.classList.contains('pos-center')) {
         toggleMenu();
     } 
-    // Yandaki (sağdaki) karta tıklandıysa DEĞİŞTİR
     else if (isMenuOpen && clickedCard.classList.contains('pos-right')) {
         performSwap(clickedCard);
     }
@@ -697,12 +715,10 @@ function toggleMenu() {
     }
 }
 
-// --- GÜNCELLENEN KISIM BAŞLANGIÇ ---
 function performSwap(clickedCard) {
     const wrapper = document.querySelector('.logo-wrapper');
     const currentCenter = wrapper.querySelector('.pos-center');
     
-    // Değişim Animasyonu
     clickedCard.classList.remove('pos-right', 'visible');
     clickedCard.classList.add('pos-center');
 
@@ -711,18 +727,15 @@ function performSwap(clickedCard) {
 
     isMenuOpen = false;
     
-    // TEMA DEĞİŞTİRME VE LİSTE YENİLEME
     if (clickedCard.classList.contains('theme-red')) {
         setTheme('red');
     } else {
         setTheme('default');
     }
 
-    // Listeyi sıfırla ve yeniden çek
     currentPage = 1;
     fetchWords(currentPage);
 }
-// --- GÜNCELLENEN KISIM BİTİŞ ---
 
 function setTheme(themeName) {
     document.body.setAttribute('data-theme', themeName);

@@ -13,11 +13,9 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = ['id', 'word', 'author', 'comment', 'timestamp', 'score', 'user_vote']
 
     def get_user_vote(self, obj):
-        # context['user_votes'] artık { comment_id: 1 veya -1 } tutuyor
         votes = self.context.get('user_votes', {})
         vote_value = votes.get(obj.id)
         
-        # INTEGER -> STRING ÇEVİRİMİ
         if vote_value == 1: return 'like'
         if vote_value == -1: return 'dislike'
         return None
@@ -34,7 +32,6 @@ class WordSerializer(serializers.ModelSerializer):
         votes = self.context.get('user_votes', {})
         vote_value = votes.get(obj.id)
         
-        # INTEGER -> STRING ÇEVİRİMİ
         if vote_value == 1: return 'like'
         if vote_value == -1: return 'dislike'
         return None
@@ -45,7 +42,7 @@ class WordSerializer(serializers.ModelSerializer):
         return data
 
 # --- YAZMA (WRITE) SERIALIZERS ---
-# (Değişiklik yok)
+
 class WordCreateSerializer(serializers.ModelSerializer):
     nickname = serializers.CharField(source='author', required=False, allow_blank=True, max_length=50)
     
@@ -55,13 +52,15 @@ class WordCreateSerializer(serializers.ModelSerializer):
 
     def validate_word(self, value):
         value = value.strip()
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.-,0-9]+$', value):
+        # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.-,0-9]+$', value):
             raise serializers.ValidationError("Sözcük sadece harf, rakam ve temel noktalama işaretleri içerebilir.")
         return value
 
     def validate_definition(self, value):
         value = value.strip()
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]+$', value):
+        # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9]+$', value):
             raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor.")
         return value
 
@@ -70,7 +69,8 @@ class WordCreateSerializer(serializers.ModelSerializer):
             return "Anonim"
         if value:
             value = value.strip()
-            if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]*$', value):
+            # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
+            if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9]*$', value):
                 raise serializers.ValidationError("Takma ad geçersiz karakterler içeriyor.")
         return value 
 
