@@ -15,9 +15,12 @@ from .serializers import (
     WordCreateSerializer, CommentCreateSerializer
 )
 
+##TODO  sozcuk ksrtlrının altına yorumlar için tıkla tarzı bir şeyler ekle 
+
 # --- YARDIMCI FONKSİYONLAR ---
 
 def get_client_ip(request):
+    
     cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
     if cf_ip:
         return cf_ip
@@ -148,7 +151,6 @@ def get_comments(request, word_id):
     return response
 
 # --- YAZMA (WRITE) ENDPOINTLERİ ---
-
 @api_view(['POST'])
 @authentication_classes([]) 
 @permission_classes([])

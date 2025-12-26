@@ -92,10 +92,10 @@ function createVoteControls(entityType, data) {
     const container = document.createElement('div');
     container.className = 'vote-container';
     
-    const netScore = (data.likes || 0) - (data.dislikes || 0);
-
+    const netScore = data.score;
+    
     const likeBtn = document.createElement('button');
-    likeBtn.className = `vote-btn like ${data.is_liked ? 'active' : ''}`;
+    likeBtn.className = `vote-btn like ${data.user_vote === 'like' ? 'active' : ''}`;
     likeBtn.innerHTML = `
         <svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
     `;
@@ -109,7 +109,7 @@ function createVoteControls(entityType, data) {
     scoreSpan.innerText = netScore;
 
     const dislikeBtn = document.createElement('button');
-    dislikeBtn.className = `vote-btn dislike ${data.is_disliked ? 'active' : ''}`;
+    dislikeBtn.className = `vote-btn dislike ${data.user_vote === 'dislike' ? 'active' : ''}`;
     dislikeBtn.innerHTML = `
         <svg viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path></svg>
     `;
@@ -275,7 +275,7 @@ function handleCommentEnter(event) {
 
 function createCommentElement(commentData) {
     const item = document.createElement('div');
-    item.className = 'comment-item';
+    item.className = 'comment-card';
     
     // --- Header ---
     const header = document.createElement('div');
@@ -464,12 +464,25 @@ function createWordCardElement(item) {
     card.appendChild(titleDiv);
     card.appendChild(defDiv);
 
+    // --- Footer Section (Hint + Author) ---
+    const footerDiv = document.createElement('div');
+    footerDiv.className = 'word-footer';
+
+    // Left side: Click Hint
+    const hintSpan = document.createElement('span');
+    hintSpan.className = 'click-hint';
+    hintSpan.textContent = 'Detaylar & Yorumlar ↴'; 
+    footerDiv.appendChild(hintSpan);
+
+    // Right side: Author (if exists)
     if (item.author) {
-        const authDiv = document.createElement('div');
-        authDiv.className = 'word-author';
-        authDiv.textContent = `— ekleyen ${decode(item.author)}`;
-        card.appendChild(authDiv);
+        const authSpan = document.createElement('span');
+        authSpan.className = 'word-author';
+        authSpan.textContent = `— ekleyen ${decode(item.author)}`;
+        footerDiv.appendChild(authSpan);
     }
+
+    card.appendChild(footerDiv);
     
     return card;
 }
