@@ -427,7 +427,7 @@ body[data-theme="red"] textarea:focus {
 
 body[data-theme="red"] .form-card button {
     background-color: var(--accent); color: #fff;
-    text-transform: uppercase; letter-spacing: 0.5px;
+    letter-spacing: 0.5px;
     box-shadow: 0 4px 10px rgba(185, 28, 28, 0.4);
 }
 body[data-theme="red"] .form-card button:hover { background-color: #991b1b; }
@@ -454,15 +454,17 @@ body[data-theme="red"] .form-card button:hover { background-color: #991b1b; }
 */
 .vote-container {
     display: flex; align-items: center; gap: 4px;
-    background: rgba(142, 127, 127, 0.08); padding: 3px 6px;
+    background: var(--accent);  /* Değişti: Arka plan vurgu rengi */
+    padding: 3px 6px;
     border-radius: 20px; width: fit-content;
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--accent);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15); /* Hafif bir derinlik eklendi */
 }
-
 .vote-btn {
     background: none; border: none; cursor: pointer; padding: 4px;
     display: flex; align-items: center; justify-content: center;
-    transition: transform 0.1s ease-out; color: var(--text-muted);
+    transition: transform 0.1s ease-out; 
+    color: var(--card-bg); /* Değişti: İkonlar artık açık renk (zeminle zıt) */
 }
 .vote-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; transition: fill 0.3s, stroke 0.3s; }
 .vote-btn:hover:not(:disabled) { transform: scale(1.15); color: var(--text-main); }
@@ -473,7 +475,8 @@ body[data-theme="red"] .form-card button:hover { background-color: #991b1b; }
 .vote-btn.dislike.active svg { fill: var(--dislike-color-active); stroke: var(--dislike-color-active); }
 
 .vote-score {
-    font-size: 0.95rem; font-weight: 700; color: var(--text-muted);
+    font-size: 0.95rem; font-weight: 700; 
+    color: var(--card-bg); /* Değişti: Puan yazısı açık renk */
     min-width: 20px; text-align: center; margin: 0 4px; user-select: none;
 }
 

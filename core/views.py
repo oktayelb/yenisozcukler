@@ -21,13 +21,8 @@ from .serializers import (
 
 def get_client_ip(request):
     
-    cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
-    if cf_ip:
-        return cf_ip
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        return x_forwarded_for.split(',')[0].strip()
-    return request.META.get('REMOTE_ADDR')
+    return request.META.get('HTTP_CF_CONNECTING_IP')
+
 
 def get_or_create_session_id(request):
     return request.COOKIES.get('user_id') or str(uuid.uuid4())
