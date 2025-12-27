@@ -53,14 +53,14 @@ class WordCreateSerializer(serializers.ModelSerializer):
     def validate_word(self, value):
         value = value.strip()
         # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.-,0-9]+$', value):
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
             raise serializers.ValidationError("Sözcük sadece harf, rakam ve temel noktalama işaretleri içerebilir.")
         return value
 
     def validate_definition(self, value):
         value = value.strip()
         # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9]+$', value):
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
             raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor.")
         return value
 
@@ -70,7 +70,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
         if value:
             value = value.strip()
             # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
-            if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9]*$', value):
+            if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
                 raise serializers.ValidationError("Takma ad geçersiz karakterler içeriyor.")
         return value 
 

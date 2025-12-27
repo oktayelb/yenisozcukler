@@ -81,9 +81,9 @@ function allowOnlyLetters(event, allowSpaces) {
     
     let regex;
     if (allowSpaces) { 
-        regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9\-]$/; 
+        regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$/; 
     } else { 
-        regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ.,0-9\-]$/; 
+        regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ.,0-9()-]+$/; 
     }
     
     if (regex.test(key)) { return true; } else { event.preventDefault(); return false; }
@@ -600,59 +600,93 @@ function handleWordSubmit(event) {
     event.preventDefault(); 
     submitWord();
 }
-
+function getCSRFToken() {
+    const name = "csrftoken=";
+    const decodedCookie = decodeURIComponent(document.cookie);
+    const ca = decodedCookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+        let c = ca[i].trim();
+        if (c.indexOf(name) === 0) {
+            return c.substring(name.length, c.length);
+        }
+    }
+    return null;
+}
 async function submitWord() {
     const wordInput = document.getElementById('inputWord');
     const defInput = document.getElementById('inputDef');
-    const nickInput = document.getElementById('inputNick');
+    const nickInput = document.getElementById('inputNick'); // Input ID'si HTML'de doğru mu kontrol et
     const btn = document.querySelector(".form-card button");
 
     const word = wordInput.value.trim();
     const definition = defInput.value.trim();
-    const nickname = nickInput.value.trim();
+    // DÜZELTME 1: Değişken adını backend ile uyumlu olması için author olarak kullanacağız
+    const author = nickInput.value.trim(); 
     
     const currentTheme = localStorage.getItem(COLOR_THEME_KEY);
     const isProfane = (currentTheme === 'red'); 
 
+    // Basit Validasyonlar
     if (word.length === 0 || definition.length === 0) { 
         showCustomAlert("Lütfen Sözcük ve Tanım alanlarını doldurun.", "error"); 
         return; 
+    }
+    
+    // DÜZELTME 3: Karakter sınırı kontrolü (Backend hatasından önce biz uyaralım)
+    if (definition.length > 300) {
+        showCustomAlert("Tanım 300 karakterden uzun olamaz.", "error");
+        return;
     }
 
     btn.disabled = true;
     btn.innerText = "Kaydediliyor...";
 
-    try {
-        const response = await fetch('/api/add', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ word, definition, nickname, is_profane: isProfane })
-        });
+try {
+    const response = await fetch('/api/add', {
+        method: 'POST',
+        headers: {
+    'Content-Type': 'application/json',
+    'X-CSRFToken': getCSRFToken()
+},
 
-        if (response.ok) {
-            wordInput.value = ''; 
-            defInput.value = ''; 
-            nickInput.value = '';
-            
-            updateCount(defInput);
-            
-            if (isProfane) {
-                showCustomAlert("Sözcük (Argo/+18) gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
-            } else {
-                showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
-            }
-            
-        } else {
-            const data = await response.json();
-            showCustomAlert(data.error || "Sözcük kaydedilirken bir hata oluştu.", "error");
-        }
-    } catch (error) { 
-        showCustomAlert("Ağ hatası: Sunucuya ulaşılamadı.", "error"); 
-    } 
-    finally { 
-        btn.disabled = false; 
-        btn.innerText = "Sözlüğe Ekle"; 
+        body: JSON.stringify({ word, definition, nickname: author, is_profane: isProfane })
+    });
+
+    // Check content type before parsing
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+        const errorText = await response.text(); 
+        console.error("SERVER ERROR HTML:", errorText); // <--- LOOK AT THIS IN CONSOLE
+        throw new Error("Server returned non-JSON content: " + contentType);
     }
+
+    const data = await response.json();
+
+    // Handle rate limit
+    if (response.status === 429) {
+        throw new Error(data.error || "Çok fazla deneme yaptınız, lütfen bekleyin.");
+    }
+
+    if (response.ok) {
+        wordInput.value = ''; 
+        defInput.value = ''; 
+        nickInput.value = '';
+        updateCount({ value: '' }); 
+        
+        if (isProfane) {
+            showCustomAlert("Sözcük (Argo/+18) gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
+        } else {
+            showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
+        }
+    } else {
+        showCustomAlert(data.error || "Sözcük kaydedilirken bir hata oluştu.", "error");
+    }
+} catch (error) { 
+    showCustomAlert(error.message || "Ağ hatası: Sunucuya ulaşılamadı.", "error"); 
+} finally { 
+    btn.disabled = false; 
+    btn.innerText = "Sözlüğe Ekle"; 
+}
 }
 
 /* --- YENİ LOGO SWAP SİSTEMİ (BASİTLEŞTİRİLMİŞ) --- */
