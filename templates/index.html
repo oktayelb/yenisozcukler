@@ -23,8 +23,17 @@
     </div>  
     
     <header>
-        <h1 id="mainTitle">Yeni Sözcükler</h1>
-        <span class="subtitle" id="subtitleText">"Yeni sözcüklerini paylaş"</span>
+        <div class="logo-wrapper">
+            <div class="logo-card theme-red pos-behind" id="cardRed" onclick="animateLogo(this)">
+                <h1 id="mainTitle">Yeni Sözcükler</h1>
+                <span class="subtitle" id="subtitleText">"Yeni küfürlerini de paylaş"</span>
+            </div>
+
+            <div class="logo-card theme-default pos-center" id="cardDefault" onclick="animateLogo(this)">
+                <h1 id="mainTitle">Yeni Sözcükler</h1>
+                <span class="subtitle" id="subtitleText">"Yeni sözcüklerini paylaş"</span>
+            </div>
+        </div>
     </header>
 
     <div class="container">
@@ -50,10 +59,6 @@
                     <input type="text" id="inputNick" maxlength="20" placeholder="Anonim" onkeypress="return allowOnlyLetters(event, false)">
                 </div>
                 
-                <div class="checkbox-wrapper">
-                    <input type="checkbox" id="inputProfane">
-                    <label for="inputProfane" class="checkbox-label">Bu sözcük +18 / Argo içeriyor</label>
-                </div>
                 <button type="submit">Sözlüğe Ekle</button>
             </form>
         </div>
@@ -89,11 +94,19 @@
                 <p>
                     Yüzyıllar öncesinde yaşanan alıntı sözcük modası, günümüzde de yaşanıyor, ancak yaşanırken kimse farkında olamıyor.
                     Bu nedenle bu siteyi kurarak gelecek nesillere, yaşayan ve sürekli gelişen bir Türkçe sözlük mirası bırakmayı hedefliyoruz.
+                </p>    
+                <p>
+                    Aynı zamanda sözcük türetme bilincini Türkçe ile kısıtlı bırakmayıp, kullanıcıları türettikleri yabancı sözcükleri de paylaşmaları için teşvik ediyoruz. 
                 </p>
 
                 <div class="about-section-title">Nasıl Çalışır?</div>
                 <p>
                     Sözcüklerinizi "Katkıda Bulun" formunu kullanarak ekleyebilirsiniz. 
+                    Sözcüklerin üstüne dokunarak yorum bırakamayı unutmayın! 
+                </p>
+                <div class="about-section-title">İletişim</div>
+                <p>
+                    e269354@metu.edu.tr email adresine şikayet ve tavsiyelerinizi iletebilirsiniz.
                 </p>
             </div>
         </div>

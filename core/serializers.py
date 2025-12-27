@@ -5,31 +5,44 @@ import re
 # --- OKUMA (READ) SERIALIZERS ---
 
 class CommentSerializer(serializers.ModelSerializer):
+    score = serializers.IntegerField(read_only=True)
+    user_vote = serializers.SerializerMethodField()
+
     class Meta:
         model = Comment
-        fields = ['id', 'word', 'author', 'comment', 'timestamp']
+        fields = ['id', 'word', 'author', 'comment', 'timestamp', 'score', 'user_vote']
+
+    def get_user_vote(self, obj):
+        votes = self.context.get('user_votes', {})
+        vote_value = votes.get(obj.id)
+        
+        if vote_value == 1: return 'like'
+        if vote_value == -1: return 'dislike'
+        return None
 
 class WordSerializer(serializers.ModelSerializer):
-    # PERFORMANS GÜNCELLEMESİ: Artık 'annotated_likes' yerine
-    # doğrudan modeldeki 'likes_count' alanını okuyoruz. Çok daha hızlı.
-    likes = serializers.IntegerField(source='likes_count', read_only=True)
-    is_liked = serializers.SerializerMethodField()
+    score = serializers.IntegerField(read_only=True)
+    user_vote = serializers.SerializerMethodField()
 
     class Meta:
         model = Word
-        fields = ['id', 'word', 'author', 'likes', 'timestamp', 'is_liked', 'is_profane', 'definition'] 
+        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition'] 
 
-    def get_is_liked(self, obj):
-        liked_ids = self.context.get('liked_ids', set())
-        return obj.id in liked_ids
+    def get_user_vote(self, obj):
+        votes = self.context.get('user_votes', {})
+        vote_value = votes.get(obj.id)
+        
+        if vote_value == 1: return 'like'
+        if vote_value == -1: return 'dislike'
+        return None
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data['def'] = instance.definition 
         return data
 
-# --- YAZMA (WRITE/CREATE) SERIALIZERS ---
-# (Bu kısımda değişiklik yok, aynen kalabilir)
+# --- YAZMA (WRITE) SERIALIZERS ---
+
 class WordCreateSerializer(serializers.ModelSerializer):
     nickname = serializers.CharField(source='author', required=False, allow_blank=True, max_length=50)
     
@@ -39,13 +52,15 @@ class WordCreateSerializer(serializers.ModelSerializer):
 
     def validate_word(self, value):
         value = value.strip()
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]+$', value):
+        # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.-,0-9]+$', value):
             raise serializers.ValidationError("Sözcük sadece harf, rakam ve temel noktalama işaretleri içerebilir.")
         return value
 
     def validate_definition(self, value):
         value = value.strip()
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]+$', value):
+        # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9]+$', value):
             raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor.")
         return value
 
@@ -54,7 +69,8 @@ class WordCreateSerializer(serializers.ModelSerializer):
             return "Anonim"
         if value:
             value = value.strip()
-            if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜ\s.,0-9]*$', value):
+            # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
+            if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9]*$', value):
                 raise serializers.ValidationError("Takma ad geçersiz karakterler içeriyor.")
         return value 
 
