@@ -13,8 +13,10 @@ const COMMENTS_PER_PAGE = 10;
 let currentWordCommentsHasNext = false;
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('mainTitle').classList.add('loaded');
-    document.getElementById('subtitleText').classList.add('loaded');
+    const mainTitle = document.getElementById('mainTitle');
+    const subtitle = document.getElementById('subtitleText');
+    if(mainTitle) mainTitle.classList.add('loaded');
+    if(subtitle) subtitle.classList.add('loaded');
     
     // --- DARK MODE SETUP ---
     const savedTheme = localStorage.getItem(THEME_KEY);
@@ -30,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     darkModeToggle.addEventListener('click', toggleDarkMode);
     
     // --- LOGO & COLOR THEME SETUP ---
+    // Sayfa yüklendiğinde kartların doğru pozisyonda (kim önde kim arkada) başlamasını sağlar.
     initLogoSystem();
 
     fetchWords(currentPage);
@@ -77,7 +80,6 @@ function allowOnlyLetters(event, allowSpaces) {
     }
     
     let regex;
-    // UPDATED REGEX: Added âîûÂÎÛ and - (hyphen)
     if (allowSpaces) { 
         regex = /^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9\-]$/; 
     } else { 
@@ -252,7 +254,9 @@ function closeCommentView() {
 
     setTimeout(() => {
         const originalCards = document.querySelectorAll('.word-card');
-        const titleText = activeCardClone.querySelector('#commentTitle').textContent; 
+        const titleElement = activeCardClone.querySelector('#commentTitle');
+        // Eğer titleElement null ise (hata durumunda) boş string kullan
+        const titleText = titleElement ? titleElement.textContent : ''; 
 
         originalCards.forEach(card => {
             const cardTitle = card.querySelector('.word-title span');
@@ -601,17 +605,14 @@ async function submitWord() {
     const wordInput = document.getElementById('inputWord');
     const defInput = document.getElementById('inputDef');
     const nickInput = document.getElementById('inputNick');
-    // const profaneInput = ... (BU SATIRI VE CHECKBOX REFERANSLARINI KALDIRDIK)
     const btn = document.querySelector(".form-card button");
 
     const word = wordInput.value.trim();
     const definition = defInput.value.trim();
     const nickname = nickInput.value.trim();
     
-    // --- YENİ MANTIK: PROFANE DURUMUNU TEMADAN AL ---
     const currentTheme = localStorage.getItem(COLOR_THEME_KEY);
     const isProfane = (currentTheme === 'red'); 
-    // ------------------------------------------------
 
     if (word.length === 0 || definition.length === 0) { 
         showCustomAlert("Lütfen Sözcük ve Tanım alanlarını doldurun.", "error"); 
@@ -632,11 +633,9 @@ async function submitWord() {
             wordInput.value = ''; 
             defInput.value = ''; 
             nickInput.value = '';
-            // profaneInput.checked = false; (BU SATIRI DA SİLDİK)
             
             updateCount(defInput);
             
-            // Kullanıcıya verdiği içeriğin türüne göre uygun mesaj
             if (isProfane) {
                 showCustomAlert("Sözcük (Argo/+18) gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
             } else {
@@ -656,115 +655,80 @@ async function submitWord() {
     }
 }
 
-/* --- LOGO MENU & SWAP SYSTEM (2 KARTLI SİSTEM) --- */
+/* --- YENİ LOGO SWAP SİSTEMİ (BASİTLEŞTİRİLMİŞ) --- */
 
-let isMenuOpen = false;
-
+/**
+ * Sayfa ilk açıldığında çalışır.
+ * LocalStorage'daki veriye göre hangi kartın önde (pos-center),
+ * hangi kartın arkada (pos-behind) olacağına karar verir.
+ */
 function initLogoSystem() {
-    const wrapper = document.querySelector('.logo-wrapper');
-    const originalCard = document.querySelector('.logo-card');
-    
-    if (!wrapper || !originalCard) return;
+    const savedTheme = localStorage.getItem(COLOR_THEME_KEY) || 'default';
+    const cardDefault = document.getElementById('cardDefault');
+    const cardRed = document.getElementById('cardRed');
 
-    let savedColorTheme = localStorage.getItem(COLOR_THEME_KEY);
-    if (savedColorTheme === 'blue') savedColorTheme = 'default';
-    if (!savedColorTheme) savedColorTheme = 'default';
-    
-    setTheme(savedColorTheme);
+    // Eğer elementler HTML'de yoksa hata vermesin
+    if (!cardDefault || !cardRed) return;
 
-    const cardDefault = originalCard;
-    const cardRed = originalCard.cloneNode(true); 
+    // Temayı body'e işle (CSS renkleri için)
+    document.body.setAttribute('data-theme', savedTheme);
 
-    cleanIds(cardDefault);
-    cleanIds(cardRed);
-
-    cardDefault.className = 'logo-card theme-default';
-    cardRed.className = 'logo-card theme-red';
-
-    const redH1 = cardRed.querySelector('h1');
-    if (redH1) redH1.textContent = 'Yeni Sözcükler';
-
-    if (savedColorTheme === 'red') {
-        cardRed.classList.add('pos-center');
-        cardDefault.classList.add('pos-right'); 
+    if (savedTheme === 'red') {
+        // Kırmızı önde, Default arkada
+        cardRed.className = 'logo-card theme-red pos-center';
+        cardDefault.className = 'logo-card theme-default pos-behind';
     } else {
-        cardDefault.classList.add('pos-center');
-        cardRed.classList.add('pos-right'); 
-    }
-
-    wrapper.appendChild(cardRed);
-
-    [cardDefault, cardRed].forEach(card => {
-        card.onclick = (e) => handleCardClick(e, card);
-    });
-
-    document.addEventListener('click', handleOutsideClick);
-}
-
-function handleCardClick(event, clickedCard) {
-    event.stopPropagation(); 
-
-    if (clickedCard.classList.contains('pos-center')) {
-        toggleMenu();
-    } 
-    else if (isMenuOpen && clickedCard.classList.contains('pos-right')) {
-        performSwap(clickedCard);
+        // Default önde, Kırmızı arkada
+        cardDefault.className = 'logo-card theme-default pos-center';
+        cardRed.className = 'logo-card theme-red pos-behind';
     }
 }
 
-function toggleMenu() {
-    const wrapper = document.querySelector('.logo-wrapper');
-    const centerCard = wrapper.querySelector('.pos-center');
-    const sideCard = wrapper.querySelector('.pos-right'); 
+/**
+ * Logoya (herhangi birine) tıklandığında çalışır.
+ * Temayı değiştirir, kartların yerini değiştirir (swap) ve içeriği yeniler.
+ */
+function animateLogo(clickedElement) {
+    // 1. Yeni temayı belirle
+    const currentTheme = localStorage.getItem(COLOR_THEME_KEY) || 'default';
+    const newTheme = currentTheme === 'default' ? 'red' : 'default';
 
-    if (isMenuOpen) {
-        centerCard.classList.remove('menu-open');
-        if(sideCard) sideCard.classList.remove('visible');
-        isMenuOpen = false;
-    } else {
-        centerCard.classList.add('menu-open');
-        if(sideCard) sideCard.classList.add('visible');
-        isMenuOpen = true;
-    }
-}
-
-function performSwap(clickedCard) {
-    const wrapper = document.querySelector('.logo-wrapper');
-    const currentCenter = wrapper.querySelector('.pos-center');
+    // 2. Temayı kaydet ve Body'e uygula
+    localStorage.setItem(COLOR_THEME_KEY, newTheme);
+    document.body.setAttribute('data-theme', newTheme);
     
-    clickedCard.classList.remove('pos-right', 'visible');
-    clickedCard.classList.add('pos-center');
+    // 3. Görsel Animasyon (Sınıfları değiştir)
+    updateLogoVisuals(newTheme);
 
-    currentCenter.classList.remove('pos-center', 'menu-open');
-    currentCenter.classList.add('pos-right');
-
-    isMenuOpen = false;
-    
-    if (clickedCard.classList.contains('theme-red')) {
-        setTheme('red');
-    } else {
-        setTheme('default');
-    }
-
+    // 4. İçeriği Yenile
     currentPage = 1;
     fetchWords(currentPage);
 }
 
-function setTheme(themeName) {
-    document.body.setAttribute('data-theme', themeName);
-    localStorage.setItem(COLOR_THEME_KEY, themeName);
-}
+/**
+ * Animasyonlu geçişi sağlayan yardımcı fonksiyon.
+ */
+function updateLogoVisuals(activeTheme) {
+    const cardDefault = document.getElementById('cardDefault');
+    const cardRed = document.getElementById('cardRed');
 
-function handleOutsideClick(event) {
-    const wrapper = document.querySelector('.logo-wrapper');
-    if (isMenuOpen && wrapper && !wrapper.contains(event.target)) {
-        toggleMenu();
+    if (!cardDefault || !cardRed) return;
+
+    if (activeTheme === 'red') {
+        // Kırmızıyı öne getir
+        cardRed.classList.remove('pos-behind');
+        cardRed.classList.add('pos-center');
+
+        // Beyazı arkaya at
+        cardDefault.classList.remove('pos-center');
+        cardDefault.classList.add('pos-behind');
+    } else {
+        // Beyazı öne getir
+        cardDefault.classList.remove('pos-behind');
+        cardDefault.classList.add('pos-center');
+
+        // Kırmızıyı arkaya at
+        cardRed.classList.remove('pos-center');
+        cardRed.classList.add('pos-behind');
     }
-}
-
-function cleanIds(element) {
-    element.removeAttribute('id');
-    const children = element.querySelectorAll('[id]');
-    children.forEach(child => child.removeAttribute('id'));
-    element.removeAttribute('onclick');
 }

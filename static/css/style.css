@@ -19,8 +19,8 @@
     --z-negative: -1;
     --z-base: 1;
     --z-card-profane: 10;
-    --z-logo-center: 20;
-    --z-logo-side: 25;
+    --z-logo-behind: 15; /* Arkadaki kart */
+    --z-logo-center: 20; /* Öndeki kart */
     --z-header: 1000;
     --z-modal-backdrop: 1050;
     --z-drawer: 2000;
@@ -41,11 +41,10 @@
     --accent: #8e7f7f;
     --border-light: rgba(142, 127, 127, 0.3);
     
-    /* --- INPUT SISTEMI (YENİ DİNAMİK YAPI) --- */
-    /* Bu değişkenler temanın input davranışını yönetir */
-    --input-bg: var(--bg-color);        /* Normal hali (Zeminle aynı) */
-    --input-focus-bg: var(--card-bg);   /* Tıklanınca alacağı renk (Default: Açık Kart Rengi) */
-    --input-text: var(--text-main);     /* Yazı rengi */
+    /* --- INPUT SISTEMI (DİNAMİK YAPI) --- */
+    --input-bg: var(--bg-color);        
+    --input-focus-bg: var(--card-bg);   
+    --input-text: var(--text-main);     
     --input-border: rgba(142, 127, 127, 0.2);
     --input-placeholder: rgba(93, 92, 97, 0.6);
     --icon-color: var(--text-muted);
@@ -76,9 +75,8 @@ body.dark-mode {
     --accent: #b8a9a9;
     --border-light: rgba(255, 255, 255, 0.1);
     
-    /* Dark Mode Input Ayarları */
     --input-bg: #2c2c34;
-    --input-focus-bg: #3c3c45; /* Tıklayınca biraz açılır */
+    --input-focus-bg: #3c3c45;
     --input-text: #f0f0f0;
     --input-border: rgba(255, 255, 255, 0.1);
     --input-placeholder: rgba(160, 160, 160, 0.6);
@@ -93,20 +91,17 @@ body.dark-mode {
 
 /* --- RED THEME (KIRMIZI MOD) --- */
 body[data-theme="red"] {
-    
-    --bg-color: #7f1d1d; /* Koyu Bordo Zemin */
+    --bg-color: #7f1d1d; 
     --text-main-define: #fff5f5;
-    --card-bg: #fff5f5; /* Kartlar Açık Renk */
-    --text-main: #2b0b0b; /* Genel yazı koyu */
+    --card-bg: #fff5f5; 
+    --text-main: #2b0b0b; 
     --text-muted: #7f4f4f;
     --accent: #b91c1c; 
     --border-light: rgba(185, 28, 28, 0.15);
     
-    /* RED THEME INPUT AYARLARI (SORUN ÇÖZÜCÜ KISIM) */
-    /* Arka plan hep koyu bordo kalır, tıklayınca beyaza dönmez */
     --input-bg: #7f1d1d;             
-    --input-focus-bg: #7f1d1d;       /* TIKLAYINCA RENK DEĞİŞTİRMEZ (Sabit Koyu) */
-    --input-text: #ffffff;           /* Yazı her zaman BEYAZ */
+    --input-focus-bg: #7f1d1d;       
+    --input-text: #ffffff;           
     --input-border: rgba(255, 255, 255, 0.3); 
     --input-placeholder: rgba(255, 255, 255, 0.6); 
     --icon-color: rgba(255, 255, 255, 0.9);
@@ -130,7 +125,6 @@ body.dark-mode[data-theme="red"] {
     --accent: #ff5252;
     --border-light: #450a0a;
     
-    /* Dark Red Input */
     --input-bg: #2a0505;
     --input-focus-bg: #3f1010;
     --input-text: #ffdada;
@@ -155,7 +149,6 @@ body {
     transition: background-color var(--transition-slow), color var(--transition-slow);
 }
 
-/* --- GLOBAL SCROLLBAR --- */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -166,7 +159,6 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover { background-color: var(--text-muted); }
 
-/* --- SPINNER --- */
 .spinner {
     border: 4px solid rgba(0, 0, 0, 0.1);
     width: 36px; height: 36px; border-radius: 50%;
@@ -205,7 +197,6 @@ header { text-align: center; margin-bottom: 40px; margin-top: 50px; padding: var
 }
 .header-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; }
 
-/* Kırmızı Tema Buton Düzeltmesi */
 body[data-theme="red"] .header-btn { border-color: var(--border-light); }
 body[data-theme="red"] .header-btn:hover { background-color: var(--accent); color: #fff; }
 
@@ -217,25 +208,32 @@ body[data-theme="red"] .header-btn:hover { background-color: var(--accent); colo
 }
 
 /* ========================================
-   5. LOGO SİSTEMİ
+   5. LOGO SİSTEMİ (SWAP MEKANİZMASI)
    ========================================
 */
 .logo-wrapper {
-    display: inline-grid; grid-template-columns: 1fr; grid-template-rows: 1fr;
+    display: inline-grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
     justify-items: center; align-items: center; position: relative;
     z-index: var(--z-header); overflow: visible;
 }
 
 .logo-card {
-    grid-column: 1 / 2; grid-row: 1 / 2;
+    grid-column: 1 / 2; grid-row: 1 / 2; /* Kartlar üst üste biner */
     background: var(--card-bg); padding: 20px 50px;
     border-radius: var(--radius); box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-light); width: max-content; 
-    transition: all var(--transition-slow); cursor: pointer;
-    user-select: none; box-sizing: border-box; opacity: 0; z-index: 0;
-    transform: translate(0, 0) scale(0.9); pointer-events: none; 
+    
+    /* Animasyon Ayarları - SWAP işlemi için */
+    transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1), 
+                z-index 0.1s step-end, /* Z-index anlık değil, hareket bitince değişsin gibi */
+                filter 0.3s ease,
+                opacity 0.3s ease;
+    
+    cursor: pointer;
+    user-select: none; box-sizing: border-box;
 }
-.logo-card:hover { box-shadow: var(--shadow-lg); }
 
 .logo-card h1 {
     font-family: var(--font-heading); font-size: 4.5rem; margin: 0; 
@@ -247,28 +245,45 @@ body[data-theme="red"] .header-btn:hover { background-color: var(--accent); colo
     margin-top: 5px; display: block; pointer-events: none;
 }
 
+/* --- DURUM 1: ÖNDE (ACTIVE) --- */
 .logo-card.pos-center {
-    opacity: 1; z-index: var(--z-logo-center);
-    transform: translate(0, 0) scale(1); pointer-events: auto; 
-}
-.logo-card.pos-center.menu-open {
-    transform: translateX(-60%) scale(0.95) rotate(-2deg) !important;
-    border-color: var(--accent);
-}
-.logo-card.pos-right.visible {
-    opacity: 1; z-index: var(--z-logo-side);
-    transform: translateX(60%) scale(0.95) rotate(2deg) !important; 
+    z-index: var(--z-logo-center);
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg); /* Düz duruş */
+    filter: none;
     pointer-events: auto;
 }
+.logo-card.pos-center:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px); /* Hafif yukarı kalkma */
+}
 
-.logo-card.theme-default { background-color: var(--card-bg) !important; }
+/* --- DURUM 2: ARKADA (BEHIND) --- */
+.logo-card.pos-behind {
+    z-index: var(--z-logo-behind);
+    opacity: 1; /* Görünür olmalı */
+    /* Arkada, solda, eğik ve biraz küçük */
+    transform: rotate(-6deg) translate(-15px, -8px) scale(0.95);
+    filter: brightness(0.9); /* Derinlik hissi için hafif koyu */
+    pointer-events: auto; /* Tıklanabilir olmalı ki swap yapılabilsin */
+}
 
-/* Kırmızı Logo Kartı */
+/* HOVER: Arkadaki karta fare gelince "beni seç" der gibi dışarı fırlasın */
+.logo-wrapper:hover .logo-card.pos-behind {
+    transform: rotate(-10deg) translate(-50px, -20px) scale(0.95);
+    filter: brightness(1); /* Parlasın */
+}
+
+/* --- TEMA ÖZELLEŞTİRMELERİ --- */
+
+/* Varsayılan (Beyaz) Kart */
+.logo-card.theme-default { background-color: var(--card-bg); }
+
+/* Kırmızı (Gizli) Kart */
 .logo-card.theme-red { 
     background-color: #b91c1c !important; 
     border-color: rgba(0, 0, 0, 0.5) !important;
     box-shadow: 0 10px 25px rgba(185, 28, 28, 0.4) !important;
-    transform: translate(0, 0) scale(0.9);
 }
 body.dark-mode .logo-card.theme-red { 
     background-color: #7f1d1d !important; 
@@ -287,19 +302,18 @@ body.dark-mode .logo-card.theme-red {
     transform: rotate(10deg);
 }
 .logo-card.theme-red .subtitle {
-    font-family: sans-serif !important; text-transform: uppercase; font-weight: 700;
-    font-size: 0.75rem !important; background: rgba(0, 0, 0, 0.25);
-    color: #fff !important; padding: 5px 12px; transform: none; 
-    display: inline-block; margin-top: 10px !important;
-    border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);
+    font-family: var(--font-heading); font-size: 1.7rem; color: var(--text-main);
+    margin-top: 5px; display: block; pointer-events: none;  
 }
 
 @media (max-width: 768px) {
-    .logo-card.pos-center.menu-open { transform: translateY(-60%) scale(0.9) !important; }
-    .logo-card.pos-right.visible { transform: translateY(60%) scale(0.9) !important; }
     .logo-card { padding: 20px 20px; }
     h1 { font-size: 3.5rem; margin-top: 0; } 
-    .logo-card.theme-red { transform: none !important; }
+    
+    /* Mobilde arkaya saklanma açısını biraz kısıyoruz ki ekrandan taşmasın */
+    .logo-card.pos-behind { transform: rotate(-4deg) translate(-8px, -4px) scale(0.92); }
+    .logo-wrapper:hover .logo-card.pos-behind { transform: rotate(-6deg) translate(-20px, -8px) scale(0.92); }
+
     .logo-card.theme-red h1::after { right: -10px; top: -15px; font-size: 0.4em; }
 }
 
@@ -359,7 +373,7 @@ body.dark-mode .logo-card.theme-red {
 body.dark-mode .word-footer { color: #a0a0a0; border-top-color: #555; }
 
 /* ========================================
-   7. FORM & INPUTS (GÜNCELLENDİ)
+   7. FORM & INPUTS
    ========================================
 */
 .form-card {
@@ -381,14 +395,10 @@ label {
     font-family: sans-serif;
 }
 
-/* INPUT DÜZENLEMESİ: ARTIK SEMANTİK DEĞİŞKEN KULLANIYOR */
 input, textarea {
     width: 100%; padding: 12px; 
-    
-    /* Dinamik Değişkenler */
     background-color: var(--input-bg);
     color: var(--input-text);
-    
     border: 1px solid #dcd6cc; font-size: 1.05rem;
     font-family: var(--font-body); outline: none; box-sizing: border-box;
     border-radius: 6px; transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s, color 0.3s;
@@ -396,14 +406,10 @@ input, textarea {
 
 input:focus, textarea:focus { 
     border-color: var(--accent); 
-    
-    /* İşte çözüm: Card rengi yerine dinamik focus rengi */
     background-color: var(--input-focus-bg); 
-    
     box-shadow: 0 0 0 3px rgba(142, 127, 127, 0.2);
 }
 
-/* Kırmızı temada focus border */
 body[data-theme="red"] input:focus, 
 body[data-theme="red"] textarea:focus {
     box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.15);
@@ -489,7 +495,7 @@ body[data-theme="red"] .form-card button:hover { background-color: #991b1b; }
 .load-more-comments-btn:hover { text-decoration: underline; color: var(--text-main); }
 
 /* ========================================
-   9. MODAL & YORUMLAR (DÜZELTİLDİ)
+   9. MODAL & YORUMLAR
    ========================================
 */
 .modal-backdrop {
@@ -547,7 +553,6 @@ body[data-theme="red"] .form-card button:hover { background-color: #991b1b; }
     flex-shrink: 0; padding: 15px; border-radius: var(--radius);
 }
 
-/* YORUM INPUT KAPLAYICISI - Dinamik Değişkenleri Kullanıyor */
 .custom-comment-wrapper {
     background-color: var(--input-bg);
     border: 2px solid var(--input-border);
@@ -558,7 +563,6 @@ body[data-theme="red"] .form-card button:hover { background-color: #991b1b; }
 
 .custom-comment-wrapper:focus-within {
     border-color: var(--accent); box-shadow: var(--shadow-sm);
-    /* Burası artık kırmızı modda koyu kırmızı kalacak */
     background-color: var(--input-focus-bg);
     transform: translateY(-2px);
 }
@@ -573,8 +577,6 @@ body[data-theme="red"] .form-card button:hover { background-color: #991b1b; }
     background: transparent; border: none; font-family: var(--font-body);
     font-size: 0.9rem; font-weight: 700; width: 100%;
     outline: none; padding: 5px 0;
-    
-    /* Metin Rengi: Default modda Accent, Kırmızı Modda Beyaz */
     color: var(--input-text);
 }
 .custom-input-minimal::placeholder { color: var(--input-placeholder); opacity: 0.7; font-weight: 400; }
