@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.db.models import F
 from django.db import transaction
 import uuid
-
+from django.views.decorators.csrf import csrf_exempt
 from .models import Word, Comment, WordVote, CommentVote
 from .serializers import (
     WordSerializer, CommentSerializer, 
@@ -208,14 +208,14 @@ def vote(request, entity_type, entity_id):
     
     return response
 
-@ratelimit(key='ip', rate='1/15s', method='POST', block=False)
+@ratelimit(key='ip', rate='2/15s', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([]) 
 @permission_classes([])
 def add_word(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
-
+    ip = get_client_ip(request)
     serializer = WordCreateSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save(status='pending')
