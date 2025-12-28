@@ -13,6 +13,18 @@ DEBUG = False
 
 ALLOWED_HOSTS = ["yenisozcukler.com", "localhost", "127.0.0.1"]
 
+# --- CLOUDFLARE VE GÜVENLİK AYARLARI (EKLENDİ) ---
+
+# Django 4.0+ için zorunlu: Admin panelindeki 403 hatasını çözer.
+# Cloudflare üzerinden gelen https isteklerini güvenilir kabul eder.
+CSRF_TRUSTED_ORIGINS = [
+    'https://yenisozcukler.com',
+]
+
+# Cloudflare ile SSL (HTTPS) iletişimini Django'ya bildirir.
+# Bu ayar olmadan Django, isteğin güvenli olduğunu anlamayıp işlemi reddedebilir.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
