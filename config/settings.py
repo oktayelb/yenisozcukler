@@ -1,17 +1,20 @@
 from pathlib import Path
+from decouple import config, Csv  # <--- IMPORT ADDED
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# Not: Canlı ortamda bu anahtarı environment variable'dan çekmelisin.
-SECRET_KEY = 'django-insecure-replace-this-with-a-random-string'
+# Reads SECRET_KEY from .env
+SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Statik dosyaların (CSS/JS) localhost'ta görünmesi için True yapıldı.
-DEBUG = False
+# Reads DEBUG from .env, converts "False"/"True" string to boolean
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = ["yenisozcukler.com", "localhost", "127.0.0.1"]
+# Reads ALLOWED_HOSTS from .env, converts comma-separated string to list
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
+
 
 # --- CLOUDFLARE VE GÜVENLİK AYARLARI (EKLENDİ) ---
 
@@ -36,7 +39,6 @@ INSTALLED_APPS = [
     'rest_framework', 
     'core',
 ]
-
 # Geliştirme için yerel bellek cache'i yeterlidir.
 # İleride Redis'e geçilebilir.
 CACHES = {
