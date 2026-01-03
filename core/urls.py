@@ -18,4 +18,6 @@ urlpatterns = [
     # Eski 'api/like/...' kaldırıldı.
     # Artık tek bir endpoint var: /api/vote/word/5 veya /api/vote/comment/12 gibi çalışır.
     path('api/vote/<str:entity_type>/<int:entity_id>', views.vote, name='vote'),
+
+    path('api/auth', views.unified_auth, name='unified_auth'),
 ]

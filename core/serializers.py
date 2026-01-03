@@ -94,3 +94,15 @@ class CommentCreateSerializer(serializers.ModelSerializer):
 
     def validate_author(self, value):
         return value.strip() if value else "Anonim"
+    
+
+class AuthSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=20)
+    password = serializers.CharField(min_length=6, write_only=True)
+
+    def validate_username(self, value):
+        value = value.strip()
+        # Kullanıcı adı sadece harf, rakam ve alt çizgi içerebilir
+        if not re.match(r'^[a-zA-Z0-9_]+$', value):
+            raise serializers.ValidationError("Kullanıcı adı sadece harf, rakam ve '_' içerebilir.")
+        return value

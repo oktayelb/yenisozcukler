@@ -14,7 +14,9 @@ from .serializers import (
     WordSerializer, CommentSerializer, 
     WordCreateSerializer, CommentCreateSerializer
 )
-
+from django.contrib.auth import authenticate, login
+from django.contrib.auth.models import User
+from .serializers import AuthSerializer
 
 
 def get_client_ip(request):
@@ -311,3 +313,54 @@ def add_comment(request):
     else:
         first_error = next(iter(serializer.errors.values()))[0]
         return Response({'success': False, 'error': first_error}, status=400)
+    
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+def unified_auth(request):
+    """
+    Tek endpoint: Hem Login hem Register.
+    - Kullanıcı varsa -> Şifre kontrol et -> Giriş yap.
+    - Kullanıcı yoksa -> Kaydet -> Giriş yap.
+    """
+    serializer = AuthSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        username = serializer.validated_data['username']
+        password = serializer.validated_data['password']
+        
+        # 1. Kullanıcı var mı kontrol et
+        user_exists = User.objects.filter(username=username).exists()
+        
+        user = None
+        action_taken = ""
+
+        if user_exists:
+            # Login Modu
+            user = authenticate(request, username=username, password=password)
+            if user is None:
+                return Response({'success': False, 'error': 'Kullanıcı adı dolu, ancak şifre yanlış.'}, status=400)
+            action_taken = "login"
+        else:
+            # Register Modu
+            try:
+                user = User.objects.create_user(username=username, password=password)
+                action_taken = "register"
+                # Not: create_user çalıştığı an signals.py devreye girer 
+                # ve eski içerikleri bu user'a zimmetler.
+            except Exception as e:
+                return Response({'success': False, 'error': 'Kayıt oluşturulamadı.'}, status=400)
+
+        # 2. Oturumu Başlat (Session Oluştur)
+        if user:
+            login(request, user)
+            return Response({
+                'success': True, 
+                'username': user.username, 
+                'action': action_taken,
+                'message': f'Başarıyla {action_taken} işlemi yapıldı.'
+            })
+            
+    # Validasyon hatası varsa
+    first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
+    return Response({'success': False, 'error': first_error}, status=400)
