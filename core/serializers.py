@@ -102,6 +102,11 @@ class AuthSerializer(serializers.Serializer):
 
     def validate_username(self, value):
         value = value.strip()
+
+
+        if value.lower() == 'anonim':
+            raise serializers.ValidationError("Bu kullanıcı adı sistem tarafından ayrılmıştır, alınamaz.")
+        
         # Kullanıcı adı sadece harf, rakam ve alt çizgi içerebilir
         if not re.match(r'^[a-zA-Z0-9_]+$', value):
             raise serializers.ValidationError("Kullanıcı adı sadece harf, rakam ve '_' içerebilir.")
