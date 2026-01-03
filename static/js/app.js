@@ -814,7 +814,7 @@ function switchAuthMode(mode) {
         tabRegister.classList.remove('active');
     } else {
         title.innerText = "Kayıt Ol";
-        subtitle.innerText = "Anonim olmadan sözcük göndermek için giriş yap";
+        subtitle.innerText = "Eski sözcüklerinizi yeni hesabınıza yazdırabilirsiniz!";
         emailGroup.style.display = 'block'; // Show Confirm Password
         btn.innerText = "Kayıt Ol";
 
