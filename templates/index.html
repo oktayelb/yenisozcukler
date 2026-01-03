@@ -6,10 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yeni Sözcükler</title>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
-    
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
-<body>
+<body data-user-auth="{{ request.user.is_authenticated|yesno:'true,false' }}" 
+      data-username="{{ request.user.username|default:'' }}">
 
     <div class="notification-container" id="notificationContainer"></div>
     <div id="modalBackdrop" class="modal-backdrop" onclick="closeCommentView()"></div> 
@@ -18,9 +18,19 @@
         <button class="header-btn" id="darkModeToggle">Karanlık Mod</button>
     </div>
 
-    <div class="header-controls-right">
-        <button class="header-btn" onclick="showAboutInfo()">Bu site nedir?</button>
-    </div>  
+<div class="header-controls-right">
+    {% if request.user.is_authenticated %}
+        <div class="header-user-info">
+            <span class="header-user-welcome">Merhaba, <strong>{{ request.user.username }}</strong></span>
+            <button class="header-btn logout-btn" onclick="handleLogout()" title="Çıkış Yap">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </button>
+        </div>
+    {% else %}
+        <button class="header-btn" onclick="openAuthModal()">Giriş Yap</button>
+    {% endif %}
+    <button class="header-btn" onclick="showAboutInfo()">Bu site nedir?</button>
+</div>
     
     <header>
         <div class="logo-wrapper">
@@ -56,7 +66,11 @@
 
                 <div class="form-group">
                     <label>Ekleyenin Takma Adı</label>
-                    <input type="text" id="inputNick" maxlength="20" placeholder="Anonim" onkeypress="return allowOnlyLetters(event, false)">
+                    <input type="text" id="inputNick" maxlength="20" 
+                           placeholder="{% if request.user.is_authenticated %}{{ request.user.username }}{% else %}Anonim{% endif %}" 
+                           value="{% if request.user.is_authenticated %}{{ request.user.username }}{% endif %}"
+                           {% if request.user.is_authenticated %}readonly{% endif %}
+                           onkeypress="return allowOnlyLetters(event, false)">
                 </div>
                 
                 <button type="submit">Sözlüğe Ekle</button>
@@ -102,11 +116,6 @@
                     Aynı zamanda sözcük türetme bilincini Türkçe ile kısıtlı bırakmayıp, kullanıcıları türettikleri yabancı sözcükleri de paylaşmaları için teşvik ediyoruz. 
                 </p>
 
-                <div class="about-section-title">Nasıl Çalışır?</div>
-                <p>
-                    Sözcüklerinizi "Katkıda Bulun" formunu kullanarak ekleyebilirsiniz. 
-                    Sözcüklerin üstüne dokunarak yorum bırakamayı unutmayın! 
-                </p>
                 <div class="about-section-title">İletişim</div>
                 <p>
                     e269354@metu.edu.tr email adresine şikayet ve tavsiyelerinizi iletebilirsiniz.
@@ -114,42 +123,36 @@
             </div>
         </div>
     </div>
-<div id="authModal" class="auth-overlay" onclick="closeAuthModal(event)">
-    <div class="auth-box">
-        <button class="close-btn auth-close" onclick="closeAuthModal(event, true)">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
 
-        <div class="auth-header">
-            <h2 id="authTitle">Giriş Yap</h2>
-            <p id="authSubtitle">Anonim olmadan sözcük göndermek için giriş yap.</p>
-        </div>
+    <div id="authModal" class="auth-overlay" onclick="closeAuthModal(event)">
+        <div class="auth-box">
+            <button class="close-btn auth-close" onclick="closeAuthModal(event, true)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
 
-        <div class="auth-tabs">
-            <button class="auth-tab active" onclick="switchAuthMode('login')" id="tabLogin">Giriş</button>
-            <button class="auth-tab" onclick="switchAuthMode('register')" id="tabRegister">Kayıt Ol</button>
-        </div>
-
-        <div class="auth-form">
-            <div class="form-group">
-                <label>Kullanıcı Adı</label>
-                <input type="text" id="authUsername" placeholder="Kullanıcı Adı">
-            </div>
-            
-            <div class="form-group">
-                <label>Şifre</label>
-                <input type="password" id="authPassword" placeholder="••••••">
+            <div class="auth-header">
+                <h2 id="authTitle">Giriş Yap / Kayıt Ol</h2>
+                <p id="authSubtitle">Kullanıcı adın varsa giriş yapar, yoksa senin için oluştururuz.</p>
             </div>
 
-            <div class="form-group" id="authEmailGroup" style="display:none;">
-                <label>Şifre (Tekrar)</label>
-                <input type="password" id="authPasswordConfirm" placeholder="••••••">
-            </div>
+            <div class="auth-form" id="authForm">
+                <div class="form-group">
+                    <label>Kullanıcı Adı</label>
+                    <input type="text" id="authUsername" placeholder="Kullanıcı Adı" autocomplete="username">
+                </div>
+                
+                <div class="form-group">
+                    <label>Şifre</label>
+                    <input type="password" id="authPassword" placeholder="••••••" autocomplete="current-password">
+                </div>
+                
+                <p id="authErrorMsg" style="color: var(--error-color); font-size: 0.9rem; margin-bottom: 10px; display: none;"></p>
 
-            <button class="auth-submit-btn" onclick="handleAuthSubmit()">Giriş Yap</button>
+                <button class="auth-submit-btn" type="button" onclick="handleAuthSubmit()">Devam Et</button>
+            </div>
         </div>
     </div>
-</div>
-<script src="{% static 'js/app.js' %}"></script>
+
+    <script src="{% static 'js/app.js' %}"></script>
 </body>
 </html>

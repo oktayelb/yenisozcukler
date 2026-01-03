@@ -2,7 +2,10 @@ const THEME_KEY = 'userTheme';
 const COLOR_THEME_KEY = 'userColorTheme'; 
 let currentWordId = null; 
 let activeCardClone = null;
-let isUserLoggedIn = false;
+
+// Auth durumunu HTML'den oku
+let isUserLoggedIn = document.body.getAttribute('data-user-auth') === 'true';
+
 let currentPage = 1;
 const ITEMS_PER_PAGE = 20; 
 let isLoading = false;
@@ -17,10 +20,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const subtitle = document.getElementById('subtitleText');
     if(mainTitle) mainTitle.classList.add('loaded');
     if(subtitle) subtitle.classList.add('loaded');
+    
+    // --- AUTH TRIGGER LOGIC (GÜNCELLENDİ) ---
     const nickInput = document.getElementById('inputNick');
+    const defInput = document.getElementById('inputDef');
+
+    // 1. Durum: Tanım girerken ENTER'a basılırsa -> Anonim Gönder
+    if (defInput) {
+        defInput.addEventListener('keydown', function(event) {
+            // Enter'a basıldıysa VE Shift'e basılmıyorsa (Yeni satır istemiyorsa)
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault(); // Yeni satıra geçmeyi engelle
+                submitWord(); // Direkt gönder (Takma ad boş gidecek, backend Anonim yapacak)
+            }
+        });
+    }
+
+    // 2. Durum: Takma Ad'a (TAB ile veya TIKLAYARAK) odaklanılırsa -> Modal Aç
     if (nickInput) {
         nickInput.addEventListener('focus', triggerAuthRequirement);
     }
+    // ----------------------------------------
+
     // --- DARK MODE SETUP ---
     const savedTheme = localStorage.getItem(THEME_KEY);
     const darkModeToggle = document.getElementById('darkModeToggle');
@@ -35,11 +56,28 @@ document.addEventListener('DOMContentLoaded', () => {
     darkModeToggle.addEventListener('click', toggleDarkMode);
     
     // --- LOGO & COLOR THEME SETUP ---
-    // Sayfa yüklendiğinde kartların doğru pozisyonda (kim önde kim arkada) başlamasını sağlar.
     initLogoSystem();
 
     fetchWords(currentPage);
 });
+
+// --- YENİ ÇIKIŞ FONKSİYONU ---
+function handleLogout() {
+    fetch('/api/logout', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken()
+        }
+    })
+    .then(response => {
+        // Başarılı olsa da olmasa da sayfayı yenilemek en temizi
+        window.location.reload();
+    })
+    .catch(err => {
+        console.error("Çıkış hatası:", err);
+        window.location.reload();
+    });
+}
 
 function toggleDarkMode() {
     const isDarkMode = document.body.classList.toggle('dark-mode');
@@ -144,7 +182,10 @@ async function handleVote(entityType, entityId, action, container) {
     try {
         const response = await fetch(endpoint, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
             body: JSON.stringify({ action: action })
         });
 
@@ -174,6 +215,9 @@ async function handleVote(entityType, entityId, action, container) {
     }
 }
 
+// Global değişkenlerin olduğu en tepeye bunu da ekleyebilirsin (Opsiyonel, aşağıda zaten okuyoruz)
+let currentUserUsername = document.body.getAttribute('data-username');
+
 function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef) { 
     if (activeCardClone) return; 
     
@@ -202,6 +246,15 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef) {
     clone.style.height = rect.height + 'px';
     clone.style.position = 'fixed'; 
 
+    // --- YENİ EKLENEN KISIM: Kullanıcı Durumu ---
+    // Eğer giriş yapmışsa username'i al, yapmamışsa boş bırak.
+    const currentUsername = document.body.getAttribute('data-username') || '';
+    
+    const authValue = isUserLoggedIn ? currentUsername : '';
+    const authReadOnly = isUserLoggedIn ? 'readonly' : '';
+    const authPlaceholder = isUserLoggedIn ? '' : 'Takma Ad (İsteğe bağlı)';
+    // ---------------------------------------------
+
     const fullContentHTML = `
         <div class="drawer-header">
             <div style="flex-grow: 1; padding-right: 15px;">
@@ -216,9 +269,14 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef) {
             <div class="custom-comment-wrapper">
                 <div class="custom-comment-header">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                    <input type="text" id="commentAuthor" class="custom-input-minimal" maxlength="30" placeholder="Takma Adın (İsteğe bağlı)">
+                    
+                    <input type="text" id="commentAuthor" class="custom-input-minimal" 
+                           maxlength="30" 
+                           value="${authValue}" 
+                           ${authReadOnly}
+                           placeholder="${authPlaceholder}">
                 </div>
-                <textarea id="commentInput" class="custom-textarea-minimal" rows="3" placeholder="Bu sözcük hakkında ne düşünüyorsun?.." maxlength="200" oninput="document.getElementById('liveCharCount').innerText = this.value.length + '/200'" onkeydown="handleCommentEnter(event)"></textarea>
+                <textarea id="commentInput" class="custom-textarea-minimal" rows="3" placeholder="Bu sözcük hakkında ne düşünüyorsun?.." maxlength="200" oninput="document.getElementById('liveCharCount').innerText = this.value.length + '/200'"></textarea>
                 <div class="custom-comment-footer">
                     <span id="liveCharCount" class="char-counter-minimal">0/200</span>
                     <button class="send-btn-minimal" onclick="submitComment()">
@@ -237,10 +295,29 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef) {
     `;
 
     document.body.appendChild(clone);
-    const commentAuthInput = clone.querySelector('#commentAuthor');
-if (commentAuthInput) {
-    commentAuthInput.addEventListener('focus', triggerAuthRequirement);
-}
+    
+    // --- EVENT LISTENERS (YENİ MANTIK) ---
+    const commentInput = clone.querySelector('#commentInput');
+    const commentAuthor = clone.querySelector('#commentAuthor');
+
+    // 1. Textarea'da Enter'a basılırsa -> Anonim Gönder (Shift+Enter hariç)
+    if (commentInput) {
+        commentInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitComment();
+            }
+        });
+        // Modalı açınca direkt yoruma odaklan
+        setTimeout(() => commentInput.focus(), 100);
+    }
+
+    // 2. Eğer giriş YAPMAMIŞSA: Takma Ad'a tıklayınca/odaklanınca -> Auth Modal Aç
+    if (commentAuthor && !isUserLoggedIn) {
+        commentAuthor.addEventListener('focus', triggerAuthRequirement);
+    }
+    // -------------------------------------
+    
     activeCardClone = clone;
     originalCard.style.opacity = '0';
     currentWordId = wordId;
@@ -262,7 +339,6 @@ function closeCommentView() {
     setTimeout(() => {
         const originalCards = document.querySelectorAll('.word-card');
         const titleElement = activeCardClone.querySelector('#commentTitle');
-        // Eğer titleElement null ise (hata durumunda) boş string kullan
         const titleText = titleElement ? titleElement.textContent : ''; 
 
         originalCards.forEach(card => {
@@ -382,6 +458,12 @@ function submitComment() {
     const commentsList = activeCardClone.querySelector('#commentsList');
     
     const commentText = input.value.trim();
+    
+    // Yazar adı mantığı:
+    // 1. Giriş yapmışsa: Input dolu olsa bile Backend override edip username yapacak (Güvenlik).
+    // 2. Giriş yapmamışsa: Input boşsa Backend 'Anonim' yapacak.
+    let authorNameToSend = authorInput.value.trim();
+
     if (commentText.length === 0) { showCustomAlert("Lütfen bir yorum yazın.", "error"); return; }
     if (commentText.length > 200) { showCustomAlert("Yorum 200 karakterden uzun olamaz.", "error"); return; }
     
@@ -390,10 +472,13 @@ function submitComment() {
 
     fetch('/api/comment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
         body: JSON.stringify({ 
             word_id: currentWordId, 
-            author: authorInput.value, 
+            author: authorNameToSend, // Boş giderse backend 'Anonim' yapar
             comment: commentText 
         })
     })
@@ -404,6 +489,8 @@ function submitComment() {
             input.value = '';
             document.getElementById('liveCharCount').innerText = '0/200'; 
             
+            // Backend'den dönen veriyi kullanıyoruz (data.comment).
+            // Backend, isim boş gittiyse oraya "Anonim" yazıp geri gönderir.
             const newCommentData = {
                 ...data.comment,
                 likes: 0,
@@ -414,12 +501,17 @@ function submitComment() {
             
             const newItem = createCommentElement(newCommentData);
             
+            // Eğer "Henüz yorum yok" yazısı varsa onu temizle
             if (commentsList.firstElementChild && commentsList.firstElementChild.textContent.includes('Henüz yorum yok')) { 
                 commentsList.innerHTML = ''; 
             }
             
+            // Yeni yorumu en başa ekle
             commentsList.insertBefore(newItem, commentsList.firstChild);
             
+            // Listeyi en üste kaydır (kullanıcı görsün)
+            commentsList.scrollTop = 0;
+
         } else {
             showCustomAlert(data.error || "Yorum eklenirken hata oluştu.", "error"); 
         }
@@ -475,17 +567,15 @@ function createWordCardElement(item) {
     card.appendChild(titleDiv);
     card.appendChild(defDiv);
 
-    // --- Footer Section (Hint + Author) ---
+    // --- Footer Section ---
     const footerDiv = document.createElement('div');
     footerDiv.className = 'word-footer';
 
-    // Left side: Click Hint
     const hintSpan = document.createElement('span');
     hintSpan.className = 'click-hint';
     hintSpan.textContent = 'Detaylar & Yorumlar ↴'; 
     footerDiv.appendChild(hintSpan);
 
-    // Right side: Author (if exists)
     if (item.author) {
         const authSpan = document.createElement('span');
         authSpan.className = 'word-author';
@@ -607,6 +697,7 @@ function handleWordSubmit(event) {
     event.preventDefault(); 
     submitWord();
 }
+
 function getCSRFToken() {
     const name = "csrftoken=";
     const decodedCookie = decodeURIComponent(document.cookie);
@@ -619,15 +710,15 @@ function getCSRFToken() {
     }
     return null;
 }
+
 async function submitWord() {
     const wordInput = document.getElementById('inputWord');
     const defInput = document.getElementById('inputDef');
-    const nickInput = document.getElementById('inputNick'); // Input ID'si HTML'de doğru mu kontrol et
+    const nickInput = document.getElementById('inputNick'); 
     const btn = document.querySelector(".form-card button");
 
     const word = wordInput.value.trim();
     const definition = defInput.value.trim();
-    // DÜZELTME 1: Değişken adını backend ile uyumlu olması için author olarak kullanacağız
     const author = nickInput.value.trim(); 
     
     const currentTheme = localStorage.getItem(COLOR_THEME_KEY);
@@ -639,7 +730,6 @@ async function submitWord() {
         return; 
     }
     
-    // DÜZELTME 3: Karakter sınırı kontrolü (Backend hatasından önce biz uyaralım)
     if (definition.length > 300) {
         showCustomAlert("Tanım 300 karakterden uzun olamaz.", "error");
         return;
@@ -648,107 +738,84 @@ async function submitWord() {
     btn.disabled = true;
     btn.innerText = "Kaydediliyor...";
 
-try {
-    const response = await fetch('/api/add', {
-        method: 'POST',
-        headers: {
-    'Content-Type': 'application/json',
-    'X-CSRFToken': getCSRFToken()
-},
+    try {
+        const response = await fetch('/api/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({ word, definition, nickname: author, is_profane: isProfane })
+        });
 
-        body: JSON.stringify({ word, definition, nickname: author, is_profane: isProfane })
-    });
-
-    // Check content type before parsing
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-        const errorText = await response.text(); 
-        console.error("SERVER ERROR HTML:", errorText); // <--- LOOK AT THIS IN CONSOLE
-        throw new Error("Server returned non-JSON content: " + contentType);
-    }
-
-    const data = await response.json();
-
-    // Handle rate limit
-    if (response.status === 429) {
-        throw new Error(data.error || "Çok fazla deneme yaptınız, lütfen bekleyin.");
-    }
-
-    if (response.ok) {
-        wordInput.value = ''; 
-        defInput.value = ''; 
-        nickInput.value = '';
-        updateCount({ value: '' }); 
-        
-        if (isProfane) {
-            showCustomAlert("Sözcük (Argo/+18) gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
-        } else {
-            showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
+        // Check content type before parsing
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            const errorText = await response.text(); 
+            throw new Error("Server returned non-JSON content: " + contentType);
         }
-    } else {
-        showCustomAlert(data.error || "Sözcük kaydedilirken bir hata oluştu.", "error");
+
+        const data = await response.json();
+
+        if (response.status === 429) {
+            throw new Error(data.error || "Çok fazla deneme yaptınız, lütfen bekleyin.");
+        }
+
+        if (response.ok) {
+            wordInput.value = ''; 
+            defInput.value = ''; 
+            if (!isUserLoggedIn) nickInput.value = '';
+            
+            updateCount({ value: '' }); 
+            
+            if (isProfane) {
+                showCustomAlert("Sözcük (Argo/+18) gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
+            } else {
+                showCustomAlert("Sözcük gönderildi! Moderasyon incelemesinden sonra görünecektir.", "success");
+            }
+        } else {
+            showCustomAlert(data.error || "Sözcük kaydedilirken bir hata oluştu.", "error");
+        }
+    } catch (error) { 
+        showCustomAlert(error.message || "Ağ hatası: Sunucuya ulaşılamadı.", "error"); 
+    } finally { 
+        btn.disabled = false; 
+        btn.innerText = "Sözlüğe Ekle"; 
     }
-} catch (error) { 
-    showCustomAlert(error.message || "Ağ hatası: Sunucuya ulaşılamadı.", "error"); 
-} finally { 
-    btn.disabled = false; 
-    btn.innerText = "Sözlüğe Ekle"; 
-}
 }
 
-/* --- YENİ LOGO SWAP SİSTEMİ (BASİTLEŞTİRİLMİŞ) --- */
-
-/**
- * Sayfa ilk açıldığında çalışır.
- * LocalStorage'daki veriye göre hangi kartın önde (pos-center),
- * hangi kartın arkada (pos-behind) olacağına karar verir.
- */
+/* --- YENİ LOGO SWAP SİSTEMİ --- */
 function initLogoSystem() {
     const savedTheme = localStorage.getItem(COLOR_THEME_KEY) || 'default';
     const cardDefault = document.getElementById('cardDefault');
     const cardRed = document.getElementById('cardRed');
 
-    // Eğer elementler HTML'de yoksa hata vermesin
     if (!cardDefault || !cardRed) return;
 
-    // Temayı body'e işle (CSS renkleri için)
     document.body.setAttribute('data-theme', savedTheme);
 
     if (savedTheme === 'red') {
-        // Kırmızı önde, Default arkada
         cardRed.className = 'logo-card theme-red pos-center';
         cardDefault.className = 'logo-card theme-default pos-behind';
     } else {
-        // Default önde, Kırmızı arkada
         cardDefault.className = 'logo-card theme-default pos-center';
         cardRed.className = 'logo-card theme-red pos-behind';
     }
 }
 
-/**
- * Logoya (herhangi birine) tıklandığında çalışır.
- * Temayı değiştirir, kartların yerini değiştirir (swap) ve içeriği yeniler.
- */
 function animateLogo(clickedElement) {
-    // 1. Yeni temayı belirle
     const currentTheme = localStorage.getItem(COLOR_THEME_KEY) || 'default';
     const newTheme = currentTheme === 'default' ? 'red' : 'default';
 
-    // 2. Temayı kaydet ve Body'e uygula
     localStorage.setItem(COLOR_THEME_KEY, newTheme);
     document.body.setAttribute('data-theme', newTheme);
     
-    // 3. Görsel Animasyon (Sınıfları değiştir)
     updateLogoVisuals(newTheme);
 
-    // 4. İçeriği Yenile
     currentPage = 1;
     fetchWords(currentPage);
 }
 
-/**
- * Animasyonlu geçişi sağlayan yardımcı fonksiyon.
- */
 function updateLogoVisuals(activeTheme) {
     const cardDefault = document.getElementById('cardDefault');
     const cardRed = document.getElementById('cardRed');
@@ -756,88 +823,93 @@ function updateLogoVisuals(activeTheme) {
     if (!cardDefault || !cardRed) return;
 
     if (activeTheme === 'red') {
-        // Kırmızıyı öne getir
         cardRed.classList.remove('pos-behind');
         cardRed.classList.add('pos-center');
 
-        // Beyazı arkaya at
         cardDefault.classList.remove('pos-center');
         cardDefault.classList.add('pos-behind');
     } else {
-        // Beyazı öne getir
         cardDefault.classList.remove('pos-behind');
         cardDefault.classList.add('pos-center');
 
-        // Kırmızıyı arkaya at
         cardRed.classList.remove('pos-center');
         cardRed.classList.add('pos-behind');
     }
 }
 
-// ... bottom of app.js ...
-
-/* --- AUTH MODAL LOGIC --- */
+/* --- AUTH MODAL LOGIC (GÜNCELLENDİ) --- */
 
 function triggerAuthRequirement(event) {
-    // If user is NOT logged in, block access and show modal
     if (!isUserLoggedIn) {
-        event.preventDefault(); // Stop typing
-        event.target.blur();    // Remove focus from input
-        
-        const modal = document.getElementById('authModal');
-        modal.classList.add('show');
+        event.preventDefault(); 
+        event.target.blur();    
+        openAuthModal();
     }
+}
+
+function openAuthModal() {
+    const modal = document.getElementById('authModal');
+    if(modal) modal.classList.add('show');
+    document.activeElement.blur();
 }
 
 function closeAuthModal(event, forceClose = false) {
     const modal = document.getElementById('authModal');
     if (forceClose || event.target === modal) {
         modal.classList.remove('show');
-    }
-}
-
-function switchAuthMode(mode) {
-    const title = document.getElementById('authTitle');
-    const subtitle = document.getElementById('authSubtitle');
-    const emailGroup = document.getElementById('authEmailGroup');
-    const btn = document.querySelector('.auth-submit-btn');
-    const tabLogin = document.getElementById('tabLogin');
-    const tabRegister = document.getElementById('tabRegister');
-
-    if (mode === 'login') {
-        title.innerText = "Giriş Yap";
-        subtitle.innerText = "Anonim olmadan sözcük göndermek için giriş yap";
-        emailGroup.style.display = 'none';
-        btn.innerText = "Giriş Yap";
-        
-        tabLogin.classList.add('active');
-        tabRegister.classList.remove('active');
-    } else {
-        title.innerText = "Kayıt Ol";
-        subtitle.innerText = "Eski sözcüklerinizi yeni hesabınıza yazdırabilirsiniz!";
-        emailGroup.style.display = 'block'; // Show Confirm Password
-        btn.innerText = "Kayıt Ol";
-
-        tabRegister.classList.add('active');
-        tabLogin.classList.remove('active');
+        const errorMsg = document.getElementById('authErrorMsg');
+        if(errorMsg) errorMsg.style.display = 'none';
     }
 }
 
 function handleAuthSubmit() {
-    // Placeholder logic for now
+    const usernameInput = document.getElementById('authUsername');
+    const passwordInput = document.getElementById('authPassword');
+    const errorMsg = document.getElementById('authErrorMsg');
     const btn = document.querySelector('.auth-submit-btn');
+
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value.trim();
+
+    if (!username || !password) {
+        errorMsg.textContent = "Lütfen tüm alanları doldurun.";
+        errorMsg.style.display = 'block';
+        return;
+    }
+
     const originalText = btn.innerText;
-    
     btn.innerText = "İşleniyor...";
     btn.disabled = true;
+    errorMsg.style.display = 'none';
 
-    setTimeout(() => {
-        // Fake success for UI demonstration
-        isUserLoggedIn = true; 
-        showCustomAlert("Giriş yapıldı! Artık takma ad kullanabilirsin.", "success");
-        closeAuthModal(null, true);
-        
+    fetch('/api/auth', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({ username, password })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showCustomAlert(data.message || "Giriş başarılı!", "success");
+            closeAuthModal(null, true);
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        } else {
+            errorMsg.textContent = data.error || "Bir hata oluştu.";
+            errorMsg.style.display = 'block';
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    })
+    .catch(error => {
+        console.error(error);
+        errorMsg.textContent = "Sunucu bağlantı hatası.";
+        errorMsg.style.display = 'block';
         btn.innerText = originalText;
         btn.disabled = false;
-    }, 1500);
+    });
 }

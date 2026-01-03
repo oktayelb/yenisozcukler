@@ -17,7 +17,7 @@ from .serializers import (
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.models import User
 from .serializers import AuthSerializer
-
+from django.contrib.auth import logout # En üste ekle
 
 def get_client_ip(request):
     return request.META.get('HTTP_CF_CONNECTING_IP') or request.META.get('REMOTE_ADDR')
@@ -364,3 +364,10 @@ def unified_auth(request):
     # Validasyon hatası varsa
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
     return Response({'success': False, 'error': first_error}, status=400)
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+def logout_view(request):
+    logout(request)
+    return Response({'success': True})

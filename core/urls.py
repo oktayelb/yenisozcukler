@@ -20,4 +20,5 @@ urlpatterns = [
     path('api/vote/<str:entity_type>/<int:entity_id>', views.vote, name='vote'),
 
     path('api/auth', views.unified_auth, name='unified_auth'),
+    path('api/logout', views.logout_view, name='logout'),
 ]
