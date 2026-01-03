@@ -12,19 +12,21 @@ from django.views.decorators.csrf import csrf_exempt
 from .models import Word, Comment, WordVote, CommentVote
 from .serializers import (
     WordSerializer, CommentSerializer, 
-    WordCreateSerializer, CommentCreateSerializer
+    WordCreateSerializer, CommentCreateSerializer,
+    AuthSerializer, ChangeUsernameSerializer # <-- YENİ EKLENDİ
 )
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.models import User
-from .serializers import AuthSerializer
-from django.contrib.auth import logout # En üste ekle
+from django.db.models import Sum
+from rest_framework.permissions import IsAuthenticated
+import re
+
+# --- YARDIMCI FONKSİYONLAR ---
 
 def get_client_ip(request):
     return request.META.get('HTTP_CF_CONNECTING_IP') or request.META.get('REMOTE_ADDR')
 
 def get_or_create_session_id(request):
-    # 'user_id' burada çerez ismidir (Cookie Name).
-    # Değeri ise her kullanıcı için unique UUID'dir.
     return request.COOKIES.get('user_id') or str(uuid.uuid4())
 
 # --- OKUMA (READ) ENDPOINTLERİ ---
@@ -61,7 +63,7 @@ def get_words(request):
     except (PageNotAnInteger, EmptyPage):
         words_page = []
 
-    # --- OYLARI GETİRME (GÜNCELLENDİ: Auth + Guest) ---
+    # --- OYLARI GETİRME ---
     session_id = request.COOKIES.get('user_id')
     user_votes = {}
     
@@ -70,14 +72,11 @@ def get_words(request):
             page_word_ids = [w.id for w in words_page]
             votes = []
 
-            # 1. Kullanıcı giriş yapmışsa USER tablosundan çek
             if request.user.is_authenticated:
                 votes = WordVote.objects.filter(
                     user=request.user, 
                     word_id__in=page_word_ids
                 ).values('word', 'value')
-            
-            # 2. Giriş yapmamışsa ama Session ID varsa SESSION'dan çek
             elif session_id:
                 votes = WordVote.objects.filter(
                     session_id=session_id, 
@@ -99,7 +98,6 @@ def get_words(request):
         'total_count': total_count
     })
     
-    # Session cookie yoksa oluştur
     if not session_id:
         response.set_cookie('user_id', str(uuid.uuid4()), max_age=31536000, httponly=True)
         
@@ -129,14 +127,11 @@ def get_comments(request, word_id):
             page_comment_ids = [c.id for c in comments_page]
             votes = []
 
-            # 1. Kullanıcı giriş yapmışsa USER tablosundan çek
             if request.user.is_authenticated:
                 votes = CommentVote.objects.filter(
                     user=request.user,
                     comment_id__in=page_comment_ids
                 ).values('comment', 'value')
-
-            # 2. Giriş yapmamışsa SESSION'dan çek
             elif session_id:
                 votes = CommentVote.objects.filter(
                     session_id=session_id,
@@ -190,52 +185,42 @@ def vote(request, entity_type, entity_id):
     else:
         return Response({'error': 'Geçersiz tip.'}, status=404)
 
-    # Veritabanını kilitle (Concurrency)
     obj = get_object_or_404(ModelClass.objects.select_for_update(), id=entity_id)
     
     if entity_type == 'word' and obj.status != 'approved':
         return Response({'error': 'Geçersiz içerik.'}, status=404)
 
-    # --- OY BULMA MANTIĞI ---
     existing_vote = None
 
     if user:
-        # 1. Kullanıcı ise önce kendi adına kayıtlı oya bak
         existing_vote = VoteClass.objects.filter(user=user, **{lookup_field: obj}).first()
-        
-        # 2. Kendi adına yoksa, anonimken verdiği oyu (Session ID) bul ve sahiplen
         if not existing_vote:
             stray_vote = VoteClass.objects.filter(session_id=session_id, user__isnull=True, **{lookup_field: obj}).first()
             if stray_vote:
                 existing_vote = stray_vote
-                existing_vote.user = user # Oyu sahiplen
+                existing_vote.user = user 
     else:
-        # 3. Misafir ise sadece Session ID ile bak
         existing_vote = VoteClass.objects.filter(session_id=session_id, **{lookup_field: obj}).first()
 
     response_action = 'none'
 
-    # --- OYLAMA İŞLEMİ ---
     if existing_vote:
-        # Aynı oyu vermişse kaldır (Toggle)
         if existing_vote.value == vote_val:
             existing_vote.delete()
             obj.score = F('score') - vote_val
             response_action = 'none'
-        # Farklı oy vermişse güncelle
         else:
             existing_vote.value = vote_val
-            if user: existing_vote.user = user # User bilgisini güncelle
+            if user: existing_vote.user = user 
             existing_vote.save()
             obj.score = F('score') + (vote_val * 2)
             response_action = 'liked' if vote_val == 1 else 'disliked'
     else:
-        # Yeni oy oluştur
         new_vote = VoteClass(
             value=vote_val, 
             ip_address=client_ip, 
-            session_id=session_id, # Session ID her zaman loglanır
-            user=user,             # Varsa user, yoksa None
+            session_id=session_id, 
+            user=user,             
             **{lookup_field: obj}
         )
         new_vote.save()
@@ -250,9 +235,7 @@ def vote(request, entity_type, entity_id):
         'new_score': obj.score, 
         'user_action': response_action 
     })
-    # Cookie süresini uzat
     response.set_cookie('user_id', session_id, max_age=31536000, httponly=True)
-    
     return response
 
 @ratelimit(key='ip', rate='2/15s', method='POST', block=False)
@@ -267,7 +250,6 @@ def add_word(request):
     if serializer.is_valid():
         save_kwargs = {'status': 'pending'}
         
-        # Giriş yapmışsa User ve Author bilgisini ayarla
         if request.user.is_authenticated:
             save_kwargs['user'] = request.user
             save_kwargs['author'] = request.user.username
@@ -293,11 +275,9 @@ def add_comment(request):
     if serializer.is_valid():
         word = get_object_or_404(Word, id=serializer.validated_data['word_id'])
         
-        # Varsayılan değerler
         author_name = serializer.validated_data.get('author', 'Anonim')
         user_obj = None
         
-        # Giriş yapmışsa override et
         if request.user.is_authenticated:
             user_obj = request.user
             author_name = request.user.username
@@ -306,7 +286,7 @@ def add_comment(request):
             word=word,
             author=author_name,
             comment=serializer.validated_data['comment'],
-            user=user_obj, # User'ı kaydet
+            user=user_obj, 
             score=0
         )
         return Response({'success': True, 'comment': CommentSerializer(new_comment).data}, status=201)
@@ -320,8 +300,6 @@ def add_comment(request):
 def unified_auth(request):
     """
     Tek endpoint: Hem Login hem Register.
-    - Kullanıcı varsa -> Şifre kontrol et -> Giriş yap.
-    - Kullanıcı yoksa -> Kaydet -> Giriş yap.
     """
     serializer = AuthSerializer(data=request.data)
     
@@ -329,29 +307,29 @@ def unified_auth(request):
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
         
-        # 1. Kullanıcı var mı kontrol et
         user_exists = User.objects.filter(username=username).exists()
-        
         user = None
         action_taken = ""
 
         if user_exists:
-            # Login Modu
+            # Login
             user = authenticate(request, username=username, password=password)
             if user is None:
                 return Response({'success': False, 'error': 'Kullanıcı adı dolu, ancak şifre yanlış.'}, status=400)
             action_taken = "login"
         else:
-            # Register Modu
+            # Register
             try:
                 user = User.objects.create_user(username=username, password=password)
                 action_taken = "register"
-                # Not: create_user çalıştığı an signals.py devreye girer 
-                # ve eski içerikleri bu user'a zimmetler.
+                
+                # Eski İçerikleri Zimmetle
+                Word.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
+                Comment.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
+                
             except Exception as e:
                 return Response({'success': False, 'error': 'Kayıt oluşturulamadı.'}, status=400)
 
-        # 2. Oturumu Başlat (Session Oluştur)
         if user:
             login(request, user)
             return Response({
@@ -361,7 +339,6 @@ def unified_auth(request):
                 'message': f'Başarıyla {action_taken} işlemi yapıldı.'
             })
             
-    # Validasyon hatası varsa
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
     return Response({'success': False, 'error': first_error}, status=400)
 
@@ -371,3 +348,64 @@ def unified_auth(request):
 def logout_view(request):
     logout(request)
     return Response({'success': True})
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_profile(request):
+    user = request.user
+    
+    word_count = Word.objects.filter(user=user).count()
+    comment_count = Comment.objects.filter(user=user).count()
+    total_score = Word.objects.filter(user=user).aggregate(Sum('score'))['score__sum'] or 0
+    
+    return Response({
+        'username': user.username,
+        'date_joined': user.date_joined.strftime('%d.%m.%Y'),
+        'word_count': word_count,
+        'comment_count': comment_count,
+        'total_score': total_score
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    user = request.user
+    new_password = request.data.get('new_password')
+    
+    if not new_password or len(new_password) < 6:
+        return Response({'success': False, 'error': 'Şifre en az 6 karakter olmalı.'}, status=400)
+    
+    user.set_password(new_password)
+    user.save()
+    update_session_auth_hash(request, user)
+    
+    return Response({'success': True, 'message': 'Şifreniz başarıyla güncellendi.'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_username(request):
+    # Serializer'a request'i context olarak gönderiyoruz
+    serializer = ChangeUsernameSerializer(data=request.data, context={'request': request})
+    
+    if serializer.is_valid():
+        new_username = serializer.validated_data['new_username']
+        user = request.user
+
+        try:
+            with transaction.atomic():
+                user.username = new_username
+                user.save()
+
+                # Denormalize alanları güncelle
+                Word.objects.filter(user=user).update(author=new_username)
+                Comment.objects.filter(user=user).update(author=new_username)
+                
+                return Response({'success': True, 'message': 'Kullanıcı adı başarıyla değiştirildi.'})
+                
+        except Exception as e:
+            return Response({'success': False, 'error': 'Veritabanı güncelleme hatası.'}, status=500)
+    
+    else:
+        first_error = next(iter(serializer.errors.values()))[0]
+        return Response({'success': False, 'error': first_error}, status=400)

@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.contrib.auth.models import User
 from .models import Word, Comment
 import re
 
@@ -52,14 +53,12 @@ class WordCreateSerializer(serializers.ModelSerializer):
 
     def validate_word(self, value):
         value = value.strip()
-        # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
         if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
             raise serializers.ValidationError("Sözcük sadece harf, rakam ve temel noktalama işaretleri içerebilir.")
         return value
 
     def validate_definition(self, value):
         value = value.strip()
-        # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
         if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
             raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor.")
         return value
@@ -69,7 +68,6 @@ class WordCreateSerializer(serializers.ModelSerializer):
             return "Anonim"
         if value:
             value = value.strip()
-            # FIX C: Added Turkish circumflex chars: âîûÂÎÛ
             if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
                 raise serializers.ValidationError("Takma ad geçersiz karakterler içeriyor.")
         return value 
@@ -103,11 +101,36 @@ class AuthSerializer(serializers.Serializer):
     def validate_username(self, value):
         value = value.strip()
 
-
         if value.lower() == 'anonim':
             raise serializers.ValidationError("Bu kullanıcı adı sistem tarafından ayrılmıştır, alınamaz.")
         
-        # Kullanıcı adı sadece harf, rakam ve alt çizgi içerebilir
-        if not re.match(r'^[a-zA-Z0-9_]+$', value):
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
             raise serializers.ValidationError("Kullanıcı adı sadece harf, rakam ve '_' içerebilir.")
         return value
+
+# --- YENİ EKLENEN SERIALIZER ---
+class ChangeUsernameSerializer(serializers.Serializer):
+    new_username = serializers.CharField(max_length=20, required=True)
+
+    def validate_new_username(self, value):
+        value = value.strip()
+        # View'dan context ile gönderilen request'ten user'ı alıyoruz
+        user = self.context['request'].user 
+
+        # 1. Boşluk kontrolü
+        if not value:
+            raise serializers.ValidationError("Kullanıcı adı boş olamaz.")
+
+        # 2. Yasaklı kelime kontrolü
+        if value.lower() == 'anonim':
+            raise serializers.ValidationError("Bu kullanıcı adı sistem tarafından ayrılmıştır.")
+
+        # 3. Regex (Karakter) kontrolü (AuthSerializer ile aynı)
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
+            raise serializers.ValidationError("Kullanıcı adı geçersiz karakterler içeriyor.")
+
+        # 4. Müsaitlik kontrolü (Kendisi hariç başkası almış mı?)
+        if User.objects.filter(username__iexact=value).exclude(id=user.id).exists():
+            raise serializers.ValidationError("Bu kullanıcı adı zaten kullanımda.")
+
+        return value    

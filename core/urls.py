@@ -21,4 +21,8 @@ urlpatterns = [
 
     path('api/auth', views.unified_auth, name='unified_auth'),
     path('api/logout', views.logout_view, name='logout'),
+    # ...
+    path('api/profile', views.get_user_profile, name='get_user_profile'),
+    path('api/change-password', views.change_password, name='change_password'),
+    path('api/change-username', views.change_username, name='change_username'),
 ]

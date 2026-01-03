@@ -913,3 +913,144 @@ function handleAuthSubmit() {
         btn.disabled = false;
     });
 }
+
+/* --- PROFILE MODAL LOGIC --- */
+
+function openProfileModal() {
+    const modal = document.getElementById('profileModal');
+    if(modal) {
+        modal.classList.add('show');
+        fetchProfileData(); // Açılır açılmaz verileri çek
+    }
+}
+
+function closeProfileModal(event, forceClose = false) {
+    const modal = document.getElementById('profileModal');
+    if (forceClose || event.target === modal) {
+        modal.classList.remove('show');
+        // İki inputu da temizle
+        document.getElementById('newPassword').value = '';
+        const confirmInput = document.getElementById('newPasswordConfirm');
+        if(confirmInput) confirmInput.value = '';
+    }
+}
+
+
+async function fetchProfileData() {
+    try {
+        const response = await fetch('/api/profile', {
+            headers: {
+                'X-CSRFToken': getCSRFToken()
+            }
+        });
+        const data = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('profileUsername').textContent = data.username;
+            document.getElementById('profileDate').textContent = data.date_joined;
+            document.getElementById('statWords').textContent = data.word_count;
+            document.getElementById('statComments').textContent = data.comment_count;
+            document.getElementById('statScore').textContent = data.total_score;
+        }
+    } catch (error) {
+        console.error("Profil verisi çekilemedi:", error);
+    }
+}
+
+// app.js dosyasının en altındaki ilgili fonksiyonları bununla değiştir:
+
+
+function handleChangePassword() {
+    const newPassInput = document.getElementById('newPassword');
+    const confirmPassInput = document.getElementById('newPasswordConfirm'); // Yeni input
+    
+    const newPass = newPassInput.value.trim();
+    const confirmPass = confirmPassInput.value.trim();
+    
+    const btn = document.querySelector('#profileModal .auth-submit-btn');
+    
+    // --- VALIDASYONLAR ---
+    if (newPass.length < 6) {
+        showCustomAlert("Şifre en az 6 karakter olmalıdır.", "error");
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        showCustomAlert("Şifreler birbiriyle eşleşmiyor.", "error");
+        return;
+    }
+    // ---------------------
+
+    const originalText = btn.innerText;
+    btn.innerText = "Güncelleniyor...";
+    btn.disabled = true;
+
+    fetch('/api/change-password', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({ new_password: newPass })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showCustomAlert(data.message, "success");
+            newPassInput.value = '';
+            confirmPassInput.value = ''; // Başarılı olunca temizle
+        } else {
+            showCustomAlert(data.error || "Hata oluştu.", "error");
+        }
+    })
+    .catch(err => {
+        showCustomAlert("Sunucu hatası.", "error");
+    })
+    .finally(() => {
+        btn.innerText = originalText;
+        btn.disabled = false;
+    });
+}
+
+// app.js en altına ekle:
+
+function handleChangeUsername() {
+    const input = document.getElementById('newUsernameInput');
+    const newUsername = input.value.trim();
+    const btn = input.nextElementSibling; // Yanındaki buton
+
+    if (!newUsername) return;
+
+    const originalText = btn.innerText;
+    btn.innerText = "...";
+    btn.disabled = true;
+
+    fetch('/api/change-username', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({ new_username: newUsername })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showCustomAlert(data.message, "success");
+            // Kullanıcı adı değiştiği için sayfayı yenilemek en sağlıklısıdır
+            // (Header, yorumlar vb. her yerin güncellenmesi için)
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showCustomAlert(data.error || "Hata oluştu.", "error");
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    })
+    .catch(err => {
+        showCustomAlert("Sunucu hatası.", "error");
+        btn.innerText = originalText;
+        btn.disabled = false;
+    });
+}
