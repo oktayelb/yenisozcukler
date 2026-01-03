@@ -612,3 +612,47 @@ body[data-theme="red"] .auth-submit-btn { background-color: var(--accent); color
     }
     .drawer-header h2 { font-size: 1.2rem; }
 }
+
+/* Profil Başlık Düzeni */
+.profile-header-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 5px;
+}
+
+/* Kullanıcı Adı Stili */
+.profile-username {
+    margin: 0;
+    font-size: 1.8rem;
+    color: var(--text-main);
+}
+
+/* Yeni Düzenle Butonu Stili */
+.edit-profile-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-color: transparent;
+    border: 1px solid var(--border-light);
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border-radius: 20px; /* Hap şeklinde yuvarlak kenarlar */
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.edit-profile-btn:hover {
+    background-color: var(--input-bg);
+    color: var(--accent);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+}
+
+.edit-profile-btn svg {
+    width: 14px;
+    height: 14px;
+}

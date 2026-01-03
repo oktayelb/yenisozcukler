@@ -5,13 +5,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yeni Sözcükler</title>
+    
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
+
 <body data-user-auth="{{ request.user.is_authenticated|yesno:'true,false' }}" 
       data-username="{{ request.user.username|default:'' }}">
 
     <div class="notification-container" id="notificationContainer"></div>
+    
     <div id="modalBackdrop" class="modal-backdrop" onclick="closeCommentView()"></div> 
 
     <div class="header-controls">
@@ -51,6 +57,7 @@
     </header>
 
     <div class="container">
+        
         <div class="form-card">
             <div class="form-title">Katkıda Bulun</div>
 
@@ -100,24 +107,15 @@
             </div>
             
             <h2 class="about-heading">Bu Site Nedir?</h2>
-                <p>
-                    Bu site, kullanıcıların türettikleri yepyeni sözcükleri paylaşarak Türkçe'nin gelişmesine ve ilerlemesine katkıda
-                    bulunabilecekleri, Türk dilinin ifade yelpazesini geliştirebilecekleri bir platformdur.
-                </p>           
+            <p>
+                Bu site, kullanıcıların türettikleri yepyeni sözcükleri paylaşarak Türkçe'nin gelişmesine ve ilerlemesine katkıda
+                bulunabilecekleri, Türk dilinin ifade yelpazesini geliştirebilecekleri bir platformdur.
+            </p>           
             <div class="about-text">
                 <div class="about-section-title">Görevimiz</div>
                 <p>
                     Amacımız, dilimizin zenginliklerini korumak ve modern ya da eski alıntı sözcükler yerine
                     yeni türetilen Türkçe sözcükleri modern bir platformda toplamaktır.
-                </p>
-
-                <div class="about-section-title">Nedenimiz</div>
-                <p>
-                    Yüzyıllar öncesinde yaşanan alıntı sözcük modası, günümüzde de yaşanıyor, ancak yaşanırken kimse farkında olamıyor.
-                    Bu nedenle bu siteyi kurarak gelecek nesillere, yaşayan ve sürekli gelişen bir Türkçe sözlük mirası bırakmayı hedefliyoruz.
-                </p>    
-                <p>
-                    Aynı zamanda sözcük türetme bilincini Türkçe ile kısıtlı bırakmayıp, kullanıcıları türettikleri yabancı sözcükleri de paylaşmaları için teşvik ediyoruz. 
                 </p>
 
                 <div class="about-section-title">İletişim</div>
@@ -150,6 +148,7 @@
                     <input type="password" id="authPassword" placeholder="••••••" autocomplete="current-password">
                 </div>
                 
+                <div class="cf-turnstile" data-sitekey="0x4AAAAAACKXoAcWo8k1VLPm" data-theme="auto"></div>
                 <p id="authErrorMsg" style="color: var(--error-color); font-size: 0.9rem; margin-bottom: 10px; display: none;"></p>
 
                 <button class="auth-submit-btn" type="button" onclick="handleAuthSubmit()">Devam Et</button>
@@ -164,11 +163,21 @@
             </button>
 
             <div class="auth-header">
-                <h2 id="profileUsername">Yükleniyor...</h2>
-                <p style="font-size:0.9rem; color:var(--text-muted);">Üyelik Tarihi: <span id="profileDate">-</span></p>
+                <div class="profile-header-wrapper">
+                    <h2 id="profileUsername" class="profile-username">Yükleniyor...</h2>
+                    
+                    <button class="edit-profile-btn" onclick="openEditProfileModal()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        Bilgileri Değiştir
+                    </button>
+                </div>
+                <p style="font-size:0.9rem; color:var(--text-muted); margin-top:5px;">Üyelik Tarihi: <span id="profileDate">-</span></p>
             </div>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-bottom:25px; text-align:center;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; text-align:center;">
                 <div style="background:var(--input-bg); padding:10px; border-radius:8px; border:1px solid var(--border-light);">
                     <div style="font-weight:bold; font-size:1.2rem; color:var(--accent);" id="statWords">0</div>
                     <div style="font-size:0.75rem; color:var(--text-muted);">Sözcük</div>
@@ -182,10 +191,21 @@
                     <div style="font-size:0.75rem; color:var(--text-muted);">Puan</div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <br>
+    <div id="editProfileModal" class="auth-overlay" onclick="closeEditProfileModal(event)">
+        <div class="auth-box" style="max-width: 400px;">
+            <button class="close-btn auth-close" onclick="closeEditProfileModal(event, true)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
 
-            <h4 style="margin:0 0 10px 0; color:var(--text-main);">Kullanıcı Adı</h4>
+            <div class="auth-header">
+                <h2>Profili Düzenle</h2>
+                <p style="color:var(--text-muted);">Kullanıcı bilgilerini buradan güncelleyebilirsin.</p>
+            </div>
+
+            <h4 style="margin:0 0 10px 0; color:var(--text-main); font-size:1rem;">Kullanıcı Adı</h4>
             <div class="auth-form" style="margin-bottom: 25px;">
                 <div class="form-group" style="display:flex; gap:10px;">
                     <input type="text" id="newUsernameInput" placeholder="Kullanıcı Adı" maxlength="20">
@@ -195,7 +215,7 @@
 
             <hr style="border:0; border-top:1px dashed var(--input-border); margin-bottom:20px;">
 
-            <h4 style="margin:0 0 10px 0; color:var(--text-main);">Şifre Değiştir</h4>
+            <h4 style="margin:0 0 10px 0; color:var(--text-main); font-size:1rem;">Şifre Değiştir</h4>
             <div class="auth-form">
                 <div class="form-group">
                     <input type="password" id="newPassword" placeholder="Yeni Şifre (En az 6 karakter)">
@@ -206,9 +226,16 @@
                 
                 <button class="auth-submit-btn" onclick="handleChangePassword()">Şifreyi Güncelle</button>
             </div>
+            
+            <button onclick="backToProfile()" style="background:none; border:none; color:var(--text-muted); width:100%; margin-top:15px; cursor:pointer; font-size:0.9rem;">
+                &larr; Profile Geri Dön
+            </button>
         </div>
     </div>
 
     <script src="{% static 'js/app.js' %}"></script>
 </body>
 </html>
+
+
+  

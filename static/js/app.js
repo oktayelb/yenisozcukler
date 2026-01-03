@@ -862,6 +862,8 @@ function closeAuthModal(event, forceClose = false) {
     }
 }
 
+// app.js
+
 function handleAuthSubmit() {
     const usernameInput = document.getElementById('authUsername');
     const passwordInput = document.getElementById('authPassword');
@@ -871,8 +873,18 @@ function handleAuthSubmit() {
     const username = usernameInput.value.trim();
     const password = passwordInput.value.trim();
 
+    // Turnstile token'ını al (Widget bu isimde gizli bir input oluşturur)
+    const turnstileToken = document.querySelector('[name="cf-turnstile-response"]')?.value;
+
     if (!username || !password) {
         errorMsg.textContent = "Lütfen tüm alanları doldurun.";
+        errorMsg.style.display = 'block';
+        return;
+    }
+
+    // Token kontrolü
+    if (!turnstileToken) {
+        errorMsg.textContent = "Lütfen robot olmadığınızı doğrulayın.";
         errorMsg.style.display = 'block';
         return;
     }
@@ -888,7 +900,8 @@ function handleAuthSubmit() {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCSRFToken()
         },
-        body: JSON.stringify({ username, password })
+        // Token'ı da gönderiyoruz
+        body: JSON.stringify({ username, password, token: turnstileToken })
     })
     .then(response => response.json())
     .then(data => {
@@ -903,6 +916,9 @@ function handleAuthSubmit() {
             errorMsg.style.display = 'block';
             btn.innerText = originalText;
             btn.disabled = false;
+            
+            // Hata durumunda Turnstile'ı sıfırla (Kullanıcı tekrar çözsün)
+            if (window.turnstile) window.turnstile.reset();
         }
     })
     .catch(error => {
@@ -924,14 +940,23 @@ function openProfileModal() {
     }
 }
 
+// app.js
+
+
+// GÜNCELLENEN FONKSİYON: Kapatırken ayar menüsünü de gizle
 function closeProfileModal(event, forceClose = false) {
     const modal = document.getElementById('profileModal');
     if (forceClose || event.target === modal) {
         modal.classList.remove('show');
-        // İki inputu da temizle
+        
+        // Inputları temizle
         document.getElementById('newPassword').value = '';
         const confirmInput = document.getElementById('newPasswordConfirm');
         if(confirmInput) confirmInput.value = '';
+        
+        // --- YENİ: Ayar menüsünü kapat (Resetle) ---
+        const editSection = document.getElementById('editProfileSection');
+        if(editSection) editSection.style.display = 'none';
     }
 }
 
@@ -1053,4 +1078,43 @@ function handleChangeUsername() {
         btn.innerText = originalText;
         btn.disabled = false;
     });
+}
+
+// app.js - EN ALT KISIM
+
+// 1. Düzenleme Modalını Aç (Profil modalını kapatır)
+function openEditProfileModal() {
+    // Önce mevcut profil modalını kapat
+    const profileModal = document.getElementById('profileModal');
+    profileModal.classList.remove('show');
+
+    // Yeni modalı aç
+    const editModal = document.getElementById('editProfileModal');
+    editModal.classList.add('show');
+
+    // Kullanıcı adını inputa otomatik doldur (Global değişkenden veya DOM'dan alarak)
+    const currentUsername = document.body.getAttribute('data-username');
+    const input = document.getElementById('newUsernameInput');
+    if(input && currentUsername) input.value = currentUsername;
+}
+
+// 2. Düzenleme Modalını Kapat
+function closeEditProfileModal(event, forceClose = false) {
+    const modal = document.getElementById('editProfileModal');
+    if (forceClose || event.target === modal) {
+        modal.classList.remove('show');
+        // Inputları temizle
+        document.getElementById('newPassword').value = '';
+        document.getElementById('newPasswordConfirm').value = '';
+    }
+}
+
+// 3. "Profile Geri Dön" Fonksiyonu
+function backToProfile() {
+    // Edit'i kapat
+    const editModal = document.getElementById('editProfileModal');
+    editModal.classList.remove('show');
+    
+    // Profili geri aç
+    openProfileModal();
 }

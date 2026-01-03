@@ -2,7 +2,8 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Word, Comment
 import re
-
+import requests
+from decouple import config
 # --- OKUMA (READ) SERIALIZERS ---
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -97,7 +98,7 @@ class CommentCreateSerializer(serializers.ModelSerializer):
 class AuthSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=20)
     password = serializers.CharField(min_length=6, write_only=True)
-
+    token = serializers.CharField(write_only=True, required=True) # Yeni alan
     def validate_username(self, value):
         value = value.strip()
 
@@ -107,6 +108,30 @@ class AuthSerializer(serializers.Serializer):
         if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
             raise serializers.ValidationError("Kullanıcı adı sadece harf, rakam ve '_' içerebilir.")
         return value
+    
+    def validate(self, attrs):
+        token = attrs.get('token')
+        
+        # Cloudflare Verify API
+        secret_key = config('CLOUDFLARE_SECRET_KEY')
+        verify_url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+        
+        data = {
+            'secret': secret_key,
+            'response': token
+        }
+        
+        try:
+            response = requests.post(verify_url, data=data)
+            result = response.json()
+            
+            if not result.get('success'):
+                raise serializers.ValidationError({"token": "Robot doğrulaması başarısız oldu. Lütfen tekrar deneyin."})
+                
+        except requests.RequestException:
+             raise serializers.ValidationError({"token": "Doğrulama sunucusuna ulaşılamadı."})
+
+        return attrs
 
 # --- YENİ EKLENEN SERIALIZER ---
 class ChangeUsernameSerializer(serializers.Serializer):
