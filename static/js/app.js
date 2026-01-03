@@ -2,7 +2,7 @@ const THEME_KEY = 'userTheme';
 const COLOR_THEME_KEY = 'userColorTheme'; 
 let currentWordId = null; 
 let activeCardClone = null;
-
+let isUserLoggedIn = false;
 let currentPage = 1;
 const ITEMS_PER_PAGE = 20; 
 let isLoading = false;
@@ -17,7 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const subtitle = document.getElementById('subtitleText');
     if(mainTitle) mainTitle.classList.add('loaded');
     if(subtitle) subtitle.classList.add('loaded');
-    
+    const nickInput = document.getElementById('inputNick');
+    if (nickInput) {
+        nickInput.addEventListener('focus', triggerAuthRequirement);
+    }
     // --- DARK MODE SETUP ---
     const savedTheme = localStorage.getItem(THEME_KEY);
     const darkModeToggle = document.getElementById('darkModeToggle');
@@ -234,6 +237,10 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef) {
     `;
 
     document.body.appendChild(clone);
+    const commentAuthInput = clone.querySelector('#commentAuthor');
+if (commentAuthInput) {
+    commentAuthInput.addEventListener('focus', triggerAuthRequirement);
+}
     activeCardClone = clone;
     originalCard.style.opacity = '0';
     currentWordId = wordId;
@@ -765,4 +772,72 @@ function updateLogoVisuals(activeTheme) {
         cardRed.classList.remove('pos-center');
         cardRed.classList.add('pos-behind');
     }
+}
+
+// ... bottom of app.js ...
+
+/* --- AUTH MODAL LOGIC --- */
+
+function triggerAuthRequirement(event) {
+    // If user is NOT logged in, block access and show modal
+    if (!isUserLoggedIn) {
+        event.preventDefault(); // Stop typing
+        event.target.blur();    // Remove focus from input
+        
+        const modal = document.getElementById('authModal');
+        modal.classList.add('show');
+    }
+}
+
+function closeAuthModal(event, forceClose = false) {
+    const modal = document.getElementById('authModal');
+    if (forceClose || event.target === modal) {
+        modal.classList.remove('show');
+    }
+}
+
+function switchAuthMode(mode) {
+    const title = document.getElementById('authTitle');
+    const subtitle = document.getElementById('authSubtitle');
+    const emailGroup = document.getElementById('authEmailGroup');
+    const btn = document.querySelector('.auth-submit-btn');
+    const tabLogin = document.getElementById('tabLogin');
+    const tabRegister = document.getElementById('tabRegister');
+
+    if (mode === 'login') {
+        title.innerText = "Giriş Yap";
+        subtitle.innerText = "Anonim olmadan sözcük göndermek için giriş yap";
+        emailGroup.style.display = 'none';
+        btn.innerText = "Giriş Yap";
+        
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+    } else {
+        title.innerText = "Kayıt Ol";
+        subtitle.innerText = "Anonim olmadan sözcük göndermek için giriş yap";
+        emailGroup.style.display = 'block'; // Show Confirm Password
+        btn.innerText = "Kayıt Ol";
+
+        tabRegister.classList.add('active');
+        tabLogin.classList.remove('active');
+    }
+}
+
+function handleAuthSubmit() {
+    // Placeholder logic for now
+    const btn = document.querySelector('.auth-submit-btn');
+    const originalText = btn.innerText;
+    
+    btn.innerText = "İşleniyor...";
+    btn.disabled = true;
+
+    setTimeout(() => {
+        // Fake success for UI demonstration
+        isUserLoggedIn = true; 
+        showCustomAlert("Giriş yapıldı! Artık takma ad kullanabilirsin.", "success");
+        closeAuthModal(null, true);
+        
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }, 1500);
 }
