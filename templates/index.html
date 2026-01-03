@@ -114,7 +114,42 @@
             </div>
         </div>
     </div>
+<div id="authModal" class="auth-overlay" onclick="closeAuthModal(event)">
+    <div class="auth-box">
+        <button class="close-btn auth-close" onclick="closeAuthModal(event, true)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
 
+        <div class="auth-header">
+            <h2 id="authTitle">Giriş Yap</h2>
+            <p id="authSubtitle">Anonim olmadan sözcük göndermek için giriş yap.</p>
+        </div>
+
+        <div class="auth-tabs">
+            <button class="auth-tab active" onclick="switchAuthMode('login')" id="tabLogin">Giriş</button>
+            <button class="auth-tab" onclick="switchAuthMode('register')" id="tabRegister">Kayıt Ol</button>
+        </div>
+
+        <div class="auth-form">
+            <div class="form-group">
+                <label>Kullanıcı Adı</label>
+                <input type="text" id="authUsername" placeholder="Kullanıcı Adı">
+            </div>
+            
+            <div class="form-group">
+                <label>Şifre</label>
+                <input type="password" id="authPassword" placeholder="••••••">
+            </div>
+
+            <div class="form-group" id="authEmailGroup" style="display:none;">
+                <label>Şifre (Tekrar)</label>
+                <input type="password" id="authPasswordConfirm" placeholder="••••••">
+            </div>
+
+            <button class="auth-submit-btn" onclick="handleAuthSubmit()">Giriş Yap</button>
+        </div>
+    </div>
+</div>
 <script src="{% static 'js/app.js' %}"></script>
 </body>
 </html>
