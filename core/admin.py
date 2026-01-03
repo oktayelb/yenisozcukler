@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import Word, Comment, WordVote, CommentVote
-
+from django.contrib.auth.models import User
+from django.contrib.auth.admin import UserAdmin
 # --- Define Actions ---
 
 @admin.action(description='Mark selected words as Approved')
@@ -46,8 +47,26 @@ class CommentVoteAdmin(admin.ModelAdmin):
     search_fields = ('ip_address', 'comment__comment')
 
 # --- Register Models ---
-
+admin.site.unregister(User)
 admin.site.register(Word, WordAdmin)
 admin.site.register(Comment, CommentAdmin)
 admin.site.register(WordVote, WordVoteAdmin)
 admin.site.register(CommentVote, CommentVoteAdmin)
+class CustomUserAdmin(UserAdmin):
+    # Listede görünecek sütunlar (ID ve Kayıt Tarihi eklendi)
+    list_display = ('id', 'username', 'email', 'first_name', 'last_name', 'is_staff', 'date_joined')
+    
+    # Sağ taraftaki filtreleme seçenekleri
+    list_filter = ('is_staff', 'is_superuser', 'is_active', 'date_joined')
+    
+    # Arama kutusunun hangi alanlarda arama yapacağı
+    search_fields = ('username', 'email', 'first_name', 'last_name')
+    
+    # Sıralama (En yeni üyeler en üstte)
+    ordering = ('-date_joined',)
+    
+    # İstersen kullanıcı detayına girdiğinde görünen alanları da gruplayabilirsin
+    # (Genelde varsayılan hali yeterlidir, o yüzden fieldsets ayarına dokunmuyoruz)
+
+# 3. User Modelini Tekrar Kaydet
+admin.site.register(User, CustomUserAdmin)
