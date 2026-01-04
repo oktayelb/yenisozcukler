@@ -656,3 +656,121 @@ body[data-theme="red"] .auth-submit-btn { background-color: var(--accent); color
     width: 14px;
     height: 14px;
 }
+/* --- PROFİL MODALI ÖZELLEŞTİRMELERİ --- */
+
+/* 1. Profil içindeki Sözcük Listesi (Scrollbar Alanı) */
+#userWordsList {
+    padding-right: 10px; /* Scrollbar ile içerik arasına boşluk */
+    margin-top: 15px;
+}
+
+/* 2. Özel Scrollbar Tasarımı (Webkit: Chrome, Safari, Edge) */
+#userWordsList::-webkit-scrollbar {
+    width: 6px; /* Daha ince çubuk */
+}
+
+#userWordsList::-webkit-scrollbar-track {
+    background: var(--input-bg); /* Arka plan rengi */
+    border-radius: 10px;
+}
+
+#userWordsList::-webkit-scrollbar-thumb {
+    background-color: var(--border-light); /* Çubuğun rengi */
+    border-radius: 10px;
+}
+
+#userWordsList::-webkit-scrollbar-thumb:hover {
+    background-color: var(--accent); /* Üzerine gelince renk değişsin */
+}
+
+/* 3. Profil İçindeki Kartların Etkileşimi */
+#userWordsList .word-card {
+    transition: all 0.2s ease;
+    border: 1px solid var(--border-light);
+    background-color: var(--card-bg);
+}
+
+#userWordsList .word-card:hover {
+    transform: translateY(-3px); /* Hafifçe yukarı kalksın */
+    border-color: var(--accent); /* Kenarlık rengi değişsin */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); /* Hafif gölge */
+}
+
+/* --- Z-INDEX KATMAN HİYERARŞİSİ (Z-Index Fix) --- */
+
+/* 1. Seviye: Arka Plan Karartması */
+.modal-backdrop {
+    z-index: 990 !important; 
+}
+
+/* 2. Seviye: Standart Modallar (Giriş, Profil, Hakkında) */
+/* Profil penceresi burada durur */
+.auth-overlay, 
+.about-overlay {
+    z-index: 1000 !important;
+}
+
+/* 3. Seviye: Profil Düzenleme Penceresi */
+/* Profilin üzerine açılırsa diye bir tık yukarıda */
+#editProfileModal {
+    z-index: 1050 !important;
+}
+
+/* 4. Seviye: Detay / Yorum Görünümü (EN KRİTİK KISIM) */
+/* Profil penceresinin kesinlikle üstünde olmalı */
+/* Not: JS tarafında detay penceresine verdiğin class ismine göre burası çalışır. 
+   Genellikle 'fixed' pozisyonda açılan container'dır. */
+.comment-drawer-container, 
+.detail-view-wrapper, 
+div[style*="position: fixed"][style*="bottom: 0"] { 
+    /* Detay pencerenin kapsayıcısını yakalamak için genel bir seçim */
+    z-index: 2000 !important;
+}
+
+/* Eğer JS ile detay görünümü için özel bir ID veya Class atadıysan (örn: #commentView)
+   onu da buraya ekleyebilirsin: */
+#commentDetailModal, .comment-view {
+    z-index: 2000 !important;
+}
+
+/* 5. Seviye: Bildirimler (HER ŞEYİN ÜSTÜNDE) */
+.notification-container {
+    z-index: 9999 !important;
+    pointer-events: none; /* Tıklamayı engellemesin, sadece görünsün */
+}
+
+/* Bildirim içindeki kutular tıklanabilir olsun */
+.notification-toast {
+    pointer-events: auto;
+}
+
+/* İstatistik kutusunu tıklanabilir yap */
+.clickable-stat {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.clickable-stat:hover {
+    background-color: var(--input-bg); /* Hafif koyulaşma */
+    transform: translateY(-2px); /* Yukarı kalkma */
+    border-color: var(--accent) !important; /* Kenarlık rengi değişimi */
+}
+
+.clickable-stat:active {
+    transform: translateY(0);
+}
+
+/* Sözcüklerim Modalı için Feed Alanı */
+#myWordsFeed {
+    padding: 10px;
+    overflow-y: auto;
+    max-height: 60vh; /* Ekranın %60'ı kadar yükseklik */
+}
+
+/* Mobilde tam ekran hissi için */
+@media (max-width: 480px) {
+    #myWordsFeed {
+        max-height: 70vh;
+    }
+}

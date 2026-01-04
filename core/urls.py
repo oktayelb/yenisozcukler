@@ -25,4 +25,6 @@ urlpatterns = [
     path('api/profile', views.get_user_profile, name='get_user_profile'),
     path('api/change-password', views.change_password, name='change_password'),
     path('api/change-username', views.change_username, name='change_username'),
+
+    path('api/my-words', views.get_my_words, name='get_my_words'),
 ]

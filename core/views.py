@@ -409,3 +409,11 @@ def change_username(request):
     else:
         first_error = next(iter(serializer.errors.values()))[0]
         return Response({'success': False, 'error': first_error}, status=400)
+    
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_my_words(request):
+    # SADECE ONAYLANMIŞ (Yayında Olan) kelimeleri getir
+    words = Word.objects.filter(user=request.user, status='approved').order_by('-timestamp')
+    serializer = WordSerializer(words, many=True)
+    return Response({'success': True, 'words': serializer.data})
