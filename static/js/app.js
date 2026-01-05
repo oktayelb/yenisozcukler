@@ -11,6 +11,9 @@ let currentCommentPage = 1;
 let isLoading = false;
 let currentWordCommentsHasNext = false;
 
+// !!! NEW: Track which profile is currently open
+let currentProfileUser = null; 
+
 // Read User Auth State
 const isUserLoggedIn = document.body.getAttribute('data-user-auth') === 'true';
 const currentUserUsername = document.body.getAttribute('data-username');
@@ -233,7 +236,7 @@ function createCardElement(item, isModalMode) {
 
     // 1. Click Handler
     card.onclick = (e) => {
-        if (e.target.closest('.vote-btn') || card.classList.contains('is-profane-content')) return;
+        if (e.target.closest('.vote-btn') || e.target.closest('.user-badge') || card.classList.contains('is-profane-content')) return;
         animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), isModalMode);
     };
 
@@ -250,7 +253,7 @@ function createCardElement(item, isModalMode) {
     `;
     card.appendChild(contentDiv);
 
-    // 4. FOOTER (Simple Signature)
+    // 4. FOOTER (Simple Signature with Clickable Badge)
     const foot = document.createElement('div'); 
     foot.className = 'word-footer';
     
@@ -259,12 +262,27 @@ function createCardElement(item, isModalMode) {
     hint.innerHTML = `Detaylar & Yorumlar <span>&rarr;</span>`;
     foot.appendChild(hint);
 
+    // --- AUTHOR BADGE LOGIC ---
+    const authorName = item.author ? decode(item.author) : 'Anonim';
     const authorSpan = document.createElement('div');
     authorSpan.className = 'card-author';
-    // The "Simple" format you requested
-    authorSpan.innerHTML = `&mdash; ekleyen ${item.author ? decode(item.author) : 'anonim'}`;
+    authorSpan.innerHTML = '&mdash; ekleyen ';
+
+    if (authorName !== 'Anonim') {
+        const badge = document.createElement('span');
+        badge.className = 'user-badge';
+        badge.innerText = authorName;
+        badge.onclick = (e) => {
+            e.stopPropagation(); // Prevent opening comment view
+            openProfileModal(authorName);
+        };
+        authorSpan.appendChild(badge);
+    } else {
+        authorSpan.innerHTML += ' anonim';
+    }
+    // -----------------------------
+
     foot.appendChild(authorSpan);
-    
     card.appendChild(foot);
 
     // 5. PROFANITY OVERLAY (Smooth Fade)
@@ -448,12 +466,47 @@ async function loadComments(wordId, page = 1) {
 function createCommentItem(c) {
     const d = document.createElement('div'); d.className='comment-card';
     const date = new Date(c.timestamp).toLocaleDateString('tr-TR', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
-    d.innerHTML = `
-        <div style="display:flex; justify-content:space-between;"><strong>${c.author||'Anonim'}</strong><span style="font-size:0.75rem;color:var(--text-muted);">${date}</span></div>
-        <div style="margin:5px 0;">${c.comment}</div>
-        <div style="display:flex; justify-content:flex-end;"></div>
-    `;
-    d.lastElementChild.appendChild(createVoteControls('comment', c));
+    
+    // Header (Author + Date)
+    const authorName = c.author || 'Anonim';
+    const head = document.createElement('div');
+    head.style.display = 'flex';
+    head.style.justifyContent = 'space-between';
+    head.style.alignItems = 'center';
+
+    const left = document.createElement('div');
+    if (authorName !== 'Anonim') {
+        const badge = document.createElement('span');
+        badge.className = 'user-badge';
+        badge.innerText = authorName;
+        badge.onclick = (e) => { e.stopPropagation(); openProfileModal(authorName); };
+        left.appendChild(badge);
+    } else {
+        const b = document.createElement('strong');
+        b.innerText = 'Anonim';
+        left.appendChild(b);
+    }
+    
+    const right = document.createElement('span');
+    right.style.fontSize = '0.75rem';
+    right.style.color = 'var(--text-muted)';
+    right.innerText = date;
+
+    head.append(left, right);
+    d.appendChild(head);
+
+    // Body
+    const body = document.createElement('div');
+    body.style.margin = '5px 0';
+    body.innerText = c.comment;
+    d.appendChild(body);
+
+    // Footer
+    const ft = document.createElement('div');
+    ft.style.display = 'flex'; ft.style.justifyContent = 'flex-end';
+    ft.appendChild(createVoteControls('comment', c));
+    d.appendChild(ft);
+
     return d;
 }
 
@@ -481,27 +534,79 @@ function submitComment() {
 }
 
 /* --- PROFILE & EDIT PROFILE --- */
-function openProfileModal() { openModal('profileModal'); fetchProfileData(); }
-async function fetchProfileData() {
+function openProfileModal(targetUsername = null) {
+    // If no username passed, default to current logged in user
+    if (!targetUsername && isUserLoggedIn) {
+        targetUsername = currentUserUsername;
+    }
+    
+    if (!targetUsername) return; 
+
+    // !!! SAVE CURRENT PROFILE USER GLOBAL VARIABLE
+    currentProfileUser = targetUsername;
+
+    openModal('profileModal');
+    
+    // Toggle Edit Button Visibility
+    const editBtn = document.querySelector('.edit-profile-btn');
+    const isOwnProfile = (targetUsername === currentUserUsername);
+    
+    if (editBtn) {
+        editBtn.style.display = isOwnProfile ? 'flex' : 'none';
+    }
+
+    // Update Modal Title while loading
+    document.getElementById('profileUsername').innerText = targetUsername;
+    
+    // Fetch data for this specific user
+    fetchProfileData(targetUsername); 
+}
+
+async function fetchProfileData(username) {
     try {
-        const d = await apiRequest('/api/profile');
+        const d = await apiRequest(`/api/profile?username=${username}`);
         document.getElementById('profileUsername').innerText = d.username;
         document.getElementById('profileDate').innerText = d.date_joined;
         document.getElementById('statWords').innerText = d.word_count;
         document.getElementById('statComments').innerText = d.comment_count;
         document.getElementById('statScore').innerText = d.total_score;
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error(e); 
+        showCustomAlert("Profil bilgileri alınamadı", "error");
+    }
 }
-function openMyWordsModal() { closeModal('profileModal', true); openModal('myWordsModal'); fetchMyWordsFeed(); }
+
+function openMyWordsModal() { 
+    closeModal('profileModal', true); 
+    openModal('myWordsModal'); 
+    fetchMyWordsFeed(); 
+}
+
 async function fetchMyWordsFeed() {
     const c = document.getElementById('myWordsFeed'); c.innerHTML='<div class="spinner"></div>';
+    
+    // !!! UPDATE: SEND THE SAVED USERNAME TO THE API
+    let url = '/api/my-words';
+    if (currentProfileUser) {
+        url += `?username=${currentProfileUser}`;
+    }
+
+    // Change Title based on user
+    const title = document.querySelector('#myWordsModal h2');
+    if (title) {
+        title.innerText = (currentProfileUser === currentUserUsername) 
+            ? "Sözcüklerim" 
+            : `${currentProfileUser} adlı kullanıcının sözcükleri`;
+    }
+
     try {
-        const d = await apiRequest('/api/my-words');
+        const d = await apiRequest(url);
         c.innerHTML='';
         if(d.words?.length>0) appendCards(d.words, c, false); 
         else c.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);">Sözcük yok.</div>';
     } catch (e) { c.innerHTML='<div style="text-align:center;color:var(--error-color);">Hata.</div>'; }
 }
+
 function openEditProfileModal(){ 
     closeModal('profileModal', true); 
     openModal('editProfileModal'); 

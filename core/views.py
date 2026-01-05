@@ -13,12 +13,12 @@ from .models import Word, Comment, WordVote, CommentVote
 from .serializers import (
     WordSerializer, CommentSerializer, 
     WordCreateSerializer, CommentCreateSerializer,
-    AuthSerializer, ChangeUsernameSerializer # <-- YENİ EKLENDİ
+    AuthSerializer, ChangeUsernameSerializer 
 )
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.models import User
 from django.db.models import Sum
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 import re
 
 # --- YARDIMCI FONKSİYONLAR ---
@@ -350,13 +350,23 @@ def logout_view(request):
     return Response({'success': True})
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([]) # ARTIK HERKES GÖREBİLİR (Public Profile)
 def get_user_profile(request):
-    user = request.user
+    # Eğer username parametresi varsa o kullanıcıyı getir, yoksa giriş yapanı
+    target_username = request.GET.get('username')
+
+    if target_username:
+        user = get_object_or_404(User, username=target_username)
+    else:
+        if request.user.is_authenticated:
+            user = request.user
+        else:
+            return Response({'error': 'Kullanıcı bulunamadı.'}, status=404)
     
-    word_count = Word.objects.filter(user=user).count()
+    # İstatistikler (Sadece onaylanmış sözcükleri saymak daha güvenlidir)
+    word_count = Word.objects.filter(user=user, status='approved').count()
     comment_count = Comment.objects.filter(user=user).count()
-    total_score = Word.objects.filter(user=user).aggregate(Sum('score'))['score__sum'] or 0
+    total_score = Word.objects.filter(user=user, status='approved').aggregate(Sum('score'))['score__sum'] or 0
     
     return Response({
         'username': user.username,
@@ -385,7 +395,6 @@ def change_password(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def change_username(request):
-    # Serializer'a request'i context olarak gönderiyoruz
     serializer = ChangeUsernameSerializer(data=request.data, context={'request': request})
     
     if serializer.is_valid():
@@ -397,7 +406,6 @@ def change_username(request):
                 user.username = new_username
                 user.save()
 
-                # Denormalize alanları güncelle
                 Word.objects.filter(user=user).update(author=new_username)
                 Comment.objects.filter(user=user).update(author=new_username)
                 
@@ -411,9 +419,35 @@ def change_username(request):
         return Response({'success': False, 'error': first_error}, status=400)
     
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([]) # Public olabilir, profilden tıklandığında görünmesi için
 def get_my_words(request):
-    # SADECE ONAYLANMIŞ (Yayında Olan) kelimeleri getir
-    words = Word.objects.filter(user=request.user, status='approved').order_by('-timestamp')
-    serializer = WordSerializer(words, many=True)
+    # Eğer parametre varsa o kullanıcının kelimeleri, yoksa oturum açanın
+    target_username = request.GET.get('username')
+    
+    if target_username:
+        user = get_object_or_404(User, username=target_username)
+    elif request.user.is_authenticated:
+        user = request.user
+    else:
+        return Response({'success': False, 'error': 'Yetkisiz erişim.'}, status=401)
+
+    words = Word.objects.filter(user=user, status='approved').order_by('-timestamp')
+    
+    # --- OYLARI DA GETİRELİM Kİ LİSTEDE RENKLİ GÖRÜNSÜN ---
+    session_id = request.COOKIES.get('user_id')
+    user_votes = {}
+    try:
+        if words:
+            page_word_ids = [w.id for w in words]
+            votes = []
+            if request.user.is_authenticated:
+                votes = WordVote.objects.filter(user=request.user, word_id__in=page_word_ids).values('word', 'value')
+            elif session_id:
+                votes = WordVote.objects.filter(session_id=session_id, word_id__in=page_word_ids).values('word', 'value')
+            for v in votes:
+                user_votes[v['word']] = v['value']
+    except:
+        pass
+
+    serializer = WordSerializer(words, many=True, context={'user_votes': user_votes})
     return Response({'success': True, 'words': serializer.data})
