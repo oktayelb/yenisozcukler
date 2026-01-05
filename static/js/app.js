@@ -1,3 +1,8 @@
+/* ========================================
+   app.js - Final Corrected Version
+   ========================================
+*/
+
 /* --- GLOBAL VARIABLES & SETTINGS --- */
 const THEME_KEY = 'userTheme'; 
 const COLOR_THEME_KEY = 'userColorTheme'; 
@@ -9,12 +14,10 @@ let activeCardClone = null;
 let currentPage = 1;
 let currentCommentPage = 1;
 let isLoading = false;
-let currentWordCommentsHasNext = false;
-
-// !!! NEW: Track which profile is currently open
 let currentProfileUser = null; 
 
-// Read User Auth State
+// Auth State
+let currentAuthMode = 'login'; // 'login' or 'register'
 const isUserLoggedIn = document.body.getAttribute('data-user-auth') === 'true';
 const currentUserUsername = document.body.getAttribute('data-username');
 
@@ -44,6 +47,7 @@ function showCustomAlert(message, type = 'success') {
     alertDiv.textContent = message;
     alertDiv.onclick = () => alertDiv.remove();
     container.prepend(alertDiv);
+    
     setTimeout(() => alertDiv.classList.add('show'), 10);
     setTimeout(() => { 
         alertDiv.classList.remove('show'); 
@@ -59,16 +63,22 @@ async function apiRequest(url, method = 'GET', body = null) {
     if (body) options.body = JSON.stringify(body);
 
     const response = await fetch(url, options);
+    
     const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) throw new Error("Server error.");
+    if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Sunucu hatası (Invalid JSON).");
+    }
 
     const data = await response.json();
-    if (response.status === 429) throw new Error(data.error || "Too many requests.");
-    if (!response.ok) throw new Error(data.error || "Request failed.");
+    if (response.status === 429) throw new Error(data.error || "Çok fazla istek gönderdiniz.");
+    if (!response.ok) throw new Error(data.error || "İşlem başarısız.");
     return data;
 }
 
-function updateCount(field) { document.getElementById('charCount').innerText = `${field.value.length} / 300`; }
+function updateCount(field) { 
+    const count = field.value.length;
+    document.getElementById('charCount').innerText = `${count} / 300`; 
+}
 
 /* --- THEME & LOGO --- */
 function setupTheme() {
@@ -119,75 +129,156 @@ function updateLogoVisuals(theme) {
     }
 }
 
-/* --- AUTH TRIGGERS --- */
+/* --- AUTHENTICATION --- */
+
+function toggleAuthMode(mode) {
+    currentAuthMode = mode;
+    
+    const tabLogin = document.getElementById('tabLogin');
+    const tabRegister = document.getElementById('tabRegister');
+    const confirmGroup = document.getElementById('confirmPassGroup');
+    const subtitle = document.getElementById('authSubtitle');
+    const btn = document.getElementById('authSubmitBtn');
+    const errorMsg = document.getElementById('authErrorMsg');
+    
+    if(errorMsg) errorMsg.style.display = 'none';
+
+    if (mode === 'login') {
+        if(tabLogin) tabLogin.classList.add('active');
+        if(tabRegister) tabRegister.classList.remove('active');
+        
+        if(confirmGroup) confirmGroup.style.display = 'none';
+        if(subtitle) subtitle.innerText = "Hesabına giriş yap ve paylaşmaya başla.";
+        if(btn) btn.innerText = "Giriş Yap";
+    } else {
+        if(tabRegister) tabRegister.classList.add('active');
+        if(tabLogin) tabLogin.classList.remove('active');
+        
+        if(confirmGroup) confirmGroup.style.display = 'block';
+        if(subtitle) subtitle.innerText = "Yeni bir hesap oluştur ve aramıza katıl!\n Önceden paylaştığın sözcükleri hesabına tanımlayabilirsin! ";
+        if(btn) btn.innerText = "Kayıt Ol";
+    }
+}
+
 function setupAuthTriggers() {
     const def = document.getElementById('inputDef');
     const nick = document.getElementById('inputNick');
+    
     if (def) def.addEventListener('keydown', (e) => { 
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitWord(); } 
     });
+    
     if (nick && !isUserLoggedIn) nick.addEventListener('focus', (e) => { 
-        e.preventDefault(); e.target.blur(); openModal('authModal'); 
+        e.preventDefault(); 
+        e.target.blur(); 
+        openAuthModal(); 
     });
 }
 
 function handleAuthSubmit() {
     const u = document.getElementById('authUsername').value.trim();
     const p = document.getElementById('authPassword').value.trim();
+    const pConfirm = document.getElementById('authPasswordConfirm').value.trim();
     const t = document.querySelector('[name="cf-turnstile-response"]')?.value;
     const err = document.getElementById('authErrorMsg');
+    const btn = document.getElementById('authSubmitBtn');
 
-    if (!u || !p) return (err.innerText = "Alanları doldurun.", err.style.display='block');
-    if (!t) return (err.innerText = "Robot doğrulaması gerekli.", err.style.display='block');
+    if (!u || !p) {
+        err.innerText = "Kullanıcı adı ve şifre gerekli.";
+        err.style.display = 'block';
+        return;
+    }
 
-    const btn = document.querySelector('.auth-submit-btn');
-    btn.disabled = true; btn.innerText = "İşleniyor...";
+    // Register-Specific Client Validation
+    if (currentAuthMode === 'register') {
+        if (p.length < 6) {
+            err.innerText = "Şifre en az 6 karakter olmalı.";
+            err.style.display = 'block';
+            return;
+        }
+        if (p !== pConfirm) {
+            err.innerText = "Şifreler eşleşmiyor.";
+            err.style.display = 'block';
+            return;
+        }
+    }
 
-    apiRequest('/api/auth', 'POST', { username: u, password: p, token: t })
-        .then(data => {
-            closeModal('authModal', true);
-            showCustomAlert(data.message, "success");
-            setTimeout(() => window.location.reload(), 500);
-        })
-        .catch(e => { 
-            err.innerText = e.message; 
-            err.style.display='block'; 
-            if(window.turnstile) window.turnstile.reset(); 
-        })
-        .finally(() => { btn.disabled = false; btn.innerText = "Devam Et"; });
+    if (!t) {
+        err.innerText = "Robot doğrulaması gerekli.";
+        err.style.display = 'block';
+        return;
+    }
+
+    btn.disabled = true; 
+    btn.innerText = "İşleniyor...";
+
+    // !!! IMPORTANT: We now send 'mode' to the server
+    apiRequest('/api/auth', 'POST', { 
+        username: u, 
+        password: p, 
+        token: t,
+        mode: currentAuthMode // 'login' or 'register'
+    })
+    .then(data => {
+        closeModal('authModal', true);
+        showCustomAlert(data.message, "success");
+        setTimeout(() => window.location.reload(), 1000);
+    })
+    .catch(e => { 
+        err.innerText = e.message; 
+        err.style.display='block'; 
+        if(window.turnstile) window.turnstile.reset(); 
+    })
+    .finally(() => { 
+        btn.disabled = false; 
+        btn.innerText = currentAuthMode === 'login' ? "Giriş Yap" : "Kayıt Ol"; 
+    });
 }
 
-function handleLogout() { apiRequest('/api/logout', 'POST').finally(() => window.location.reload()); }
+function handleLogout() { 
+    apiRequest('/api/logout', 'POST').finally(() => window.location.reload()); 
+}
 
-/* --- MODALS --- */
-function openModal(id) { const m=document.getElementById(id); if(m) m.classList.add('show'); if(id==='aboutModal') document.body.style.overflow='hidden'; }
-function closeModal(id, force=false, e=null) {
+/* --- MODAL MANAGEMENT --- */
+function openModal(id) { 
+    const m = document.getElementById(id); 
+    if(m) m.classList.add('show'); 
+    if(id === 'aboutModal') document.body.style.overflow = 'hidden'; 
+}
+
+function closeModal(id, force = false, e = null) {
     const m = document.getElementById(id);
     if(force || (e && e.target === m)) {
         m.classList.remove('show');
-        if(id==='aboutModal') document.body.style.overflow='';
-        if(id==='authModal') document.getElementById('authErrorMsg').style.display='none';
+        if(id === 'aboutModal') document.body.style.overflow = '';
+        if(id === 'authModal') document.getElementById('authErrorMsg').style.display = 'none';
     }
 }
-const openAuthModal=()=>openModal('authModal'); 
-const closeAuthModal=(e,f)=>closeModal('authModal',f,e);
-const showAboutInfo=()=>openModal('aboutModal'); 
-const closeAboutInfo=(e,f)=>closeModal('aboutModal',f,e);
-const closeProfileModal=(e,f)=>closeModal('profileModal',f,e); 
-const closeEditProfileModal=(e,f)=>closeModal('editProfileModal',f,e);
-const closeMyWordsModal=(e,f)=>closeModal('myWordsModal',f,e);
 
-/* --- FEED & CARDS --- */
+function openAuthModal() {
+    toggleAuthMode('login');
+    openModal('authModal');
+}
+
+const closeAuthModal = (e, f) => closeModal('authModal', f, e);
+const showAboutInfo = () => openModal('aboutModal'); 
+const closeAboutInfo = (e, f) => closeModal('aboutModal', f, e);
+const closeProfileModal = (e, f) => closeModal('profileModal', f, e); 
+const closeEditProfileModal = (e, f) => closeModal('editProfileModal', f, e);
+const closeMyWordsModal = (e, f) => closeModal('myWordsModal', f, e);
+
+/* --- FEED & WORDS --- */
 async function fetchWords(page) {
     if (isLoading) return;
     isLoading = true;
     const list = document.getElementById('feedList');
     const loadBtn = document.querySelector('#loadMoreContainer button');
+    
     const mode = localStorage.getItem(COLOR_THEME_KEY) === 'red' ? 'profane' : 'all';
 
     if (page === 1) { 
         list.innerHTML = '<div class="spinner"></div>'; 
-        document.getElementById('loadMoreContainer').style.display='none'; 
+        document.getElementById('loadMoreContainer').style.display = 'none'; 
     } else { 
         loadBtn.textContent = 'Yükleniyor...'; 
         loadBtn.disabled = true; 
@@ -195,65 +286,63 @@ async function fetchWords(page) {
 
     try {
         const data = await apiRequest(`/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}`);
-        if(page===1) list.innerHTML='';
+        if(page === 1) list.innerHTML = '';
         
         if (data.words?.length > 0) {
             appendCards(data.words, list, false);
             const hasMore = data.words.length >= ITEMS_PER_PAGE && (!data.total_count || (page * ITEMS_PER_PAGE < data.total_count));
             document.getElementById('loadMoreContainer').style.display = hasMore ? 'block' : 'none';
-        } else if(page===1) {
+        } else if(page === 1) {
             list.innerHTML = '<div style="text-align:center;color:#ccc;margin-top:20px;">Henüz içerik yok.</div>';
         }
     } catch (e) {
-        if(page===1) list.innerHTML='<div style="text-align:center;color:var(--error-color);">Yüklenemedi.</div>';
+        if(page === 1) list.innerHTML = '<div style="text-align:center;color:var(--error-color);">Yüklenemedi.</div>';
     } finally {
         isLoading = false; 
         loadBtn.textContent = 'Daha Fazla Göster'; 
         loadBtn.disabled = false;
     }
 }
-function loadMoreWords() { currentPage++; fetchWords(currentPage); }
+
+function loadMoreWords() { 
+    currentPage++; 
+    fetchWords(currentPage); 
+}
 
 function appendCards(words, container, isModalMode) {
     const frag = document.createDocumentFragment();
     words.forEach(w => frag.appendChild(createCardElement(w, isModalMode)));
     container.appendChild(frag);
     Array.from(container.children).slice(-words.length).forEach((c, i) => {
-        requestAnimationFrame(() => setTimeout(() => { c.classList.remove('fade-in'); c.classList.add('show'); }, i * 50));
+        requestAnimationFrame(() => setTimeout(() => { 
+            c.classList.remove('fade-in'); 
+            c.classList.add('show'); 
+        }, i * 50));
     });
 }
 
-/* === CARD GENERATION (FIXED LAYOUT) === */
+/* === CARD GENERATION === */
 function createCardElement(item, isModalMode) {
     const card = document.createElement('div');
     card.className = 'word-card fade-in';
-    
-    // !!! IMPORTANT: Add ID for reliable selection later
     card.setAttribute('data-id', item.id);
     
     const parser = new DOMParser();
     const decode = (s) => s ? parser.parseFromString(s, "text/html").documentElement.textContent : '';
 
-    // 1. Click Handler
     card.onclick = (e) => {
         if (e.target.closest('.vote-btn') || e.target.closest('.user-badge') || card.classList.contains('is-profane-content')) return;
         animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), isModalMode);
     };
 
-    // 2. VOTE CONTROLS (Floating Pill)
     const votePill = createVoteControls('word', item);
     votePill.className = 'vote-container-floating'; 
     card.appendChild(votePill);
 
-    // 3. MAIN CONTENT
     const contentDiv = document.createElement('div');
-    contentDiv.innerHTML = `
-        <h3>${decode(item.word)}</h3>
-        <p>${decode(item.def)}</p>
-    `;
+    contentDiv.innerHTML = `<h3>${decode(item.word)}</h3><p>${decode(item.def)}</p>`;
     card.appendChild(contentDiv);
 
-    // 4. FOOTER (Simple Signature with Clickable Badge)
     const foot = document.createElement('div'); 
     foot.className = 'word-footer';
     
@@ -262,7 +351,6 @@ function createCardElement(item, isModalMode) {
     hint.innerHTML = `Detaylar & Yorumlar <span>&rarr;</span>`;
     foot.appendChild(hint);
 
-    // --- AUTHOR BADGE LOGIC ---
     const authorName = item.author ? decode(item.author) : 'Anonim';
     const authorSpan = document.createElement('div');
     authorSpan.className = 'card-author';
@@ -273,28 +361,24 @@ function createCardElement(item, isModalMode) {
         badge.className = 'user-badge';
         badge.innerText = authorName;
         badge.onclick = (e) => {
-            e.stopPropagation(); // Prevent opening comment view
+            e.stopPropagation(); 
             openProfileModal(authorName);
         };
         authorSpan.appendChild(badge);
     } else {
         authorSpan.innerHTML += ' anonim';
     }
-    // -----------------------------
 
     foot.appendChild(authorSpan);
     card.appendChild(foot);
 
-    // 5. PROFANITY OVERLAY (Smooth Fade)
     if (item.is_profane) {
         card.classList.add('is-profane-content');
         const ov = document.createElement('div'); 
         ov.className = 'profane-wrapper';
         ov.innerHTML = `<div class="profane-badge">+18</div><div class="profane-warning">Görmek için tıkla</div>`;
-        
         ov.onclick = (e) => { 
-            e.stopPropagation(); 
-            e.preventDefault();
+            e.stopPropagation(); e.preventDefault();
             ov.classList.add('hiding'); 
             card.classList.remove('is-profane-content'); 
             setTimeout(() => { if(ov.parentNode) ov.remove(); }, 600);
@@ -305,13 +389,14 @@ function createCardElement(item, isModalMode) {
     return card;
 }
 
-/* --- FORM & SUBMIT --- */
+/* --- ADD WORD & COMMENT --- */
 function handleWordSubmit(e) { e.preventDefault(); submitWord(); }
 async function submitWord() {
     const w = document.getElementById('inputWord').value.trim();
     const d = document.getElementById('inputDef').value.trim();
     const n = document.getElementById('inputNick').value.trim();
     const btn = document.querySelector(".form-card button");
+    
     const prof = localStorage.getItem(COLOR_THEME_KEY) === 'red';
 
     if (!w || !d) return showCustomAlert("Lütfen alanları doldurun.", "error");
@@ -319,50 +404,59 @@ async function submitWord() {
 
     btn.disabled = true; btn.innerText = "Kaydediliyor...";
     try {
-        await apiRequest('/api/add', 'POST', { word: w, definition: d, nickname: n, is_profane: prof });
+        await apiRequest('/api/add', 'POST', { 
+            word: w, 
+            definition: d, 
+            nickname: n, 
+            is_profane: prof 
+        });
         document.getElementById('inputWord').value=''; 
         document.getElementById('inputDef').value='';
         if(!isUserLoggedIn) document.getElementById('inputNick').value='';
         updateCount({value:''});
-        showCustomAlert("Sözcük gönderildi!");
+        showCustomAlert("Sözcük gönderildi (Onay bekleniyor)!");
     } catch (e) { showCustomAlert(e.message, "error"); }
     finally { btn.disabled = false; btn.innerText = "Sözlüğe Ekle"; }
 }
 
+/* --- VOTING SYSTEM --- */
 function createVoteControls(type, data) {
     const div = document.createElement('div'); div.className = 'vote-container';
     const mkBtn = (act, icon) => {
-        const b = document.createElement('button'); b.className=`vote-btn ${act} ${data.user_vote===act?'active':''}`;
+        const b = document.createElement('button'); 
+        b.className=`vote-btn ${act} ${data.user_vote === act ? 'active' : ''}`;
         b.innerHTML=`<svg viewBox="0 0 24 24"><path d="${icon}"></path></svg>`;
-        b.onclick=(e)=>{e.stopPropagation(); sendVote(type, data.id, act, div);};
+        b.onclick = (e) => { e.stopPropagation(); sendVote(type, data.id, act, div); };
         return b;
     };
     div.append(
         mkBtn('like','M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3'), 
-        Object.assign(document.createElement('span'),{className:'vote-score',innerText:data.score}), 
+        Object.assign(document.createElement('span'), { className: 'vote-score', innerText: data.score }), 
         mkBtn('dislike','M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17')
     );
     return div;
 }
 
 async function sendVote(type, id, act, con) {
-    const btns = con.querySelectorAll('.vote-btn'); btns.forEach(b=>b.disabled=true);
+    const btns = con.querySelectorAll('.vote-btn'); btns.forEach(b => b.disabled = true);
     try {
         const data = await apiRequest(`/api/vote/${type}/${id}`, 'POST', { action: act });
+        
         con.querySelector('.vote-score').innerText = data.new_score;
-        con.querySelectorAll('.vote-btn').forEach(b=>b.classList.remove('active'));
-        if(data.user_action) con.querySelector(`.${data.user_action === 'liked' ? 'like' : 'dislike'}`).classList.add('active');
+        con.querySelectorAll('.vote-btn').forEach(b => b.classList.remove('active'));
+        if(data.user_action && data.user_action !== 'none') {
+            const cls = data.user_action === 'liked' ? 'like' : 'dislike';
+            con.querySelector(`.${cls}`).classList.add('active');
+        }
     } catch (e) { showCustomAlert("Hata oluştu.", "error"); }
-    finally { setTimeout(()=>btns.forEach(b=>b.disabled=false),300); }
+    finally { setTimeout(() => btns.forEach(b => b.disabled = false), 300); }
 }
 
-/* === ANIMATED MODAL OPEN (PERFORMANCE FIX) === */
+/* === DETAIL VIEW & COMMENTS === */
 function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, isModalMode = false) { 
     if (activeCardClone) return; 
-    
     if (originalCard.classList.contains('is-profane-content')) return;
 
-    // Set Global Current ID
     currentWordId = wordId;
 
     const backdrop = document.getElementById('modalBackdrop');
@@ -407,8 +501,6 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, isMo
 
     clone.innerHTML = contentHTML;
     document.body.appendChild(clone);
-    
-    // Smooth Scale Up Animation (Uses GPU)
     requestAnimationFrame(() => requestAnimationFrame(() => clone.classList.add('expanded')));
 
     activeCardClone = clone;
@@ -416,8 +508,8 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, isMo
 
     const authorIn = clone.querySelector('#commentAuthor');
     if(authorIn && !isUserLoggedIn) {
-        authorIn.addEventListener('click', (e) => { e.preventDefault(); e.target.blur(); openModal('authModal'); });
-        authorIn.addEventListener('focus', (e) => { e.preventDefault(); e.target.blur(); openModal('authModal'); });
+        authorIn.addEventListener('click', (e) => { e.preventDefault(); e.target.blur(); openAuthModal(); });
+        authorIn.addEventListener('focus', (e) => { e.preventDefault(); e.target.blur(); openAuthModal(); });
     }
 }
 
@@ -436,17 +528,16 @@ function closeCommentView() {
     }, 400);
 }
 
-/* --- COMMENTS LOGIC --- */
 async function loadComments(wordId, page = 1) {
     const list = activeCardClone.querySelector('#commentsList');
     if(!list) return;
 
     if (page === 1) { list.innerHTML = '<div class="spinner"></div>'; currentCommentPage=1; }
-    else { const b=list.querySelector('.load-more-comments-btn'); if(b) b.innerText='Yükleniyor...'; }
+    else { const b = list.querySelector('.load-more-comments-btn'); if(b) b.innerText='Yükleniyor...'; }
 
     try {
         const data = await apiRequest(`/api/comments/${wordId}?page=${page}&limit=${COMMENTS_PER_PAGE}`);
-        if(page===1) list.innerHTML = ''; else list.querySelector('.load-more-comments-btn')?.remove();
+        if(page === 1) list.innerHTML = ''; else list.querySelector('.load-more-comments-btn')?.remove();
 
         if (data.comments?.length > 0) {
             data.comments.forEach(c => list.appendChild(createCommentItem(c)));
@@ -457,17 +548,16 @@ async function loadComments(wordId, page = 1) {
                 btn.onclick = () => loadComments(wordId, ++currentCommentPage);
                 list.appendChild(btn);
             }
-        } else if(page===1) {
+        } else if(page === 1) {
             list.innerHTML = '<div style="text-align:center;color:var(--text-muted);margin-top:20px;">Henüz yorum yok.</div>';
         }
-    } catch (e) { if(page===1) list.innerHTML='<div style="color:var(--error-color);">Hata.</div>'; }
+    } catch (e) { if(page === 1) list.innerHTML='<div style="color:var(--error-color);">Hata.</div>'; }
 }
 
 function createCommentItem(c) {
     const d = document.createElement('div'); d.className='comment-card';
     const date = new Date(c.timestamp).toLocaleDateString('tr-TR', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
     
-    // Header (Author + Date)
     const authorName = c.author || 'Anonim';
     const head = document.createElement('div');
     head.style.display = 'flex';
@@ -495,13 +585,11 @@ function createCommentItem(c) {
     head.append(left, right);
     d.appendChild(head);
 
-    // Body
     const body = document.createElement('div');
     body.style.margin = '5px 0';
     body.innerText = c.comment;
     d.appendChild(body);
 
-    // Footer
     const ft = document.createElement('div');
     ft.style.display = 'flex'; ft.style.justifyContent = 'flex-end';
     ft.appendChild(createVoteControls('comment', c));
@@ -515,10 +603,10 @@ function submitComment() {
     const txt = activeCardClone.querySelector('#commentInput').value.trim();
     const aut = activeCardClone.querySelector('#commentAuthor').value.trim();
     if(!txt) return showCustomAlert("Yorum yazın.","error");
-    if(txt.length>200) return showCustomAlert("Çok uzun.","error");
+    if(txt.length > 200) return showCustomAlert("Çok uzun.","error");
 
     const btn = activeCardClone.querySelector('.send-btn-minimal');
-    btn.disabled=true; 
+    btn.disabled = true; 
 
     apiRequest('/api/comment', 'POST', { word_id: currentWordId, author: aut, comment: txt })
     .then(data => {
@@ -527,38 +615,25 @@ function submitComment() {
         const list = activeCardClone.querySelector('#commentsList');
         if(list.innerText.includes('Henüz yorum')) list.innerHTML='';
         list.insertBefore(createCommentItem({...data.comment, user_vote:null}), list.firstChild);
-        list.scrollTop=0;
+        list.scrollTop = 0;
     })
-    .catch(e=>showCustomAlert(e.message,"error"))
-    .finally(()=>btn.disabled=false);
+    .catch(e => showCustomAlert(e.message, "error"))
+    .finally(() => btn.disabled = false);
 }
 
-/* --- PROFILE & EDIT PROFILE --- */
+/* --- PROFILE --- */
 function openProfileModal(targetUsername = null) {
-    // If no username passed, default to current logged in user
-    if (!targetUsername && isUserLoggedIn) {
-        targetUsername = currentUserUsername;
-    }
-    
+    if (!targetUsername && isUserLoggedIn) targetUsername = currentUserUsername;
     if (!targetUsername) return; 
 
-    // !!! SAVE CURRENT PROFILE USER GLOBAL VARIABLE
     currentProfileUser = targetUsername;
-
     openModal('profileModal');
     
-    // Toggle Edit Button Visibility
     const editBtn = document.querySelector('.edit-profile-btn');
     const isOwnProfile = (targetUsername === currentUserUsername);
-    
-    if (editBtn) {
-        editBtn.style.display = isOwnProfile ? 'flex' : 'none';
-    }
+    if (editBtn) editBtn.style.display = isOwnProfile ? 'flex' : 'none';
 
-    // Update Modal Title while loading
     document.getElementById('profileUsername').innerText = targetUsername;
-    
-    // Fetch data for this specific user
     fetchProfileData(targetUsername); 
 }
 
@@ -572,7 +647,7 @@ async function fetchProfileData(username) {
         document.getElementById('statScore').innerText = d.total_score;
     } catch (e) { 
         console.error(e); 
-        showCustomAlert("Profil bilgileri alınamadı", "error");
+        showCustomAlert("Kullanıcı Zimmetlenmemiş", "error");
     }
 }
 
@@ -583,15 +658,12 @@ function openMyWordsModal() {
 }
 
 async function fetchMyWordsFeed() {
-    const c = document.getElementById('myWordsFeed'); c.innerHTML='<div class="spinner"></div>';
+    const c = document.getElementById('myWordsFeed'); 
+    c.innerHTML = '<div class="spinner"></div>';
     
-    // !!! UPDATE: SEND THE SAVED USERNAME TO THE API
     let url = '/api/my-words';
-    if (currentProfileUser) {
-        url += `?username=${currentProfileUser}`;
-    }
+    if (currentProfileUser) url += `?username=${currentProfileUser}`;
 
-    // Change Title based on user
     const title = document.querySelector('#myWordsModal h2');
     if (title) {
         title.innerText = (currentProfileUser === currentUserUsername) 
@@ -601,24 +673,41 @@ async function fetchMyWordsFeed() {
 
     try {
         const d = await apiRequest(url);
-        c.innerHTML='';
-        if(d.words?.length>0) appendCards(d.words, c, false); 
-        else c.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);">Sözcük yok.</div>';
-    } catch (e) { c.innerHTML='<div style="text-align:center;color:var(--error-color);">Hata.</div>'; }
+        c.innerHTML = '';
+        if(d.words?.length > 0) appendCards(d.words, c, false); 
+        else c.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);">Sözcük yok.</div>';
+    } catch (e) { c.innerHTML = '<div style="text-align:center;color:var(--error-color);">Hata.</div>'; }
 }
 
 function openEditProfileModal(){ 
     closeModal('profileModal', true); 
     openModal('editProfileModal'); 
-    if(currentUserUsername) document.getElementById('newUsernameInput').value=currentUserUsername; 
+    if(currentUserUsername) document.getElementById('newUsernameInput').value = currentUserUsername; 
 }
-function backToProfile(){ closeModal('editProfileModal', true); openModal('profileModal'); }
+
+function backToProfile(){ 
+    closeModal('editProfileModal', true); 
+    openModal('profileModal'); 
+}
+
 function handleChangePassword(){
-    const p1=document.getElementById('newPassword').value, p2=document.getElementById('newPasswordConfirm').value;
-    if(p1.length<6||p1!==p2) return showCustomAlert("Hatalı şifre.","error");
-    apiRequest('/api/change-password','POST',{new_password:p1}).then(()=>showCustomAlert("Şifre değişti."));
+    const p1 = document.getElementById('newPassword').value;
+    const p2 = document.getElementById('newPasswordConfirm').value;
+    if(p1.length < 6 || p1 !== p2) return showCustomAlert("Hatalı veya eşleşmeyen şifre.", "error");
+    
+    apiRequest('/api/change-password','POST',{new_password: p1})
+    .then(() => {
+        showCustomAlert("Şifre değişti.");
+        document.getElementById('newPassword').value = '';
+        document.getElementById('newPasswordConfirm').value = '';
+    })
+    .catch(e => showCustomAlert(e.message, "error"));
 }
+
 function handleChangeUsername(){
-    const u=document.getElementById('newUsernameInput').value.trim();
-    if(u) apiRequest('/api/change-username','POST',{new_username:u}).then(()=>{showCustomAlert("Kullanıcı adı değişti."); setTimeout(()=>window.location.reload(),1000);});
+    const u = document.getElementById('newUsernameInput').value.trim();
+    if(u) apiRequest('/api/change-username','POST',{new_username: u}).then(() => {
+        showCustomAlert("Kullanıcı adı değişti."); 
+        setTimeout(() => window.location.reload(), 1000);
+    }).catch(e => showCustomAlert(e.message, "error"));
 }

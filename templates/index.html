@@ -114,35 +114,49 @@
                 <div class="about-section-title">Görevimiz</div>
                 <p>Amacımız, dilimizin zenginliklerini korumak ve modern ya da eski alıntı sözcükler yerine yeni türetilen Türkçe sözcükleri modern bir platformda toplamaktır.</p>
                 <div class="about-section-title">İletişim</div>
-                <p>e269354@metu.edu.tr email adresine şikayet ve tavsiyelerinizi iletebilirsiniz.</p>
+                <p>admin@yenisozcukler.com email adresine şikayet ve tavsiyelerinizi iletebilirsiniz.</p>
             </div>
         </div>
     </div>
 
     <div id="authModal" class="auth-overlay" onclick="closeAuthModal(event)">
-        <div class="auth-box">
-            <button class="close-btn auth-close" onclick="closeAuthModal(event, true)">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-            <div class="auth-header">
-                <h2 id="authTitle">Giriş Yap / Kayıt Ol</h2>
-                <p id="authSubtitle">Kullanıcı adın varsa giriş yapar, yoksa senin için oluştururuz.</p>
+    <div class="auth-box">
+        <button class="close-btn auth-close" onclick="closeAuthModal(event, true)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="tabLogin" onclick="toggleAuthMode('login')">Giriş Yap</button>
+            <button class="auth-tab" id="tabRegister" onclick="toggleAuthMode('register')">Kayıt Ol</button>
+        </div>
+
+        <div class="auth-header">
+            <p id="authSubtitle">Hesabına giriş yap ve paylaşmaya başla.</p>
+        </div>
+
+        <div class="auth-form" id="authForm">
+            <div class="form-group">
+                <label>Kullanıcı Adı</label>
+                <input type="text" id="authUsername" placeholder="Kullanıcı Adı" autocomplete="username">
             </div>
-            <div class="auth-form" id="authForm">
-                <div class="form-group">
-                    <label>Kullanıcı Adı</label>
-                    <input type="text" id="authUsername" placeholder="Kullanıcı Adı" autocomplete="username">
-                </div>
-                <div class="form-group">
-                    <label>Şifre</label>
-                    <input type="password" id="authPassword" placeholder="••••••" autocomplete="current-password">
-                </div>
-                <div class="cf-turnstile" data-sitekey="0x4AAAAAACKXoAcWo8k1VLPm" data-theme="auto"></div>
-                <p id="authErrorMsg" style="color: var(--error-color); font-size: 0.9rem; margin-bottom: 10px; display: none;"></p>
-                <button class="auth-submit-btn" type="button" onclick="handleAuthSubmit()">Devam Et</button>
+            <div class="form-group">
+                <label>Şifre</label>
+                <input type="password" id="authPassword" placeholder="••••••" autocomplete="current-password">
             </div>
+            
+            <div class="form-group" id="confirmPassGroup" style="display: none;">
+                <label>Şifre (Tekrar)</label>
+                <input type="password" id="authPasswordConfirm" placeholder="••••••" autocomplete="new-password">
+            </div>
+
+            <div class="cf-turnstile" data-sitekey="0x4AAAAAACKXoAcWo8k1VLPm" data-theme="auto"></div>
+            
+            <p id="authErrorMsg" style="color: var(--error-color); font-size: 0.9rem; margin-bottom: 10px; display: none;"></p>
+            
+            <button class="auth-submit-btn" id="authSubmitBtn" type="button" onclick="handleAuthSubmit()">Giriş Yap</button>
         </div>
     </div>
+</div>
 
     <div id="profileModal" class="auth-overlay" onclick="closeProfileModal(event)">
         <div class="auth-box" style="max-width: 450px;">
