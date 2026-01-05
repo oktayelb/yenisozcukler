@@ -316,6 +316,21 @@ input:focus, textarea:focus { border-color: var(--accent); background-color: var
 .close-btn, .auth-close { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; color: var(--text-muted); }
 .auth-submit-btn { width: 100%; padding: 12px; margin-top: 10px; background: var(--text-main); color: var(--card-bg); border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
 
+/* --- ABOUT SECTION TITLES (ADDED LINES) --- */
+.about-text .about-section-title {
+    font-family: var(--font-heading);
+    font-size: 1.6rem;
+    font-weight: bold;
+    color: var(--accent);
+    margin-top: 25px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--border-light);
+    width: 100%;
+    display: block;
+}
+.about-text .about-section-title:first-child { margin-top: 0; }
+
 /* PROFIL */
 #profileModal { z-index: var(--z-modal-base); }
 .edit-profile-btn { display: flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--border-light); color: var(--text-muted); padding: 6px 14px; border-radius: 20px; cursor: pointer; }
