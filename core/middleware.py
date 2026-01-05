@@ -18,7 +18,7 @@ class CloudflareSecurityMiddleware:
         # production'da False yapacağın varsayılır.
         if settings.DEBUG:
              # İsteğe bağlı: Test ederken kapatmak istersen burayı silebilirsin.
-             pass 
+            return self.get_response(request)
 
         # 3. Cloudflare Başlığı Kontrolü
         # Cloudflare'den gelen her istekte bu başlık mutlaka olur.

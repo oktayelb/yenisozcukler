@@ -266,7 +266,7 @@ function createCardElement(item, isModalMode) {
     const authorName = item.author ? decode(item.author) : 'Anonim';
     const authorSpan = document.createElement('div');
     authorSpan.className = 'card-author';
-    authorSpan.innerHTML = '&mdash; ekleyen ';
+    authorSpan.innerHTML = '';
 
     if (authorName !== 'Anonim') {
         const badge = document.createElement('span');

@@ -206,6 +206,12 @@ header { text-align: center; margin: 50px 0 40px; }
     margin: 0 0 10px 0;
     line-height: 1.1;
     letter-spacing: -0.5px;
+    
+    /* --- NEW FIXES FOR LONG WORDS --- */
+    padding-right: 120px;   /* Reserve space for the vote button on the right */
+    overflow-wrap: anywhere; /* Force long words to break to the next line */
+    word-break: break-word;  /* Fallback for older browsers */
+    box-sizing: border-box;  /* Ensure padding is calculated inside the width */
 }
 .word-card p {
     font-family: var(--font-body);
