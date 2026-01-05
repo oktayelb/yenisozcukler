@@ -1,175 +1,34 @@
-/* --- GLOBAL SABİTLER VE DEĞİŞKENLER --- */
+/* --- GLOBAL VARIABLES & SETTINGS --- */
 const THEME_KEY = 'userTheme'; 
 const COLOR_THEME_KEY = 'userColorTheme'; 
 const ITEMS_PER_PAGE = 20; 
 const COMMENTS_PER_PAGE = 10;
 
 let currentWordId = null; 
-let activeCardClone = null;
+let activeCardClone = null; 
 let currentPage = 1;
 let currentCommentPage = 1;
 let isLoading = false;
+let currentWordCommentsHasNext = false;
 
-// Auth durumunu ve Kullanıcı adını HTML'den oku
+// Read User Auth State
 const isUserLoggedIn = document.body.getAttribute('data-user-auth') === 'true';
 const currentUserUsername = document.body.getAttribute('data-username');
 
-/* --- BAŞLANGIÇ (INIT) MANTIĞI --- */
+/* --- INIT --- */
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Animasyon Sınıflarını Ekle
     ['mainTitle', 'subtitleText'].forEach(id => {
         const el = document.getElementById(id);
         if(el) el.classList.add('loaded');
     });
-    
-    // 2. Auth Tetikleyicileri (Anonim Giriş / Login Zorlama)
-    setupAuthTriggers();
 
-    // 3. Tema Ayarları (Dark Mode & Renk Teması)
+    setupAuthTriggers();
     setupTheme();
     initLogoSystem();
-
-    // 4. İlk İçeriği Çek
     fetchWords(currentPage);
 });
 
-/* --- AUTH VE INPUT YÖNETİMİ --- */
-function setupAuthTriggers() {
-    const nickInput = document.getElementById('inputNick');
-    const defInput = document.getElementById('inputDef');
-
-    // Enter'a basınca gönder (Shift+Enter hariç)
-    if (defInput) {
-        defInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                submitWord();
-            }
-        });
-    }
-
-    // Takma ada odaklanınca giriş modalını aç (Sadece çıkış yapmışsa)
-    if (nickInput && !isUserLoggedIn) {
-        nickInput.addEventListener('focus', (e) => {
-            e.preventDefault();
-            e.target.blur();
-            openModal('authModal');
-        });
-    }
-}
-
-function updateCount(field) {
-    document.getElementById('charCount').innerText = `${field.value.length} / 300`;
-}
-
-function allowOnlyLetters(event, allowSpaces) {
-    const key = event.key;
-    // İzin verilen kontrol tuşları
-    if (event.ctrlKey || event.altKey || event.metaKey || 
-        ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'].includes(key)) {
-        return true;
-    }
-    // İzin verilen Regex
-    const regex = allowSpaces ? /^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$/ : /^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ.,0-9()-]+$/;
-    if (!regex.test(key)) {
-        event.preventDefault();
-        return false;
-    }
-    return true;
-}
-
-/* --- TEMA YÖNETİMİ --- */
-function setupTheme() {
-    const savedTheme = localStorage.getItem(THEME_KEY);
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-        document.body.classList.add('dark-mode');
-        darkModeToggle.textContent = 'Aydınlık Mod';
-    } else {
-        darkModeToggle.textContent = 'Karanlık Mod';
-    }
-
-    darkModeToggle.addEventListener('click', () => {
-        const isDark = document.body.classList.toggle('dark-mode');
-        localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
-        darkModeToggle.textContent = isDark ? 'Aydınlık Mod' : 'Karanlık Mod';
-    });
-}
-
-function initLogoSystem() {
-    const savedTheme = localStorage.getItem(COLOR_THEME_KEY) || 'default';
-    document.body.setAttribute('data-theme', savedTheme);
-    updateLogoVisuals(savedTheme);
-}
-
-function animateLogo(clickedElement) {
-    const currentTheme = localStorage.getItem(COLOR_THEME_KEY) || 'default';
-    const newTheme = currentTheme === 'default' ? 'red' : 'default';
-
-    localStorage.setItem(COLOR_THEME_KEY, newTheme);
-    document.body.setAttribute('data-theme', newTheme);
-    updateLogoVisuals(newTheme);
-
-    currentPage = 1;
-    fetchWords(currentPage);
-}
-
-function updateLogoVisuals(activeTheme) {
-    const cardDefault = document.getElementById('cardDefault');
-    const cardRed = document.getElementById('cardRed');
-    if (!cardDefault || !cardRed) return;
-
-    if (activeTheme === 'red') {
-        setLogoClasses(cardRed, 'pos-center');
-        setLogoClasses(cardDefault, 'pos-behind');
-    } else {
-        setLogoClasses(cardDefault, 'pos-center');
-        setLogoClasses(cardRed, 'pos-behind');
-    }
-}
-
-function setLogoClasses(el, posClass) {
-    el.classList.remove('pos-center', 'pos-behind');
-    el.classList.add(posClass);
-}
-
-/* --- GENEL MODAL YÖNETİMİ --- */
-// Tüm modalları açıp kapatmak için tek fonksiyonlar
-function openModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if(modal) modal.classList.add('show');
-    if(modalId === 'aboutModal') document.body.style.overflow = 'hidden';
-}
-
-function closeModal(event, modalId, forceClose = false) {
-    const modal = document.getElementById(modalId);
-    if (forceClose || (event && event.target === modal)) {
-        modal.classList.remove('show');
-        if(modalId === 'aboutModal') document.body.style.overflow = '';
-        
-        // Modal özel temizlik işlemleri
-        if(modalId === 'authModal') {
-            const errorMsg = document.getElementById('authErrorMsg');
-            if(errorMsg) errorMsg.style.display = 'none';
-        }
-        if(modalId === 'editProfileModal') {
-            document.getElementById('newPassword').value = '';
-            document.getElementById('newPasswordConfirm').value = '';
-        }
-    }
-}
-
-// HTML onclick'leri için wrapperlar
-const closeAuthModal = (e, f) => closeModal(e, 'authModal', f);
-const showAboutInfo = () => openModal('aboutModal');
-const closeAboutInfo = (e, f) => closeModal(e, 'aboutModal', f);
-const closeProfileModal = (e, f) => closeModal(e, 'profileModal', f);
-const closeEditProfileModal = (e, f) => closeModal(e, 'editProfileModal', f);
-const closeMyWordsModal = (e, f) => closeModal(e, 'myWordsModal', f);
-
-/* --- API YARDIMCILARI --- */
+/* --- UTILS --- */
 function getCSRFToken() {
     const match = document.cookie.match(/csrftoken=([^;]+)/);
     return match ? match[1] : null;
@@ -180,17 +39,9 @@ function showCustomAlert(message, type = 'success') {
     const alertDiv = document.createElement('div');
     alertDiv.className = `custom-alert custom-alert-${type}`;
     alertDiv.textContent = message;
-    
-    // Tıklayınca hemen kapan
-    alertDiv.onclick = () => { 
-        alertDiv.classList.remove('show'); 
-        setTimeout(() => alertDiv.remove(), 300); 
-    };
-    
-    container.prepend(alertDiv); 
-    // Animasyon
-    setTimeout(() => alertDiv.classList.add('show'), 10); 
-    // Otomatik kapan
+    alertDiv.onclick = () => alertDiv.remove();
+    container.prepend(alertDiv);
+    setTimeout(() => alertDiv.classList.add('show'), 10);
     setTimeout(() => { 
         alertDiv.classList.remove('show'); 
         setTimeout(() => alertDiv.remove(), 500); 
@@ -200,582 +51,469 @@ function showCustomAlert(message, type = 'success') {
 async function apiRequest(url, method = 'GET', body = null) {
     const options = {
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRFToken()
-        }
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }
     };
     if (body) options.body = JSON.stringify(body);
 
     const response = await fetch(url, options);
     const contentType = response.headers.get("content-type");
-    
-    // JSON olmayan yanıt hatası
-    if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Sunucu hatası: Beklenmedik yanıt formatı.");
-    }
-    
+    if (!contentType || !contentType.includes("application/json")) throw new Error("Server error.");
+
     const data = await response.json();
-    
-    if (response.status === 429) throw new Error(data.error || "Çok fazla istek.");
-    if (!response.ok) throw new Error(data.error || "Bir hata oluştu.");
-    
+    if (response.status === 429) throw new Error(data.error || "Too many requests.");
+    if (!response.ok) throw new Error(data.error || "Request failed.");
     return data;
 }
 
-/* --- KELİME (WORD) İŞLEMLERİ --- */
-async function fetchWords(page) {
-    if (isLoading) return;
-    isLoading = true;
-    
-    const list = document.getElementById('feedList');
-    const loadMoreContainer = document.getElementById('loadMoreContainer');
-    const loadMoreBtn = loadMoreContainer.querySelector('button');
-    const currentTheme = localStorage.getItem(COLOR_THEME_KEY);
-    const mode = currentTheme === 'red' ? 'profane' : 'all';
+function updateCount(field) { document.getElementById('charCount').innerText = `${field.value.length} / 300`; }
 
-    // UI Durumu
-    if (page === 1) {
-        list.innerHTML = `<div class="spinner"></div>`;
-        loadMoreContainer.style.display = 'none';
+/* --- THEME & LOGO --- */
+function setupTheme() {
+    const saved = localStorage.getItem(THEME_KEY);
+    const btn = document.getElementById('darkModeToggle');
+    const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    if (saved === 'dark' || (!saved && sysDark)) {
+        document.body.classList.add('dark-mode');
+        btn.textContent = 'Aydınlık Mod';
     } else {
-        loadMoreBtn.textContent = 'Yükleniyor...';
-        loadMoreBtn.disabled = true;
+        btn.textContent = 'Karanlık Mod';
     }
 
-    try {
-        const url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}`;
-        const response = await fetch(url); // GET isteği için düz fetch yeterli
-        const data = await response.json();
-        
-        if (page === 1) list.innerHTML = '';
-        
-        if (data.words && data.words.length > 0) {
-            appendCardsToDOM(data.words, list, false);
-            
-            // Daha fazla butonunu göster/gizle
-            const hasMore = data.words.length >= ITEMS_PER_PAGE && 
-                          (!data.total_count || (page * ITEMS_PER_PAGE < data.total_count));
-            loadMoreContainer.style.display = hasMore ? 'block' : 'none';
-        } else {
-            if (page === 1) list.innerHTML = '<div style="text-align:center; color:#ccc; margin-top:20px;">Henüz içerik yok.</div>';
-            loadMoreContainer.style.display = 'none';
-        }
-    } catch (e) {
-        console.error("Fetch Error:", e);
-        if (page === 1) list.innerHTML = '<div style="text-align:center; color:var(--error-color);">Yüklenemedi.</div>';
-        else showCustomAlert("Daha fazla yüklenemedi.", "error");
-    } finally {
-        isLoading = false;
-        loadMoreBtn.textContent = 'Daha Fazla Göster';
-        loadMoreBtn.disabled = false;
-    }
-}
-
-function loadMoreWords() {
-    currentPage++;
-    fetchWords(currentPage);
-}
-
-async function submitWord() {
-    const wordInput = document.getElementById('inputWord');
-    const defInput = document.getElementById('inputDef');
-    const nickInput = document.getElementById('inputNick'); 
-    const btn = document.querySelector(".form-card button");
-
-    const word = wordInput.value.trim();
-    const definition = defInput.value.trim();
-    const author = nickInput.value.trim(); 
-    const isProfane = (localStorage.getItem(COLOR_THEME_KEY) === 'red'); 
-
-    if (!word || !definition) { 
-        showCustomAlert("Lütfen Sözcük ve Tanım alanlarını doldurun.", "error"); 
-        return; 
-    }
-    if (definition.length > 300) {
-        showCustomAlert("Tanım 300 karakterden uzun olamaz.", "error");
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerText = "Kaydediliyor...";
-
-    try {
-        await apiRequest('/api/add', 'POST', { 
-            word, 
-            definition, 
-            nickname: author, 
-            is_profane: isProfane 
-        });
-
-        // Başarılı
-        wordInput.value = ''; 
-        defInput.value = ''; 
-        if (!isUserLoggedIn) nickInput.value = '';
-        updateCount({ value: '' }); 
-        
-        showCustomAlert("Sözcük gönderildi! Moderasyon sonrası görünecektir.", "success");
-        
-    } catch (error) { 
-        showCustomAlert(error.message, "error"); 
-    } finally { 
-        btn.disabled = false; 
-        btn.innerText = "Sözlüğe Ekle"; 
-    }
-}
-
-function handleWordSubmit(event) {
-    event.preventDefault(); 
-    submitWord();
-}
-
-/* --- KART VE ARAYÜZ OLUŞTURMA (UI) --- */
-function createWordCardElement(item, isMini = false) {
-    const card = document.createElement('div');
-    card.className = 'word-card fade-in';
-    card.style.cursor = 'pointer';
-    
-    // HTML Decode
-    const parser = new DOMParser();
-    const decode = (str) => str ? parser.parseFromString(str, "text/html").documentElement.textContent : '';
-    
-    // Profane (Argo) sansür mantığı
-    if (item.is_profane) {
-        card.classList.add('is-profane-content'); 
-        const overlay = document.createElement('div');
-        overlay.className = 'profane-wrapper';
-        overlay.innerHTML = `<div class="profane-badge">+18</div><div class="profane-warning">Görmek için tıkla</div>`;
-        overlay.onclick = (e) => {
-            e.stopPropagation(); 
-            overlay.remove();
-            card.classList.remove('is-profane-content');
-        };
-        card.appendChild(overlay);
-    }
-    
-    // Tıklayınca Detay Aç
-    card.onclick = (e) => {
-        if (e.target.closest('.vote-btn')) return; // Oylara tıklayınca açma
-        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def));    
-    };
-    
-    // İçerik HTML'i
-    const dateStr = new Date(item.timestamp).toLocaleDateString('tr-TR');
-    
-    card.innerHTML += `
-        <div class="card-header">
-             ${item.author ? `<span class="author-name">@${decode(item.author)}</span>` : ''}
-             <span class="card-date">${dateStr}</span>
-        </div>
-        <div class="card-content">
-            <h3>${decode(item.word)}</h3>
-            <p>${decode(item.def)}</p>
-        </div>
-    `;
-
-    // Footer (Oylama ve Hint)
-    const footerDiv = document.createElement('div');
-    footerDiv.className = 'word-footer';
-    
-    // Oylama kontrolü (Mini kartlarda oylama kapalı olabilir tercihen)
-    footerDiv.appendChild(createVoteControls('word', item));
-
-    const hintSpan = document.createElement('span');
-    hintSpan.className = 'click-hint';
-    hintSpan.innerHTML = `Detay <span>&rarr;</span>`;
-    footerDiv.appendChild(hintSpan);
-
-    card.appendChild(footerDiv);
-    return card;
-}
-
-function appendCardsToDOM(words, listElement, isMini = false) {
-    // Spinner varsa temizle
-    const spinner = listElement.querySelector('.spinner');
-    if (spinner) spinner.remove();
-
-    const fragment = document.createDocumentFragment();
-    const cardsToAnimate = [];
-
-    words.forEach(item => {
-        const card = createWordCardElement(item, isMini);
-        cardsToAnimate.push(card);
-        fragment.appendChild(card);
-    });
-
-    listElement.appendChild(fragment);
-    
-    // Giriş Animasyonu
-    cardsToAnimate.forEach((card, index) => {
-        requestAnimationFrame(() => {
-            setTimeout(() => { 
-                card.classList.remove('fade-in'); 
-                card.classList.add('show'); 
-            }, index * 50);
-        });
+    btn.addEventListener('click', () => {
+        const isDark = document.body.classList.toggle('dark-mode');
+        localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
+        btn.textContent = isDark ? 'Aydınlık Mod' : 'Karanlık Mod';
     });
 }
 
-/* --- OYLAMA (VOTE) SİSTEMİ --- */
-function createVoteControls(entityType, data) {
-    const container = document.createElement('div');
-    container.className = 'vote-container';
-    
-    const createBtn = (cls, iconPath, action) => {
-        const btn = document.createElement('button');
-        btn.className = `vote-btn ${cls} ${data.user_vote === cls ? 'active' : ''}`;
-        btn.innerHTML = `<svg viewBox="0 0 24 24"><path d="${iconPath}"></path></svg>`;
-        btn.onclick = (e) => {
-            e.stopPropagation();
-            handleVote(entityType, data.id, cls, container);
-        };
-        return btn;
-    };
-
-    const likeBtn = createBtn('like', 'M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3');
-    const dislikeBtn = createBtn('dislike', 'M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17');
-    
-    const scoreSpan = document.createElement('span');
-    scoreSpan.className = 'vote-score';
-    scoreSpan.innerText = data.score;
-
-    container.append(likeBtn, scoreSpan, dislikeBtn);
-    return container;
+function initLogoSystem() {
+    const theme = localStorage.getItem(COLOR_THEME_KEY) || 'default';
+    document.body.setAttribute('data-theme', theme);
+    updateLogoVisuals(theme);
 }
 
-async function handleVote(entityType, entityId, action, container) {
-    const btns = container.querySelectorAll('.vote-btn');
-    btns.forEach(b => b.disabled = true); // Tıklamayı engelle
-
-    try {
-        const data = await apiRequest(`/api/vote/${entityType}/${entityId}`, 'POST', { action });
-        
-        // Skoru güncelle
-        container.querySelector('.vote-score').innerText = data.new_score;
-        
-        // Buton stillerini güncelle
-        const likeBtn = container.querySelector('.like');
-        const dislikeBtn = container.querySelector('.dislike');
-        
-        likeBtn.classList.remove('active');
-        dislikeBtn.classList.remove('active');
-        
-        if (data.user_action === 'liked') likeBtn.classList.add('active');
-        if (data.user_action === 'disliked') dislikeBtn.classList.add('active');
-
-    } catch (error) {
-        showCustomAlert(error.message, "error");
-    } finally {
-        setTimeout(() => btns.forEach(b => b.disabled = false), 300);
-    }
+function animateLogo(el) {
+    const curr = localStorage.getItem(COLOR_THEME_KEY) || 'default';
+    const next = curr === 'default' ? 'red' : 'default';
+    localStorage.setItem(COLOR_THEME_KEY, next);
+    document.body.setAttribute('data-theme', next);
+    updateLogoVisuals(next);
+    currentPage = 1; fetchWords(currentPage);
 }
 
-/* --- DETAY PENCERESİ (COMMENT VIEW) --- */
-function animateAndOpenCommentView(cardElement, wordId, word, def) {
-    // Varsa eskisini sil
-    closeCommentView();
-
-    const backdrop = document.getElementById('modalBackdrop');
-    if(backdrop) {
-        backdrop.style.display = 'block';
-        backdrop.style.zIndex = '1990';
-    }
-
-    // Modal Oluştur
-    const container = document.createElement('div');
-    container.className = 'comment-view-container'; // CSS class'ı style.css'te olmalı
-    // Veya inline stiller (Senin önceki kodundaki gibi, ama CSS class kullanmak daha temizdir)
-    Object.assign(container.style, {
-        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%) scale(0.9)',
-        width: '90%', maxWidth: '500px', maxHeight: '85vh',
-        backgroundColor: 'var(--card-bg)', borderRadius: '12px',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.3)', zIndex: '2000',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        opacity: '0', transition: 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)'
-    });
-
-    container.innerHTML = `
-        <div style="padding:15px 20px; border-bottom:1px solid var(--border-light);">
-            <div style="display:flex; justify-content:space-between;">
-                <h2 style="margin:0; font-size:1.4rem; color:var(--accent);">${word}</h2>
-                <button class="close-icon-btn" onclick="closeCommentView()">✕</button>
-            </div>
-            <p style="margin:5px 0 0 0; color:var(--text-main); font-size:0.95rem;">${def}</p>
-        </div>
-        
-        <div id="commentsList" style="flex:1; overflow-y:auto; padding:20px;">
-            <div class="spinner"></div>
-        </div>
-
-        <div style="padding:15px; border-top:1px solid var(--border-light); background:var(--input-bg);">
-            <form onsubmit="handleCommentSubmit(event, ${wordId})" style="display:flex; gap:10px;">
-                <input type="text" id="commentInput" placeholder="Yorum yaz..." maxlength="200" autocomplete="off"
-                       style="flex:1; padding:10px; border-radius:20px; border:1px solid var(--input-border);">
-                <button type="submit" class="send-btn-minimal">Gönder</button>
-            </form>
-        </div>
-    `;
-
-    document.body.appendChild(container);
+function updateLogoVisuals(theme) {
+    const def = document.getElementById('cardDefault');
+    const red = document.getElementById('cardRed');
+    if (!def || !red) return;
     
-    // Aktif kartı takip et
-    currentWordId = wordId;
-    activeCardClone = container; // Helper fonksiyonlar için ref
-
-    requestAnimationFrame(() => {
-        container.style.opacity = '1';
-        container.style.transform = 'translate(-50%, -50%) scale(1)';
-    });
-
-    loadComments(wordId);
-}
-
-function closeCommentView() {
-    const container = document.querySelector('.comment-view-container');
-    const backdrop = document.getElementById('modalBackdrop');
-    
-    if(backdrop) backdrop.style.display = 'none';
-    if(container) {
-        container.style.opacity = '0';
-        container.style.transform = 'translate(-50%, -50%) scale(0.9)';
-        setTimeout(() => container.remove(), 300);
-    }
-    currentWordId = null;
-    activeCardClone = null;
-}
-
-/* --- YORUM (COMMENT) İŞLEMLERİ --- */
-async function loadComments(wordId, page = 1, append = false) {
-    const list = activeCardClone.querySelector('#commentsList');
-    if (!append) {
-        list.innerHTML = `<div class="spinner"></div>`;
-        currentCommentPage = 1;
+    if (theme === 'red') {
+        red.className = 'logo-card theme-red pos-center';
+        def.className = 'logo-card theme-default pos-behind';
     } else {
-        const btn = list.querySelector('.load-more-btn');
-        if(btn) btn.textContent = 'Yükleniyor...';
-    }
-
-    try {
-        const response = await fetch(`/api/comments/${wordId}?page=${page}&limit=${COMMENTS_PER_PAGE}`);
-        const data = await response.json();
-        
-        if (!append) list.innerHTML = '';
-        else list.querySelector('.load-more-btn')?.remove();
-
-        if (data.success && data.comments.length > 0) {
-            data.comments.forEach(c => list.appendChild(createCommentElement(c)));
-            
-            if (data.has_next) {
-                const btn = document.createElement('button');
-                btn.className = 'load-more-btn';
-                btn.innerText = 'Daha eski yorumlar';
-                btn.onclick = () => loadComments(wordId, ++currentCommentPage, true);
-                list.appendChild(btn);
-            }
-        } else if (!append) {
-            list.innerHTML = `<div style="text-align:center; color:var(--text-muted);">Henüz yorum yok.</div>`;
-        }
-    } catch (e) {
-        if(!append) list.innerHTML = `<div style="color:var(--error-color);">Yüklenirken hata oluştu.</div>`;
+        def.className = 'logo-card theme-default pos-center';
+        red.className = 'logo-card theme-red pos-behind';
     }
 }
 
-function createCommentElement(data) {
-    const item = document.createElement('div');
-    item.className = 'comment-card';
-    
-    const dateStr = new Date(data.timestamp).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour:'2-digit', minute:'2-digit' });
-    
-    item.innerHTML = `
-        <div style="display:flex; justify-content:space-between;">
-            <strong>${data.author || 'Anonim'}</strong>
-            <span style="font-size:0.75rem; color:var(--text-muted);">${dateStr}</span>
-        </div>
-        <div style="margin:5px 0;">${data.comment}</div>
-        <div style="display:flex; justify-content:flex-end;"></div>
-    `;
-    
-    item.lastElementChild.appendChild(createVoteControls('comment', data));
-    return item;
+/* --- AUTH TRIGGERS --- */
+function setupAuthTriggers() {
+    const def = document.getElementById('inputDef');
+    const nick = document.getElementById('inputNick');
+    if (def) def.addEventListener('keydown', (e) => { 
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitWord(); } 
+    });
+    if (nick && !isUserLoggedIn) nick.addEventListener('focus', (e) => { 
+        e.preventDefault(); e.target.blur(); openModal('authModal'); 
+    });
 }
 
-async function handleCommentSubmit(event, wordId) {
-    event.preventDefault();
-    const input = document.getElementById('commentInput');
-    const text = input.value.trim();
-    const btn = activeCardClone.querySelector('.send-btn-minimal');
-
-    if (!text) return;
-    if (text.length > 200) { showCustomAlert("Yorum çok uzun.", "error"); return; }
-
-    btn.disabled = true;
-    try {
-        // Backend'de author inputu yoksa Anonim yapıyor zaten
-        const data = await apiRequest('/api/comment', 'POST', {
-            word_id: wordId,
-            comment: text
-        });
-
-        showCustomAlert("Yorum eklendi!", "success");
-        input.value = '';
-        
-        // Yeni yorumu ekle
-        const list = activeCardClone.querySelector('#commentsList');
-        if (list.textContent.includes('Henüz yorum yok')) list.innerHTML = '';
-        
-        const newComment = { ...data.comment, user_vote: null }; // Yeni yorum oysuz gelir
-        list.insertBefore(createCommentElement(newComment), list.firstChild);
-        list.scrollTop = 0;
-
-    } catch (error) {
-        showCustomAlert(error.message, "error");
-    } finally {
-        btn.disabled = false;
-    }
-}
-
-/* --- KULLANICI PROFİL İŞLEMLERİ --- */
-function openProfileModal() {
-    openModal('profileModal');
-    fetchProfileData();
-}
-
-async function fetchProfileData() {
-    try {
-        // CSRF Token'a gerek yok GET isteği için
-        const response = await fetch('/api/profile');
-        if (response.ok) {
-            const data = await response.json();
-            document.getElementById('profileUsername').textContent = data.username;
-            document.getElementById('profileDate').textContent = data.date_joined;
-            document.getElementById('statWords').textContent = data.word_count;
-            document.getElementById('statComments').textContent = data.comment_count;
-            document.getElementById('statScore').textContent = data.total_score;
-        }
-    } catch (e) { console.error(e); }
-}
-
-/* --- SÖZCÜKLERİM (MY WORDS) MODALI --- */
-function openMyWordsModal() {
-    closeProfileModal(null, true); // Profili kapat
-    openModal('myWordsModal'); // Yenisini aç
-    fetchMyWordsFeed();
-}
-
-async function fetchMyWordsFeed() {
-    const container = document.getElementById('myWordsFeed');
-    container.innerHTML = '<div class="spinner" style="margin:20px auto;"></div>';
-
-    try {
-        const response = await fetch('/api/my-words');
-        const data = await response.json();
-
-        if (data.success && data.words.length > 0) {
-            container.innerHTML = '';
-            // appendCardsToDOM fonksiyonunu burada da kullanabiliriz (DRY Prensibi)
-            // Sadece container'ı veriyoruz
-            appendCardsToDOM(data.words, container, false);
-        } else {
-            container.innerHTML = `
-                <div style="text-align:center; padding:30px; color:var(--text-muted);">
-                    Henüz yayımlanmış sözcüğün yok.
-                </div>`;
-        }
-    } catch (e) {
-        container.innerHTML = '<div style="text-align:center; color:var(--error-color);">Hata oluştu.</div>';
-    }
-}
-
-/* --- PROFİL DÜZENLEME (EDIT PROFILE) --- */
-function openEditProfileModal() {
-    closeProfileModal(null, true);
-    openModal('editProfileModal');
-    
-    // Mevcut kullanıcı adını inputa koy
-    const input = document.getElementById('newUsernameInput');
-    if(input && currentUserUsername) input.value = currentUserUsername;
-}
-
-function backToProfile() {
-    closeEditProfileModal(null, true);
-    openProfileModal();
-}
-
-// Şifre Değiştir
-function handleChangePassword() {
-    const p1 = document.getElementById('newPassword').value;
-    const p2 = document.getElementById('newPasswordConfirm').value;
-    
-    if (p1.length < 6) return showCustomAlert("Şifre en az 6 karakter olmalı.", "error");
-    if (p1 !== p2) return showCustomAlert("Şifreler eşleşmiyor.", "error");
-
-    performAuthAction('/api/change-password', { new_password: p1 }, "Şifre güncellendi.");
-}
-
-// Kullanıcı Adı Değiştir
-function handleChangeUsername() {
-    const newName = document.getElementById('newUsernameInput').value.trim();
-    if (!newName) return;
-
-    performAuthAction('/api/change-username', { new_username: newName }, "Kullanıcı adı güncellendi.", true);
-}
-
-async function performAuthAction(url, body, successMsg, reload = false) {
-    try {
-        await apiRequest(url, 'POST', body);
-        showCustomAlert(successMsg, "success");
-        if (reload) setTimeout(() => window.location.reload(), 1000);
-    } catch (e) {
-        showCustomAlert(e.message, "error");
-    }
-}
-
-/* --- AUTH (LOGIN/REGISTER) İŞLEMLERİ --- */
 function handleAuthSubmit() {
     const u = document.getElementById('authUsername').value.trim();
     const p = document.getElementById('authPassword').value.trim();
-    const token = document.querySelector('[name="cf-turnstile-response"]')?.value;
-    const errorMsg = document.getElementById('authErrorMsg');
+    const t = document.querySelector('[name="cf-turnstile-response"]')?.value;
+    const err = document.getElementById('authErrorMsg');
 
-    if (!u || !p) {
-        errorMsg.style.display = 'block';
-        errorMsg.textContent = "Alanları doldurun.";
-        return;
-    }
-    if (!token) {
-        errorMsg.style.display = 'block';
-        errorMsg.textContent = "Doğrulamayı tamamlayın.";
-        return;
-    }
+    if (!u || !p) return (err.innerText = "Alanları doldurun.", err.style.display='block');
+    if (!t) return (err.innerText = "Robot doğrulaması gerekli.", err.style.display='block');
 
     const btn = document.querySelector('.auth-submit-btn');
-    const orgText = btn.innerText;
     btn.disabled = true; btn.innerText = "İşleniyor...";
 
-    fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
-        body: JSON.stringify({ username: u, password: p, token })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            closeModal(null, 'authModal', true);
+    apiRequest('/api/auth', 'POST', { username: u, password: p, token: t })
+        .then(data => {
+            closeModal('authModal', true);
             showCustomAlert(data.message, "success");
             setTimeout(() => window.location.reload(), 500);
-        } else {
-            errorMsg.style.display = 'block';
-            errorMsg.textContent = data.error;
-            if (window.turnstile) window.turnstile.reset();
+        })
+        .catch(e => { 
+            err.innerText = e.message; 
+            err.style.display='block'; 
+            if(window.turnstile) window.turnstile.reset(); 
+        })
+        .finally(() => { btn.disabled = false; btn.innerText = "Devam Et"; });
+}
+
+function handleLogout() { apiRequest('/api/logout', 'POST').finally(() => window.location.reload()); }
+
+/* --- MODALS --- */
+function openModal(id) { const m=document.getElementById(id); if(m) m.classList.add('show'); if(id==='aboutModal') document.body.style.overflow='hidden'; }
+function closeModal(id, force=false, e=null) {
+    const m = document.getElementById(id);
+    if(force || (e && e.target === m)) {
+        m.classList.remove('show');
+        if(id==='aboutModal') document.body.style.overflow='';
+        if(id==='authModal') document.getElementById('authErrorMsg').style.display='none';
+    }
+}
+const openAuthModal=()=>openModal('authModal'); 
+const closeAuthModal=(e,f)=>closeModal('authModal',f,e);
+const showAboutInfo=()=>openModal('aboutModal'); 
+const closeAboutInfo=(e,f)=>closeModal('aboutModal',f,e);
+const closeProfileModal=(e,f)=>closeModal('profileModal',f,e); 
+const closeEditProfileModal=(e,f)=>closeModal('editProfileModal',f,e);
+const closeMyWordsModal=(e,f)=>closeModal('myWordsModal',f,e);
+
+/* --- FEED & CARDS --- */
+async function fetchWords(page) {
+    if (isLoading) return;
+    isLoading = true;
+    const list = document.getElementById('feedList');
+    const loadBtn = document.querySelector('#loadMoreContainer button');
+    const mode = localStorage.getItem(COLOR_THEME_KEY) === 'red' ? 'profane' : 'all';
+
+    if (page === 1) { 
+        list.innerHTML = '<div class="spinner"></div>'; 
+        document.getElementById('loadMoreContainer').style.display='none'; 
+    } else { 
+        loadBtn.textContent = 'Yükleniyor...'; 
+        loadBtn.disabled = true; 
+    }
+
+    try {
+        const data = await apiRequest(`/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}`);
+        if(page===1) list.innerHTML='';
+        
+        if (data.words?.length > 0) {
+            appendCards(data.words, list, false);
+            const hasMore = data.words.length >= ITEMS_PER_PAGE && (!data.total_count || (page * ITEMS_PER_PAGE < data.total_count));
+            document.getElementById('loadMoreContainer').style.display = hasMore ? 'block' : 'none';
+        } else if(page===1) {
+            list.innerHTML = '<div style="text-align:center;color:#ccc;margin-top:20px;">Henüz içerik yok.</div>';
         }
-    })
-    .catch(() => showCustomAlert("Bağlantı hatası.", "error"))
-    .finally(() => {
-        btn.disabled = false; btn.innerText = orgText;
+    } catch (e) {
+        if(page===1) list.innerHTML='<div style="text-align:center;color:var(--error-color);">Yüklenemedi.</div>';
+    } finally {
+        isLoading = false; 
+        loadBtn.textContent = 'Daha Fazla Göster'; 
+        loadBtn.disabled = false;
+    }
+}
+function loadMoreWords() { currentPage++; fetchWords(currentPage); }
+
+function appendCards(words, container, isModalMode) {
+    const frag = document.createDocumentFragment();
+    words.forEach(w => frag.appendChild(createCardElement(w, isModalMode)));
+    container.appendChild(frag);
+    Array.from(container.children).slice(-words.length).forEach((c, i) => {
+        requestAnimationFrame(() => setTimeout(() => { c.classList.remove('fade-in'); c.classList.add('show'); }, i * 50));
     });
 }
 
-function handleLogout() {
-    fetch('/api/logout', { method: 'POST', headers: {'X-CSRFToken': getCSRFToken()} })
-    .finally(() => window.location.reload());
+/* === CARD GENERATION (FIXED LAYOUT) === */
+function createCardElement(item, isModalMode) {
+    const card = document.createElement('div');
+    card.className = 'word-card fade-in';
+    
+    // !!! IMPORTANT: Add ID for reliable selection later
+    card.setAttribute('data-id', item.id);
+    
+    const parser = new DOMParser();
+    const decode = (s) => s ? parser.parseFromString(s, "text/html").documentElement.textContent : '';
+
+    // 1. Click Handler
+    card.onclick = (e) => {
+        if (e.target.closest('.vote-btn') || card.classList.contains('is-profane-content')) return;
+        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), isModalMode);
+    };
+
+    // 2. VOTE CONTROLS (Floating Pill)
+    const votePill = createVoteControls('word', item);
+    votePill.className = 'vote-container-floating'; 
+    card.appendChild(votePill);
+
+    // 3. MAIN CONTENT
+    const contentDiv = document.createElement('div');
+    contentDiv.innerHTML = `
+        <h3>${decode(item.word)}</h3>
+        <p>${decode(item.def)}</p>
+    `;
+    card.appendChild(contentDiv);
+
+    // 4. FOOTER (Simple Signature)
+    const foot = document.createElement('div'); 
+    foot.className = 'word-footer';
+    
+    const hint = document.createElement('div'); 
+    hint.className = 'click-hint'; 
+    hint.innerHTML = `Detaylar & Yorumlar <span>&rarr;</span>`;
+    foot.appendChild(hint);
+
+    const authorSpan = document.createElement('div');
+    authorSpan.className = 'card-author';
+    // The "Simple" format you requested
+    authorSpan.innerHTML = `&mdash; ekleyen ${item.author ? decode(item.author) : 'anonim'}`;
+    foot.appendChild(authorSpan);
+    
+    card.appendChild(foot);
+
+    // 5. PROFANITY OVERLAY (Smooth Fade)
+    if (item.is_profane) {
+        card.classList.add('is-profane-content');
+        const ov = document.createElement('div'); 
+        ov.className = 'profane-wrapper';
+        ov.innerHTML = `<div class="profane-badge">+18</div><div class="profane-warning">Görmek için tıkla</div>`;
+        
+        ov.onclick = (e) => { 
+            e.stopPropagation(); 
+            e.preventDefault();
+            ov.classList.add('hiding'); 
+            card.classList.remove('is-profane-content'); 
+            setTimeout(() => { if(ov.parentNode) ov.remove(); }, 600);
+        };
+        card.appendChild(ov);
+    }
+
+    return card;
+}
+
+/* --- FORM & SUBMIT --- */
+function handleWordSubmit(e) { e.preventDefault(); submitWord(); }
+async function submitWord() {
+    const w = document.getElementById('inputWord').value.trim();
+    const d = document.getElementById('inputDef').value.trim();
+    const n = document.getElementById('inputNick').value.trim();
+    const btn = document.querySelector(".form-card button");
+    const prof = localStorage.getItem(COLOR_THEME_KEY) === 'red';
+
+    if (!w || !d) return showCustomAlert("Lütfen alanları doldurun.", "error");
+    if (d.length > 300) return showCustomAlert("Tanım çok uzun.", "error");
+
+    btn.disabled = true; btn.innerText = "Kaydediliyor...";
+    try {
+        await apiRequest('/api/add', 'POST', { word: w, definition: d, nickname: n, is_profane: prof });
+        document.getElementById('inputWord').value=''; 
+        document.getElementById('inputDef').value='';
+        if(!isUserLoggedIn) document.getElementById('inputNick').value='';
+        updateCount({value:''});
+        showCustomAlert("Sözcük gönderildi!");
+    } catch (e) { showCustomAlert(e.message, "error"); }
+    finally { btn.disabled = false; btn.innerText = "Sözlüğe Ekle"; }
+}
+
+function createVoteControls(type, data) {
+    const div = document.createElement('div'); div.className = 'vote-container';
+    const mkBtn = (act, icon) => {
+        const b = document.createElement('button'); b.className=`vote-btn ${act} ${data.user_vote===act?'active':''}`;
+        b.innerHTML=`<svg viewBox="0 0 24 24"><path d="${icon}"></path></svg>`;
+        b.onclick=(e)=>{e.stopPropagation(); sendVote(type, data.id, act, div);};
+        return b;
+    };
+    div.append(
+        mkBtn('like','M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3'), 
+        Object.assign(document.createElement('span'),{className:'vote-score',innerText:data.score}), 
+        mkBtn('dislike','M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17')
+    );
+    return div;
+}
+
+async function sendVote(type, id, act, con) {
+    const btns = con.querySelectorAll('.vote-btn'); btns.forEach(b=>b.disabled=true);
+    try {
+        const data = await apiRequest(`/api/vote/${type}/${id}`, 'POST', { action: act });
+        con.querySelector('.vote-score').innerText = data.new_score;
+        con.querySelectorAll('.vote-btn').forEach(b=>b.classList.remove('active'));
+        if(data.user_action) con.querySelector(`.${data.user_action === 'liked' ? 'like' : 'dislike'}`).classList.add('active');
+    } catch (e) { showCustomAlert("Hata oluştu.", "error"); }
+    finally { setTimeout(()=>btns.forEach(b=>b.disabled=false),300); }
+}
+
+/* === ANIMATED MODAL OPEN (PERFORMANCE FIX) === */
+function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, isModalMode = false) { 
+    if (activeCardClone) return; 
+    
+    if (originalCard.classList.contains('is-profane-content')) return;
+
+    // Set Global Current ID
+    currentWordId = wordId;
+
+    const backdrop = document.getElementById('modalBackdrop');
+    backdrop.style.display = 'block';
+    requestAnimationFrame(() => backdrop.classList.add('show'));
+    
+    const clone = document.createElement('div');
+    clone.className = 'full-comment-view'; 
+    if(isModalMode) clone.classList.add('mode-modal');
+
+    const userValue = isUserLoggedIn ? currentUserUsername : '';
+    const readOnlyAttr = isUserLoggedIn ? 'readonly' : '';
+
+    const contentHTML = `
+        <div class="view-header">
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+                <div>
+                    <h2 id="commentTitle" style="margin:0; font-size:1.4rem; color:var(--accent);">${wordText}</h2>
+                    <div style="font-size:1rem; color:var(--text-muted); margin-top:5px; font-style:italic;">${wordDef}</div>
+                </div>
+                <button class="close-icon-btn" onclick="closeCommentView()">✕</button>
+            </div>
+        </div>
+        <div id="commentsList" class="view-body">
+            <div class="spinner"></div>
+        </div>
+        <div class="view-footer">
+            <div class="custom-comment-wrapper">
+                <div class="custom-comment-header">
+                    <input type="text" id="commentAuthor" class="custom-input-minimal" 
+                           placeholder="Takma Adın (İsteğe bağlı)" 
+                           value="${userValue}" 
+                           ${readOnlyAttr}>
+                </div>
+                <textarea id="commentInput" class="custom-textarea-minimal" rows="2" placeholder="Yorum yaz..." maxlength="200"></textarea>
+                <div class="custom-comment-footer">
+                    <button class="send-btn-minimal" onclick="submitComment()">Gönder</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    clone.innerHTML = contentHTML;
+    document.body.appendChild(clone);
+    
+    // Smooth Scale Up Animation (Uses GPU)
+    requestAnimationFrame(() => requestAnimationFrame(() => clone.classList.add('expanded')));
+
+    activeCardClone = clone;
+    loadComments(wordId, 1, false);
+
+    const authorIn = clone.querySelector('#commentAuthor');
+    if(authorIn && !isUserLoggedIn) {
+        authorIn.addEventListener('click', (e) => { e.preventDefault(); e.target.blur(); openModal('authModal'); });
+        authorIn.addEventListener('focus', (e) => { e.preventDefault(); e.target.blur(); openModal('authModal'); });
+    }
+}
+
+function closeCommentView() {
+    if (!activeCardClone) return;
+
+    const backdrop = document.getElementById('modalBackdrop');
+    backdrop.classList.remove('show');
+    activeCardClone.classList.remove('expanded');
+    
+    setTimeout(() => {
+        if(activeCardClone) activeCardClone.remove();
+        activeCardClone = null;
+        backdrop.style.display = 'none';
+        currentWordId = null;
+    }, 400);
+}
+
+/* --- COMMENTS LOGIC --- */
+async function loadComments(wordId, page = 1) {
+    const list = activeCardClone.querySelector('#commentsList');
+    if(!list) return;
+
+    if (page === 1) { list.innerHTML = '<div class="spinner"></div>'; currentCommentPage=1; }
+    else { const b=list.querySelector('.load-more-comments-btn'); if(b) b.innerText='Yükleniyor...'; }
+
+    try {
+        const data = await apiRequest(`/api/comments/${wordId}?page=${page}&limit=${COMMENTS_PER_PAGE}`);
+        if(page===1) list.innerHTML = ''; else list.querySelector('.load-more-comments-btn')?.remove();
+
+        if (data.comments?.length > 0) {
+            data.comments.forEach(c => list.appendChild(createCommentItem(c)));
+            if (data.has_next) {
+                const btn = document.createElement('button');
+                btn.className = 'load-more-comments-btn';
+                btn.innerText = 'Daha eski yorumlar';
+                btn.onclick = () => loadComments(wordId, ++currentCommentPage);
+                list.appendChild(btn);
+            }
+        } else if(page===1) {
+            list.innerHTML = '<div style="text-align:center;color:var(--text-muted);margin-top:20px;">Henüz yorum yok.</div>';
+        }
+    } catch (e) { if(page===1) list.innerHTML='<div style="color:var(--error-color);">Hata.</div>'; }
+}
+
+function createCommentItem(c) {
+    const d = document.createElement('div'); d.className='comment-card';
+    const date = new Date(c.timestamp).toLocaleDateString('tr-TR', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+    d.innerHTML = `
+        <div style="display:flex; justify-content:space-between;"><strong>${c.author||'Anonim'}</strong><span style="font-size:0.75rem;color:var(--text-muted);">${date}</span></div>
+        <div style="margin:5px 0;">${c.comment}</div>
+        <div style="display:flex; justify-content:flex-end;"></div>
+    `;
+    d.lastElementChild.appendChild(createVoteControls('comment', c));
+    return d;
+}
+
+function submitComment() {
+    if(!activeCardClone) return;
+    const txt = activeCardClone.querySelector('#commentInput').value.trim();
+    const aut = activeCardClone.querySelector('#commentAuthor').value.trim();
+    if(!txt) return showCustomAlert("Yorum yazın.","error");
+    if(txt.length>200) return showCustomAlert("Çok uzun.","error");
+
+    const btn = activeCardClone.querySelector('.send-btn-minimal');
+    btn.disabled=true; 
+
+    apiRequest('/api/comment', 'POST', { word_id: currentWordId, author: aut, comment: txt })
+    .then(data => {
+        showCustomAlert("Yorum eklendi!");
+        activeCardClone.querySelector('#commentInput').value='';
+        const list = activeCardClone.querySelector('#commentsList');
+        if(list.innerText.includes('Henüz yorum')) list.innerHTML='';
+        list.insertBefore(createCommentItem({...data.comment, user_vote:null}), list.firstChild);
+        list.scrollTop=0;
+    })
+    .catch(e=>showCustomAlert(e.message,"error"))
+    .finally(()=>btn.disabled=false);
+}
+
+/* --- PROFILE & EDIT PROFILE --- */
+function openProfileModal() { openModal('profileModal'); fetchProfileData(); }
+async function fetchProfileData() {
+    try {
+        const d = await apiRequest('/api/profile');
+        document.getElementById('profileUsername').innerText = d.username;
+        document.getElementById('profileDate').innerText = d.date_joined;
+        document.getElementById('statWords').innerText = d.word_count;
+        document.getElementById('statComments').innerText = d.comment_count;
+        document.getElementById('statScore').innerText = d.total_score;
+    } catch (e) { console.error(e); }
+}
+function openMyWordsModal() { closeModal('profileModal', true); openModal('myWordsModal'); fetchMyWordsFeed(); }
+async function fetchMyWordsFeed() {
+    const c = document.getElementById('myWordsFeed'); c.innerHTML='<div class="spinner"></div>';
+    try {
+        const d = await apiRequest('/api/my-words');
+        c.innerHTML='';
+        if(d.words?.length>0) appendCards(d.words, c, false); 
+        else c.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);">Sözcük yok.</div>';
+    } catch (e) { c.innerHTML='<div style="text-align:center;color:var(--error-color);">Hata.</div>'; }
+}
+function openEditProfileModal(){ 
+    closeModal('profileModal', true); 
+    openModal('editProfileModal'); 
+    if(currentUserUsername) document.getElementById('newUsernameInput').value=currentUserUsername; 
+}
+function backToProfile(){ closeModal('editProfileModal', true); openModal('profileModal'); }
+function handleChangePassword(){
+    const p1=document.getElementById('newPassword').value, p2=document.getElementById('newPasswordConfirm').value;
+    if(p1.length<6||p1!==p2) return showCustomAlert("Hatalı şifre.","error");
+    apiRequest('/api/change-password','POST',{new_password:p1}).then(()=>showCustomAlert("Şifre değişti."));
+}
+function handleChangeUsername(){
+    const u=document.getElementById('newUsernameInput').value.trim();
+    if(u) apiRequest('/api/change-username','POST',{new_username:u}).then(()=>{showCustomAlert("Kullanıcı adı değişti."); setTimeout(()=>window.location.reload(),1000);});
 }
