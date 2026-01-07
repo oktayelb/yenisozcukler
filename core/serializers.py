@@ -52,17 +52,33 @@ class WordCreateSerializer(serializers.ModelSerializer):
         model = Word
         fields = ['word', 'definition', 'nickname', 'is_profane']
 
+    def turkish_lower(self, text):
+        """
+        Custom helper to lowercase Turkish characters correctly.
+        Standard .lower() converts 'I' to 'i' instead of 'ı'.
+        """
+        if not text:
+            return ""
+        # First handle the special cases, then apply standard lower()
+        return text.replace('I', 'ı').replace('İ', 'i').lower()
+
     def validate_word(self, value):
         value = value.strip()
+        # Regex: Turkish chars allowed
         if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
             raise serializers.ValidationError("Sözcük sadece harf, rakam ve temel noktalama işaretleri içerebilir.")
-        return value
+        
+        # Apply Turkish lowercase
+        return self.turkish_lower(value)
 
     def validate_definition(self, value):
         value = value.strip()
+        # Regex: Turkish chars allowed
         if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
             raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor.")
-        return value
+        
+        # Apply Turkish lowercase
+        return self.turkish_lower(value)
 
     def validate_nickname(self, value):
         if not value or not value.strip():
@@ -71,7 +87,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
             value = value.strip()
             if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
                 raise serializers.ValidationError("Takma ad geçersiz karakterler içeriyor.")
-        return value 
+        return value
 
 class CommentCreateSerializer(serializers.ModelSerializer):
     word_id = serializers.IntegerField()
