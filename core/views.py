@@ -248,12 +248,19 @@ def add_word(request):
     
     serializer = WordCreateSerializer(data=request.data)
     if serializer.is_valid():
-        save_kwargs = {'status': 'pending'}
+        # 1. IP adresini al (Mevcut helper fonksiyonunu kullanıyoruz)
+        client_ip = get_client_ip(request)
+
+        save_kwargs = {
+            'status': 'pending',
+            'ip_address': client_ip  # <--- BURAYA EKLENDİ
+        }
         
         if request.user.is_authenticated:
             save_kwargs['user'] = request.user
             save_kwargs['author'] = request.user.username
         
+        # Serializer'ın save metoduna ip_address'i keyword argument olarak geçiyoruz
         serializer.save(**save_kwargs)
         
         cache.delete('total_approved_words_count_all')

@@ -24,6 +24,7 @@ class Word(models.Model):
     word = models.CharField(max_length=50)
     definition = models.CharField(max_length=300)
     
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
     # Author alanı duruyor. Anonimse buraya yazılan string,
     # üyeyse User'ın username'i veya display_name'i buraya kopyalanabilir (denormalizasyon).
     author = models.CharField(max_length=50, default='Anonim')    
