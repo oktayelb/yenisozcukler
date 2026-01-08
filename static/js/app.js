@@ -183,50 +183,72 @@ function handleAuthSubmit() {
     const err = document.getElementById('authErrorMsg');
     const btn = document.getElementById('authSubmitBtn');
 
+    // Her denemede hata mesajını gizle
+    if (err) err.style.display = 'none';
+
+    // Temel Doğrulamalar
     if (!u || !p) {
-        err.innerText = "Kullanıcı adı ve şifre gerekli.";
-        err.style.display = 'block';
+        if (err) {
+            err.innerText = "Kullanıcı adı ve şifre gerekli.";
+            err.style.display = 'block';
+        }
         return;
     }
 
-    // Register-Specific Client Validation
+    // Kayıt Moduna Özel Doğrulamalar (Register Validation)
     if (currentAuthMode === 'register') {
         if (p.length < 6) {
-            err.innerText = "Şifre en az 6 karakter olmalı.";
-            err.style.display = 'block';
+            if (err) {
+                err.innerText = "Şifre en az 6 karakter olmalı.";
+                err.style.display = 'block';
+            }
             return;
         }
         if (p !== pConfirm) {
-            err.innerText = "Şifreler eşleşmiyor.";
-            err.style.display = 'block';
+            if (err) {
+                err.innerText = "Şifreler eşleşmiyor.";
+                err.style.display = 'block';
+            }
             return;
         }
     }
 
     if (!t) {
-        err.innerText = "Robot doğrulaması gerekli.";
-        err.style.display = 'block';
+        if (err) {
+            err.innerText = "Robot doğrulaması gerekli.";
+            err.style.display = 'block';
+        }
         return;
     }
 
     btn.disabled = true; 
     btn.innerText = "İşleniyor...";
 
-    // !!! IMPORTANT: We now send 'mode' to the server
-    apiRequest('/api/auth', 'POST', { 
+    // --- DEĞİŞİKLİK BAŞLANGICI ---
+    
+    // 1. Mod'a göre doğru endpoint'i seçiyoruz
+    const endpoint = currentAuthMode === 'login' ? '/api/login' : '/api/register';
+
+    // 2. apiRequest artık 'mode' parametresini göndermiyor, çünkü URL zaten belli
+    apiRequest(endpoint, 'POST', { 
         username: u, 
         password: p, 
-        token: t,
-        mode: currentAuthMode // 'login' or 'register'
+        token: t
     })
+    // --- DEĞİŞİKLİK BİTİŞİ ---
+    
     .then(data => {
         closeModal('authModal', true);
         showCustomAlert(data.message, "success");
+        // Token cookie'ye yazıldığı için sayfayı yenilemek yeterlidir
         setTimeout(() => window.location.reload(), 1000);
     })
     .catch(e => { 
-        err.innerText = e.message; 
-        err.style.display='block'; 
+        if (err) {
+            err.innerText = e.message; 
+            err.style.display = 'block'; 
+        }
+        // Turnstile widget'ını sıfırla ki tekrar deneyebilsinler
         if(window.turnstile) window.turnstile.reset(); 
     })
     .finally(() => { 
@@ -234,7 +256,6 @@ function handleAuthSubmit() {
         btn.innerText = currentAuthMode === 'login' ? "Giriş Yap" : "Kayıt Ol"; 
     });
 }
-
 function handleLogout() { 
     apiRequest('/api/logout', 'POST').finally(() => window.location.reload()); 
 }

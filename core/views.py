@@ -19,7 +19,7 @@ from django.contrib.auth import authenticate, login, logout, update_session_auth
 from django.contrib.auth.models import User
 from django.db.models import Sum
 from rest_framework.permissions import IsAuthenticated, AllowAny
-import re
+from django_ratelimit.core import is_ratelimited  # <--- Add this line
 
 # --- YARDIMCI FONKSİYONLAR ---
 
@@ -301,64 +301,70 @@ def add_comment(request):
         first_error = next(iter(serializer.errors.values()))[0]
         return Response({'success': False, 'error': first_error}, status=400)
     
+
+@ratelimit(key='ip', rate='1/10s', method='POST', block=True)
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([])
-def unified_auth(request):
+def login_view(request):
     serializer = AuthSerializer(data=request.data)
-    
     if serializer.is_valid():
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
-        # Get the mode sent from frontend (default to 'login' for safety)
-        mode = request.data.get('mode', 'login') 
+
+        if not User.objects.filter(username=username).exists():
+            return Response({'success': False, 'error': 'Bu kullanıcı adı kayıtlı değil.'}, status=404)
         
-        if mode == 'login':
-            # --- LOGIN LOGIC ---
-            if not User.objects.filter(username=username).exists():
-                return Response({'success': False, 'error': 'Bu kullanıcı adı kayıtlı değil.'}, status=404)
+        user = authenticate(request, username=username, password=password)
+        if user is None:
+            return Response({'success': False, 'error': 'Şifre hatalı.'}, status=400)
+        
+        login(request, user)
+        return Response({
+            'success': True, 
+            'username': user.username, 
+            'message': 'Giriş başarılı.'
+        })
+    
+    first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
+    return Response({'success': False, 'error': first_error}, status=400)
+
+
+@ratelimit(key='ip', rate='1/6000s', method='POST', block=False)
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([])
+def register_view(request):
+    # Manual check allows us to return a custom 429 error message
+    if getattr(request, 'limited', False):
+         return Response({'success': False, 'error': 'Çok fazla kayıt denemesi. Lütfen daha sonra tekrar deneyin.'}, status=429)
+
+    serializer = AuthSerializer(data=request.data)
+    if serializer.is_valid():
+        username = serializer.validated_data['username']
+        password = serializer.validated_data['password']
+
+        if User.objects.filter(username=username).exists():
+            return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
+        
+        try:
+            user = User.objects.create_user(username=username, password=password)
             
-            user = authenticate(request, username=username, password=password)
-            if user is None:
-                return Response({'success': False, 'error': 'Şifre hatalı.'}, status=400)
+            # Zimmetleme (Claiming orphan content) logic
+            Word.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
+            Comment.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
             
             login(request, user)
             return Response({
                 'success': True, 
                 'username': user.username, 
-                'action': 'login',
-                'message': 'Giriş başarılı.'
-            })
+                'message': 'Kayıt başarılı.'
+            }, status=201)
+        except Exception as e:
+            return Response({'success': False, 'error': 'Kayıt oluşturulamadı.'}, status=500)
 
-        elif mode == 'register':
-            # --- REGISTER LOGIC ---
-            if User.objects.filter(username=username).exists():
-                return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
-            
-            try:
-                user = User.objects.create_user(username=username, password=password)
-                
-                # Zimmetleme (Claiming orphan content)
-                Word.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
-                Comment.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
-                
-                login(request, user)
-                return Response({
-                    'success': True, 
-                    'username': user.username, 
-                    'action': 'register',
-                    'message': 'Kayıt başarılı.'
-                })
-            except Exception as e:
-                return Response({'success': False, 'error': 'Kayıt oluşturulamadı.'}, status=500)
-        
-        else:
-            return Response({'success': False, 'error': 'Geçersiz işlem modu.'}, status=400)
-
-    # Serializer error handling
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
     return Response({'success': False, 'error': first_error}, status=400)
-
 
 @api_view(['POST'])
 @authentication_classes([])
