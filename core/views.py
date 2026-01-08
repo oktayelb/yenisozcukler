@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from django_ratelimit.decorators import ratelimit
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
-from django.db.models import F
+from django.db.models import Count, F  
 from django.db import transaction
 import uuid
 from django.views.decorators.csrf import csrf_exempt
@@ -40,8 +40,9 @@ def get_words(request):
     limit = min(limit, 50)
     mode = request.GET.get('mode', 'all') 
 
-    # Temel Sorgu
+    # --- CHANGED: Added .annotate(comment_count=Count('comments')) ---
     words_queryset = Word.objects.filter(status='approved')\
+        .annotate(comment_count=Count('comments'))\
         .only('id', 'word', 'definition', 'author', 'timestamp', 'is_profane', 'score')\
         .order_by('-timestamp')
     

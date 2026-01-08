@@ -367,10 +367,13 @@ function createCardElement(item, isModalMode) {
     const foot = document.createElement('div'); 
     foot.className = 'word-footer';
     
+    // --- CHANGED: Added comment count display ---
     const hint = document.createElement('div'); 
     hint.className = 'click-hint'; 
-    hint.innerHTML = `Detaylar & Yorumlar <span>&rarr;</span>`;
+    const cCount = item.comment_count || 0; 
+    hint.innerHTML = `Detaylar & Yorumlar (${cCount}) <span>&rarr;</span>`;
     foot.appendChild(hint);
+    // --------------------------------------------
 
     const authorName = item.author ? decode(item.author) : 'Anonim';
     const authorSpan = document.createElement('div');

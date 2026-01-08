@@ -25,10 +25,13 @@ class CommentSerializer(serializers.ModelSerializer):
 class WordSerializer(serializers.ModelSerializer):
     score = serializers.IntegerField(read_only=True)
     user_vote = serializers.SerializerMethodField()
+    # --- CHANGED: Added comment_count field definition ---
+    comment_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Word
-        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition'] 
+        # --- CHANGED: Added 'comment_count' to fields list ---
+        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition', 'comment_count'] 
 
     def get_user_vote(self, obj):
         votes = self.context.get('user_votes', {})
@@ -42,7 +45,6 @@ class WordSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         data['def'] = instance.definition 
         return data
-
 # --- YAZMA (WRITE) SERIALIZERS ---
 
 class WordCreateSerializer(serializers.ModelSerializer):
