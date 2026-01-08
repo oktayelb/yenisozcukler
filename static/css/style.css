@@ -179,7 +179,7 @@ header { text-align: center; margin: 50px 0 40px; }
     border-radius: 16px; 
     box-shadow: 0 2px 10px rgba(0,0,0,0.03); 
     border: 1px solid rgba(142, 127, 127, 0.15); 
-    border-left: 8px solid var(--accent); 
+    border-left: 5px solid var(--accent); 
     position: relative; 
     margin-bottom: 25px;
     display: flex;
