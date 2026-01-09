@@ -240,35 +240,7 @@
             </button>
         </div>
     </div>
-
-    <div id="editProfileModal" class="auth-overlay" onclick="closeEditProfileModal(event)">
-         <div class="auth-box" style="max-width: 400px;">
-            <button class="close-btn auth-close" onclick="closeEditProfileModal(event, true)">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-            <div class="auth-header">
-                <h2>Profili Düzenle</h2>
-            </div>
-            <div class="auth-form" style="margin-bottom: 25px;">
-                <div class="form-group" style="display:flex; gap:10px;">
-                    <input type="text" id="newUsernameInput" placeholder="Kullanıcı Adı" maxlength="20">
-                    <button class="auth-submit-btn" onclick="handleChangeUsername()" style="width:auto; margin-top:0; padding:0 20px; white-space:nowrap;">Kaydet</button>
-                </div>
-            </div>
-            <hr style="border:0; border-top:1px dashed var(--input-border); margin-bottom:20px;">
-            <div class="auth-form">
-                <div class="form-group">
-                    <input type="password" id="newPassword" placeholder="Yeni Şifre">
-                </div>
-                <div class="form-group">
-                    <input type="password" id="newPasswordConfirm" placeholder="Yeni Şifre (Tekrar)">
-                </div>
-                <button class="auth-submit-btn" onclick="handleChangePassword()">Şifreyi Güncelle</button>
-            </div>
-             <button onclick="backToProfile()" style="background:none; border:none; color:var(--text-muted); width:100%; margin-top:15px; cursor:pointer;">&larr; Profile Dön</button>
-         </div>
-    </div>
-
+    
     <div id="editProfileModal" class="auth-overlay" onclick="closeEditProfileModal(event)">
         <div class="auth-box" style="max-width: 400px;">
             <button class="close-btn auth-close" onclick="closeEditProfileModal(event, true)">
