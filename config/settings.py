@@ -130,21 +130,23 @@ REST_FRAMEWORK = {
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 
-# --- HTTPS VE GÜVENLİK ZORUNLULUKLARI (Dosyanın en altına ekleyin) ---
 
-# 1. HTTP -> HTTPS Yönlendirmesi
-# Gelen tüm HTTP (güvensiz) isteklerini otomatik olarak HTTPS'e çevirir.
-SECURE_SSL_REDIRECT = True
+if DEBUG:
+    # Geliştirme (Localhost) ortamında HTTPS zorlamasını kapatıyoruz
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    # 1. HTTP -> HTTPS Yönlendirmesi
+    
+else:
+    # Bu ayarlar SADECE canlı ortamda (Production) çalışmalı
+    SECURE_SSL_REDIRECT = True
 
-# 2. Çerez Güvenliği
-# Session ve CSRF çerezlerinin sadece güvenli (HTTPS) bağlantıda taşınmasını sağlar.
-# Bu ayar olmadan tarayıcılar "güvenli olmayan form" uyarısı verebilir veya giriş yapamazsınız.
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+    # 2. Çerez Güvenliği
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
-# 3. HSTS (HTTP Strict Transport Security)
-# Tarayıcılara "Bu siteye bir sonraki gelişinde sadece HTTPS kullan, HTTP deneme bile" der.
-# Güvenliği artırır ve aradaki yönlendirme trafiğini azaltır.
-SECURE_HSTS_SECONDS = 31536000  # 1 Yıl
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
+    # 3. HSTS (HTTP Strict Transport Security)
+    SECURE_HSTS_SECONDS = 31536000  # 1 Yıl
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
