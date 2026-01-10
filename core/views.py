@@ -241,7 +241,7 @@ def vote(request, entity_type, entity_id):
 
 @ratelimit(key='ip', rate='2/15s', method='POST', block=False)
 @api_view(['POST'])
-@authentication_classes([]) 
+#@authentication_classes([]) 
 @permission_classes([])
 def add_word(request):
     if getattr(request, 'limited', False):
@@ -273,7 +273,7 @@ def add_word(request):
 
 @ratelimit(key='ip', rate='1/15s', method='POST', block=False)
 @api_view(['POST'])
-@authentication_classes([]) 
+#@authentication_classes([]) 
 @permission_classes([])
 def add_comment(request):
     if getattr(request, 'limited', False):
