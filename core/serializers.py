@@ -25,13 +25,12 @@ class CommentSerializer(serializers.ModelSerializer):
 class WordSerializer(serializers.ModelSerializer):
     score = serializers.IntegerField(read_only=True)
     user_vote = serializers.SerializerMethodField()
-    # --- CHANGED: Added comment_count field definition ---
     comment_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Word
-        # --- CHANGED: Added 'comment_count' to fields list ---
-        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition', 'comment_count'] 
+        # Added 'example' to the fields list
+        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition', 'example', 'comment_count'] 
 
     def get_user_vote(self, obj):
         votes = self.context.get('user_votes', {})
@@ -44,7 +43,9 @@ class WordSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data['def'] = instance.definition 
+        # We can also alias example if needed, but 'example' is fine
         return data
+
 # --- YAZMA (WRITE) SERIALIZERS ---
 
 class WordCreateSerializer(serializers.ModelSerializer):
@@ -52,35 +53,41 @@ class WordCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Word
-        fields = ['word', 'definition', 'nickname', 'is_profane']
+        # Added 'example' to fields
+        fields = ['word', 'definition', 'example', 'nickname', 'is_profane']
 
     def turkish_lower(self, text):
-        """
-        Custom helper to lowercase Turkish characters correctly.
-        Standard .lower() converts 'I' to 'i' instead of 'ı'.
-        """
         if not text:
             return ""
-        # First handle the special cases, then apply standard lower()
         return text.replace('I', 'ı').replace('İ', 'i').lower()
 
     def validate_word(self, value):
         value = value.strip()
-        # Regex: Turkish chars allowed
         if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
             raise serializers.ValidationError("Sözcük sadece harf, rakam ve temel noktalama işaretleri içerebilir.")
-        
-        # Apply Turkish lowercase
         return self.turkish_lower(value)
 
     def validate_definition(self, value):
         value = value.strip()
-        # Regex: Turkish chars allowed
         if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
             raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor.")
-        
-        # Apply Turkish lowercase
         return self.turkish_lower(value)
+
+    # --- NEW VALIDATION FOR EXAMPLE SENTENCE ---
+    def validate_example(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Örnek cümle zorunludur.")
+        if len(value) > 200:
+             raise serializers.ValidationError("Örnek cümle 200 karakteri geçemez.")
+        
+        # Regex: Extended to allow ? ! ' " : ; for proper sentence punctuation
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\'"?!:;-]+$', value):
+            raise serializers.ValidationError("Örnek cümle geçersiz karakterler içeriyor.")
+            
+        # Note: We do NOT apply turkish_lower() here. 
+        # Example sentences should preserve case (e.g. "Ali okula gitti" vs "ali okula gitti").
+        return value
 
     def validate_nickname(self, value):
         if not value or not value.strip():
@@ -90,7 +97,6 @@ class WordCreateSerializer(serializers.ModelSerializer):
             if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
                 raise serializers.ValidationError("Takma ad geçersiz karakterler içeriyor.")
         return value
-
 class CommentCreateSerializer(serializers.ModelSerializer):
     word_id = serializers.IntegerField()
     

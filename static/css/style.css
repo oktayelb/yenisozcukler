@@ -1,7 +1,9 @@
 /* ========================================
-   1. TEMEL DEĞİŞKENLER
+   style.css - Final Version
    ========================================
 */
+
+/* 1. TEMEL DEĞİŞKENLER */
 :root {
     --font-heading: 'Caveat', cursive;
     --font-body: 'Merriweather', serif;
@@ -20,7 +22,7 @@
     --z-auth-overlay: 5000;   
     --z-notification: 9999;   
 
-    /* --- RENKLER (DEFAULT / LIGHT) --- */
+    /* RENKLER (DEFAULT / LIGHT) */
     --bg-color: #f4f1ea;
     --card-bg: #fffbf6;
     --text-main: #2c2c2c;
@@ -28,19 +30,18 @@
     --accent: #8e7f7f;
     --border-light: rgba(142, 127, 127, 0.3);
     
-    /* SUBTITLE COLOR */
     --subtitle-color: #5d5c61; 
 
-    /* Form Inputs (General) */
+    /* Form Inputs */
     --input-bg: #f4f1ea;        
     --input-focus-bg: #ffffff;   
     --input-text: #2c2c2c;     
     --input-border: rgba(142, 127, 127, 0.2);
     
-    /* --- İMZA VE YORUM KUTUSU --- */
+    /* İMZA VE YORUM KUTUSU */
     --sig-color: #8899a6; 
 
-    /* Comment Box (Default) */
+    /* Comment Box */
     --comment-box-bg: #f4f1ea;
     --comment-box-text: #2c2c2c;
     --comment-box-border: rgba(142, 127, 127, 0.2);
@@ -87,7 +88,7 @@ body.dark-mode {
     --dislike-active: #7986CB;
 }
 
-/* --- RED THEME --- */
+/* RED THEME */
 body[data-theme="red"] {
     --bg-color: #7f1d1d; 
     --card-bg: #fff5f5;  
@@ -206,12 +207,10 @@ header { text-align: center; margin: 50px 0 40px; }
     margin: 0 0 10px 0;
     line-height: 1.1;
     letter-spacing: -0.5px;
-    
-    /* --- NEW FIXES FOR LONG WORDS --- */
-    padding-right: 120px;   /* Reserve space for the vote button on the right */
-    overflow-wrap: anywhere; /* Force long words to break to the next line */
-    word-break: break-word;  /* Fallback for older browsers */
-    box-sizing: border-box;  /* Ensure padding is calculated inside the width */
+    padding-right: 120px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    box-sizing: border-box;
 }
 .word-card p {
     font-family: var(--font-body);
@@ -222,7 +221,18 @@ header { text-align: center; margin: 50px 0 40px; }
     padding-right: 10px;
 }
 
-/* FOOTER LAYOUT & SIGNATURE */
+/* EXAMPLE SENTENCE STYLE */
+.word-example {
+    margin-top: 12px;
+    font-style: italic;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    border-left: 3px solid var(--border-light);
+    padding-left: 12px;
+    opacity: 0.9;
+}
+
+/* FOOTER & SIGNATURE */
 .word-footer { 
     display: flex; 
     justify-content: space-between; 
@@ -271,16 +281,129 @@ header { text-align: center; margin: 50px 0 40px; }
 .word-card.is-profane-content > *:not(.profane-wrapper) { filter: blur(12px); opacity: 0.15; }
 .profane-badge { background: var(--error-color); color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 1.4rem; margin-bottom: 15px; }
 
-/* FORM */
-.form-card { background: var(--card-bg); padding: 30px; border-radius: 12px; box-shadow: var(--shadow-sm); border-top: 4px solid var(--accent); }
-.form-title { font-family: var(--font-heading); font-size: 2.3rem; margin-bottom: 20px; color: var(--accent); }
-.form-fields { display: grid; grid-template-columns: 1fr 2fr 1fr auto; gap: 15px; align-items: start; }
-input, textarea { width: 100%; padding: 12px; background-color: var(--input-bg); color: var(--input-text); border: 1px solid #dcd6cc; font-size: 1.05rem; font-family: var(--font-body); outline: none; border-radius: 6px; transition: all 0.3s; box-sizing: border-box; }
-textarea { resize: vertical; min-height: 48px; height: 48px; }
-input:focus, textarea:focus { border-color: var(--accent); background-color: var(--input-focus-bg); }
-.form-card button { padding: 0 30px; height: 48px; background-color: var(--text-main); color: var(--card-bg); border: none; font-size: 1.05rem; cursor: pointer; border-radius: 6px; font-weight: bold; transition: all 0.2s; white-space: nowrap; margin-top: 24px; }
-.form-card button:hover { background-color: var(--accent); transform: translateY(-1px); }
-@media (max-width: 900px) { .form-fields { grid-template-columns: 1fr; gap: 20px; } .form-card button { width: 100%; margin-top: 10px; } }
+/* FORM LAYOUT (REDESIGNED) */
+.form-card { 
+    background: var(--card-bg); 
+    padding: 35px; 
+    border-radius: 12px; 
+    box-shadow: var(--shadow-sm); 
+    border-top: 4px solid var(--accent); 
+}
+.form-title { 
+    font-family: var(--font-heading); 
+    font-size: 2.3rem; 
+    margin-bottom: 25px; 
+    color: var(--accent); 
+}
+
+/* Grid System for Form */
+.form-fields { 
+    display: grid; 
+    grid-template-columns: 1fr 1fr; /* 2 Equal Columns */
+    column-gap: 20px; 
+    row-gap: 20px; 
+    align-items: start; 
+}
+
+/* Helper Classes */
+.span-half { grid-column: span 1; }
+.span-full { grid-column: span 2; }
+
+/* Input Labels */
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: var(--text-main);
+    font-size: 0.95rem;
+}
+
+/* Inputs & Textareas */
+input, textarea { 
+    width: 100%; 
+    padding: 14px; 
+    background-color: var(--input-bg); 
+    color: var(--input-text); 
+    border: 1px solid var(--border-light); 
+    font-size: 1.05rem; 
+    font-family: var(--font-body); 
+    outline: none; 
+    border-radius: 8px; 
+    transition: all 0.3s; 
+    box-sizing: border-box; 
+}
+textarea { resize: vertical; min-height: 80px; }
+input:focus, textarea:focus { 
+    border-color: var(--accent); 
+    background-color: var(--input-focus-bg); 
+    box-shadow: 0 0 0 3px rgba(142, 127, 127, 0.1);
+}
+
+/* Character Limit Text */
+.char-limit {
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 5px;
+}
+
+/* Button Styling */
+.form-submit-wrapper {
+    margin-top: 10px;
+    grid-column: span 2; 
+}
+.form-card button { 
+    width: 100%; 
+    padding: 15px; 
+    background-color: var(--text-main); 
+    color: var(--card-bg); 
+    border: none; 
+    font-size: 1.1rem; 
+    cursor: pointer; 
+    border-radius: 8px; 
+    font-weight: bold; 
+    transition: all 0.2s; 
+    letter-spacing: 0.5px;
+}
+.form-card button:hover { 
+    background-color: var(--accent); 
+    transform: translateY(-2px); 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Mobile Responsive */
+@media (max-width: 900px) { 
+    /* FORM FIXES */
+    .form-fields { 
+        display: flex;           
+        flex-direction: column;  
+        gap: 20px;               
+    } 
+
+    .span-half, .span-full { 
+        width: 100%; 
+        grid-column: auto; 
+    }
+
+    .form-card { padding: 25px 20px; }
+    .form-card button { margin-top: 10px; } 
+
+    /* LOGO & HEADER FIXES */
+    header { margin: 80px 0 20px; }
+    
+    .logo-card { 
+        padding: 15px 20px; 
+        width: auto;
+        max-width: 100%; 
+    }
+
+    .logo-card h1 { font-size: 2.8rem; }
+    .logo-card .subtitle { font-size: 1.1rem; }
+    
+    .logo-card.pos-behind {
+        transform: rotate(-6deg) translate(-5px, -5px) scale(0.95);
+    }
+}
 
 /* VOTE PILL */
 .vote-container-floating {
@@ -316,7 +439,7 @@ input:focus, textarea:focus { border-color: var(--accent); background-color: var
 .close-btn, .auth-close { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; color: var(--text-muted); }
 .auth-submit-btn { width: 100%; padding: 12px; margin-top: 10px; background: var(--text-main); color: var(--card-bg); border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
 
-/* --- ABOUT SECTION TITLES (ADDED LINES) --- */
+/* ABOUT SECTION TITLES */
 .about-text .about-section-title {
     font-family: var(--font-heading);
     font-size: 1.6rem;
@@ -427,9 +550,7 @@ input:focus, textarea:focus { border-color: var(--accent); background-color: var
 .load-more-btn:hover { background: var(--accent); color: var(--card-bg); }
 .load-more-comments-btn { background: none; border: none; color: var(--accent); font-size: 0.9rem; font-weight: bold; cursor: pointer; padding: 10px; width: 100%; text-align: center; }
 
-/* ========================================
-   USER BADGE (Clickable Username)
-   ======================================== */
+/* USER BADGE */
 .user-badge {
     display: inline-flex;
     align-items: center;
@@ -437,38 +558,27 @@ input:focus, textarea:focus { border-color: var(--accent); background-color: var
     background: var(--input-bg);
     border: 1px solid var(--border-light);
     padding: 4px 12px;
-    border-radius: 20px; /* Pill shape */
+    border-radius: 20px;
     font-size: 0.85rem;
     font-weight: 700;
     color: var(--text-muted);
     cursor: pointer;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05); /* Elevation shadow */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
     user-select: none;
     margin-left: 5px;
 }
-
 .user-badge:hover {
-    transform: translateY(-2px); /* Lift effect */
+    transform: translateY(-2px);
     box-shadow: 0 5px 10px rgba(0,0,0,0.1);
     border-color: var(--accent);
     color: var(--accent);
     background: var(--card-bg);
 }
+.user-badge:active { transform: translateY(0); box-shadow: 0 2px 3px rgba(0,0,0,0.05); }
+.comment-card .user-badge { background: var(--card-bg); font-size: 0.75rem; padding: 2px 10px; }
 
-.user-badge:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 3px rgba(0,0,0,0.05);
-}
-
-/* Ensure badge looks good inside comments */
-.comment-card .user-badge {
-    background: var(--card-bg); /* Contrast against comment background */
-    font-size: 0.75rem;
-    padding: 2px 10px;
-}
-
-/* --- AUTH TABS --- */
+/* AUTH TABS */
 .auth-tabs {
     display: flex;
     justify-content: center;
@@ -477,7 +587,6 @@ input:focus, textarea:focus { border-color: var(--accent); background-color: var
     border-bottom: 1px solid var(--border-light);
     padding-bottom: 0;
 }
-
 .auth-tab {
     background: none;
     border: none;
@@ -489,20 +598,12 @@ input:focus, textarea:focus { border-color: var(--accent); background-color: var
     position: relative;
     transition: color 0.3s;
 }
-
-.auth-tab:hover {
-    color: var(--text-main);
-}
-
-.auth-tab.active {
-    color: var(--accent);
-    font-weight: bold;
-}
-
+.auth-tab:hover { color: var(--text-main); }
+.auth-tab.active { color: var(--accent); font-weight: bold; }
 .auth-tab.active::after {
     content: '';
     position: absolute;
-    bottom: -1px; /* Overlaps the container border */
+    bottom: -1px;
     left: 0;
     width: 100%;
     height: 3px;

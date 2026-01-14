@@ -4,6 +4,9 @@ import os
 import sys
 from django.core.management import execute_from_command_line
 
+## TODO sözcük hastag sistemi ekle
+## TODO kulalnıcıların tamın alanına girebileceği şeyleri relakslat, + vs
+## TODO örnek cümle ekle ve zorunlu olsun
 
 def main():
     """Run administrative tasks."""

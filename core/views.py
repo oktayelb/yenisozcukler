@@ -1,25 +1,24 @@
 # core/views.py
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
 from django.shortcuts import get_object_or_404
 from django_ratelimit.decorators import ratelimit
+from django.contrib.auth.models import User
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
-from django.db.models import Count, F  
+from django.db.models import Count, F , Sum 
 from django.db import transaction
+
 import uuid
-from django.views.decorators.csrf import csrf_exempt
 from .models import Word, Comment, WordVote, CommentVote
 from .serializers import (
     WordSerializer, CommentSerializer, 
     WordCreateSerializer, CommentCreateSerializer,
     AuthSerializer, ChangeUsernameSerializer 
 )
-from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
-from django.contrib.auth.models import User
-from django.db.models import Sum
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from django_ratelimit.core import is_ratelimited  # <--- Add this line
 
 # --- YARDIMCI FONKSİYONLAR ---
 
@@ -40,11 +39,13 @@ def get_words(request):
     limit = min(limit, 50)
     mode = request.GET.get('mode', 'all') 
 
-    # --- CHANGED: Added .annotate(comment_count=Count('comments')) ---
+    # --- UPDATED QUERY ---
+    # Added 'example' to the .only() list
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
-        .only('id', 'word', 'definition', 'author', 'timestamp', 'is_profane', 'score')\
+        .only('id', 'word', 'definition', 'example', 'author', 'timestamp', 'is_profane', 'score')\
         .order_by('-timestamp')
+    # ---------------------
     
     if mode == 'profane':
         words_queryset = words_queryset.filter(is_profane=True)
@@ -64,7 +65,7 @@ def get_words(request):
     except (PageNotAnInteger, EmptyPage):
         words_page = []
 
-    # --- OYLARI GETİRME ---
+    # (The rest of the function remains exactly the same...)
     session_id = request.COOKIES.get('user_id')
     user_votes = {}
     
@@ -241,7 +242,6 @@ def vote(request, entity_type, entity_id):
 
 @ratelimit(key='ip', rate='2/15s', method='POST', block=False)
 @api_view(['POST'])
-#@authentication_classes([]) 
 @permission_classes([])
 def add_word(request):
     if getattr(request, 'limited', False):
@@ -273,7 +273,6 @@ def add_word(request):
 
 @ratelimit(key='ip', rate='1/15s', method='POST', block=False)
 @api_view(['POST'])
-#@authentication_classes([]) 
 @permission_classes([])
 def add_comment(request):
     if getattr(request, 'limited', False):
@@ -302,7 +301,7 @@ def add_comment(request):
         first_error = next(iter(serializer.errors.values()))[0]
         return Response({'success': False, 'error': first_error}, status=400)
     
-
+##profil işlemleri
 @ratelimit(key='ip', rate='1/10s', method='POST', block=True)
 @api_view(['POST'])
 @authentication_classes([])
@@ -329,7 +328,6 @@ def login_view(request):
     
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
     return Response({'success': False, 'error': first_error}, status=400)
-
 
 @ratelimit(key='ip', rate='1/6000s', method='POST', block=False)
 @api_view(['POST'])
@@ -375,7 +373,7 @@ def logout_view(request):
     return Response({'success': True})
 
 @api_view(['GET'])
-@permission_classes([]) # ARTIK HERKES GÖREBİLİR (Public Profile)
+@permission_classes([]) 
 def get_user_profile(request):
     # Eğer username parametresi varsa o kullanıcıyı getir, yoksa giriş yapanı
     target_username = request.GET.get('username')
@@ -416,7 +414,6 @@ def change_password(request):
     
     return Response({'success': True, 'message': 'Şifreniz başarıyla güncellendi.'})
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def change_username(request):
@@ -444,7 +441,7 @@ def change_username(request):
         return Response({'success': False, 'error': first_error}, status=400)
     
 @api_view(['GET'])
-@permission_classes([]) # Public olabilir, profilden tıklandığında görünmesi için
+@permission_classes([]) 
 def get_my_words(request):
     # Eğer parametre varsa o kullanıcının kelimeleri, yoksa oturum açanın
     target_username = request.GET.get('username')

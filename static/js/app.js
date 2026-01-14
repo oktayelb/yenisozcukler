@@ -418,24 +418,35 @@ function handleWordSubmit(e) { e.preventDefault(); submitWord(); }
 async function submitWord() {
     const w = document.getElementById('inputWord').value.trim();
     const d = document.getElementById('inputDef').value.trim();
+    // 1. Get the new value
+    const ex = document.getElementById('inputExample').value.trim();
     const n = document.getElementById('inputNick').value.trim();
     const btn = document.querySelector(".form-card button");
     
     const prof = localStorage.getItem(COLOR_THEME_KEY) === 'red';
 
-    if (!w || !d) return showCustomAlert("Lütfen alanları doldurun.", "error");
+    if (!w || !d) return showCustomAlert("Lütfen tüm alanları doldurun.", "error");
+    // 2. Validate the new field
+    if (!ex) return showCustomAlert("Lütfen bir örnek cümle yazın.", "error");
+    
     if (d.length > 300) return showCustomAlert("Tanım çok uzun.", "error");
+    if (ex.length > 200) return showCustomAlert("Örnek cümle çok uzun.", "error");
 
     btn.disabled = true; btn.innerText = "Kaydediliyor...";
     try {
         await apiRequest('/api/add', 'POST', { 
             word: w, 
             definition: d, 
+            example: ex, // 3. Add to payload (backend will ignore it for now, which is fine)
             nickname: n, 
             is_profane: prof 
         });
+        
+        // 4. Clear the new field
         document.getElementById('inputWord').value=''; 
         document.getElementById('inputDef').value='';
+        document.getElementById('inputExample').value='';
+        
         if(!isUserLoggedIn) document.getElementById('inputNick').value='';
         updateCount({value:''});
         showCustomAlert("Sözcük gönderildi (Onay bekleniyor)!");
