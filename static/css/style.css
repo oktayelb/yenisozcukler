@@ -1,7 +1,6 @@
 /* ========================================
-   style.css - Final Version
-   ========================================
-*/
+   style.css - Final Complete Version
+   ======================================= */
 
 /* 1. TEMEL DEĞİŞKENLER */
 :root {
@@ -347,62 +346,55 @@ input:focus, textarea:focus {
     margin-top: 5px;
 }
 
-/* Button Styling */
+/* FORM FOOTER & BUTTON */
 .form-submit-wrapper {
-    margin-top: 10px;
-    grid-column: span 2; 
+    margin-top: 25px;
+    grid-column: span 2;
+    
+    /* Layout: Text Left, Button Right */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    padding-top: 20px;
+    border-top: 1px solid var(--border-light);
 }
+
+.submission-hint {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: var(--text-muted);
+}
+
+.author-trigger {
+    color: var(--text-main);
+    cursor: pointer;
+    border-bottom: 2px dotted var(--accent);
+    transition: all 0.2s;
+}
+.author-trigger:hover {
+    color: var(--accent);
+    background-color: rgba(142, 127, 127, 0.1);
+}
+
 .form-card button { 
-    width: 100%; 
-    padding: 15px; 
+    width: auto; 
+    min-width: 180px; 
+    padding: 12px 30px; 
     background-color: var(--text-main); 
     color: var(--card-bg); 
     border: none; 
     font-size: 1.1rem; 
     cursor: pointer; 
-    border-radius: 8px; 
+    border-radius: 30px; /* Pill shape */
     font-weight: bold; 
     transition: all 0.2s; 
-    letter-spacing: 0.5px;
+    margin-top: 0; 
 }
 .form-card button:hover { 
     background-color: var(--accent); 
     transform: translateY(-2px); 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-
-/* Mobile Responsive */
-@media (max-width: 900px) { 
-    /* FORM FIXES */
-    .form-fields { 
-        display: flex;           
-        flex-direction: column;  
-        gap: 20px;               
-    } 
-
-    .span-half, .span-full { 
-        width: 100%; 
-        grid-column: auto; 
-    }
-
-    .form-card { padding: 25px 20px; }
-    .form-card button { margin-top: 10px; } 
-
-    /* LOGO & HEADER FIXES */
-    header { margin: 80px 0 20px; }
-    
-    .logo-card { 
-        padding: 15px 20px; 
-        width: auto;
-        max-width: 100%; 
-    }
-
-    .logo-card h1 { font-size: 2.8rem; }
-    .logo-card .subtitle { font-size: 1.1rem; }
-    
-    .logo-card.pos-behind {
-        transform: rotate(-6deg) translate(-5px, -5px) scale(0.95);
-    }
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 
 /* VOTE PILL */
@@ -609,4 +601,60 @@ input:focus, textarea:focus {
     height: 3px;
     background-color: var(--accent);
     border-radius: 3px 3px 0 0;
+}
+
+/* ========================================
+   MOBILE RESPONSIVE
+   ======================================= */
+@media (max-width: 900px) { 
+    /* FORM FIXES: Vertical Stack for Inputs */
+    .form-fields { 
+        display: flex;           
+        flex-direction: column;  
+        gap: 20px;               
+    } 
+
+    .span-half, .span-full { 
+        width: 100%; 
+        grid-column: auto; 
+    }
+
+    .form-card { padding: 25px 20px; }
+    
+    /* Mobile Footer: Side-by-Side */
+    .form-submit-wrapper {
+        flex-direction: row; /* Force row layout */
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .submission-hint {
+        text-align: left;
+        font-size: 1rem;
+    }
+
+    /* Button takes natural width, minimal padding if needed */
+    .form-card button {
+        width: auto; 
+        min-width: 0; /* Let it shrink if needed */
+        padding: 12px 20px;
+        font-size: 1rem;
+    }
+
+    /* LOGO & HEADER FIXES */
+    header { margin: 80px 0 20px; }
+    
+    .logo-card { 
+        padding: 15px 20px; 
+        width: auto;
+        max-width: 100%; 
+    }
+
+    .logo-card h1 { font-size: 2.8rem; }
+    .logo-card .subtitle { font-size: 1.1rem; }
+    
+    .logo-card.pos-behind {
+        transform: rotate(-6deg) translate(-5px, -5px) scale(0.95);
+    }
 }

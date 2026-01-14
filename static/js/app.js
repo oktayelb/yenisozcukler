@@ -161,18 +161,31 @@ function toggleAuthMode(mode) {
 }
 
 function setupAuthTriggers() {
+    // 1. Definition field Enter key support
     const def = document.getElementById('inputDef');
-    const nick = document.getElementById('inputNick');
-    
-    if (def) def.addEventListener('keydown', (e) => { 
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitWord(); } 
-    });
-    
-    if (nick && !isUserLoggedIn) nick.addEventListener('focus', (e) => { 
-        e.preventDefault(); 
-        e.target.blur(); 
-        openAuthModal(); 
-    });
+    if (def) {
+        def.addEventListener('keydown', (e) => { 
+            if (e.key === 'Enter' && !e.shiftKey) { 
+                e.preventDefault(); 
+                submitWord(); 
+            } 
+        });
+    }
+
+    // 2. Click listener for "Ekleyen: Anonim" text
+    const authorBtn = document.getElementById('authorTrigger');
+    if (authorBtn) {
+        authorBtn.addEventListener('click', (e) => {
+            e.preventDefault(); 
+            // If user is NOT logged in, open login modal
+            if (!isUserLoggedIn) {
+                openAuthModal();
+            } else {
+                // If user IS logged in, open their profile
+                openProfileModal(currentUserUsername);
+            }
+        });
+    }
 }
 
 function handleAuthSubmit() {
@@ -183,72 +196,46 @@ function handleAuthSubmit() {
     const err = document.getElementById('authErrorMsg');
     const btn = document.getElementById('authSubmitBtn');
 
-    // Her denemede hata mesajını gizle
     if (err) err.style.display = 'none';
 
-    // Temel Doğrulamalar
     if (!u || !p) {
-        if (err) {
-            err.innerText = "Kullanıcı adı ve şifre gerekli.";
-            err.style.display = 'block';
-        }
+        if (err) { err.innerText = "Kullanıcı adı ve şifre gerekli."; err.style.display = 'block'; }
         return;
     }
 
-    // Kayıt Moduna Özel Doğrulamalar (Register Validation)
     if (currentAuthMode === 'register') {
         if (p.length < 6) {
-            if (err) {
-                err.innerText = "Şifre en az 6 karakter olmalı.";
-                err.style.display = 'block';
-            }
+            if (err) { err.innerText = "Şifre en az 6 karakter olmalı."; err.style.display = 'block'; }
             return;
         }
         if (p !== pConfirm) {
-            if (err) {
-                err.innerText = "Şifreler eşleşmiyor.";
-                err.style.display = 'block';
-            }
+            if (err) { err.innerText = "Şifreler eşleşmiyor."; err.style.display = 'block'; }
             return;
         }
     }
 
     if (!t) {
-        if (err) {
-            err.innerText = "Robot doğrulaması gerekli.";
-            err.style.display = 'block';
-        }
+        if (err) { err.innerText = "Robot doğrulaması gerekli."; err.style.display = 'block'; }
         return;
     }
 
     btn.disabled = true; 
     btn.innerText = "İşleniyor...";
-
-    // --- DEĞİŞİKLİK BAŞLANGICI ---
     
-    // 1. Mod'a göre doğru endpoint'i seçiyoruz
     const endpoint = currentAuthMode === 'login' ? '/api/login' : '/api/register';
 
-    // 2. apiRequest artık 'mode' parametresini göndermiyor, çünkü URL zaten belli
     apiRequest(endpoint, 'POST', { 
         username: u, 
         password: p, 
         token: t
     })
-    // --- DEĞİŞİKLİK BİTİŞİ ---
-    
     .then(data => {
         closeModal('authModal', true);
         showCustomAlert(data.message, "success");
-        // Token cookie'ye yazıldığı için sayfayı yenilemek yeterlidir
         setTimeout(() => window.location.reload(), 1000);
     })
     .catch(e => { 
-        if (err) {
-            err.innerText = e.message; 
-            err.style.display = 'block'; 
-        }
-        // Turnstile widget'ını sıfırla ki tekrar deneyebilsinler
+        if (err) { err.innerText = e.message; err.style.display = 'block'; }
         if(window.turnstile) window.turnstile.reset(); 
     })
     .finally(() => { 
@@ -353,7 +340,7 @@ function createCardElement(item, isModalMode) {
 
     card.onclick = (e) => {
         if (e.target.closest('.vote-btn') || e.target.closest('.user-badge') || card.classList.contains('is-profane-content')) return;
-        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), isModalMode);
+        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), decode(item.example), isModalMode);
     };
 
     const votePill = createVoteControls('word', item);
@@ -361,19 +348,18 @@ function createCardElement(item, isModalMode) {
     card.appendChild(votePill);
 
     const contentDiv = document.createElement('div');
-    contentDiv.innerHTML = `<h3>${decode(item.word)}</h3><p>${decode(item.def)}</p>`;
+    const exampleHTML = item.example ? `<div class="word-example">"${decode(item.example)}"</div>` : '';
+    contentDiv.innerHTML = `<h3>${decode(item.word)}</h3><p>${decode(item.def)}</p>${exampleHTML}`;
     card.appendChild(contentDiv);
 
     const foot = document.createElement('div'); 
     foot.className = 'word-footer';
     
-    // --- CHANGED: Added comment count display ---
     const hint = document.createElement('div'); 
     hint.className = 'click-hint'; 
     const cCount = item.comment_count || 0; 
     hint.innerHTML = `Detaylar & Yorumlar (${cCount}) <span>&rarr;</span>`;
     foot.appendChild(hint);
-    // --------------------------------------------
 
     const authorName = item.author ? decode(item.author) : 'Anonim';
     const authorSpan = document.createElement('div');
@@ -418,15 +404,13 @@ function handleWordSubmit(e) { e.preventDefault(); submitWord(); }
 async function submitWord() {
     const w = document.getElementById('inputWord').value.trim();
     const d = document.getElementById('inputDef').value.trim();
-    // 1. Get the new value
     const ex = document.getElementById('inputExample').value.trim();
-    const n = document.getElementById('inputNick').value.trim();
+    const n = isUserLoggedIn ? currentUserUsername : 'Anonim';
+
     const btn = document.querySelector(".form-card button");
-    
     const prof = localStorage.getItem(COLOR_THEME_KEY) === 'red';
 
     if (!w || !d) return showCustomAlert("Lütfen tüm alanları doldurun.", "error");
-    // 2. Validate the new field
     if (!ex) return showCustomAlert("Lütfen bir örnek cümle yazın.", "error");
     
     if (d.length > 300) return showCustomAlert("Tanım çok uzun.", "error");
@@ -437,17 +421,14 @@ async function submitWord() {
         await apiRequest('/api/add', 'POST', { 
             word: w, 
             definition: d, 
-            example: ex, // 3. Add to payload (backend will ignore it for now, which is fine)
+            example: ex, 
             nickname: n, 
             is_profane: prof 
         });
         
-        // 4. Clear the new field
         document.getElementById('inputWord').value=''; 
         document.getElementById('inputDef').value='';
         document.getElementById('inputExample').value='';
-        
-        if(!isUserLoggedIn) document.getElementById('inputNick').value='';
         updateCount({value:''});
         showCustomAlert("Sözcük gönderildi (Onay bekleniyor)!");
     } catch (e) { showCustomAlert(e.message, "error"); }
@@ -488,7 +469,7 @@ async function sendVote(type, id, act, con) {
 }
 
 /* === DETAIL VIEW & COMMENTS === */
-function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, isModalMode = false) { 
+function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, wordExample, isModalMode = false) { 
     if (activeCardClone) return; 
     if (originalCard.classList.contains('is-profane-content')) return;
 
@@ -504,6 +485,9 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, isMo
 
     const userValue = isUserLoggedIn ? currentUserUsername : '';
     const readOnlyAttr = isUserLoggedIn ? 'readonly' : '';
+    
+    // Example sentence for modal
+    const exampleHTML = wordExample ? `<div class="word-example" style="margin-top:8px;">"${wordExample}"</div>` : '';
 
     const contentHTML = `
         <div class="view-header">
@@ -511,6 +495,7 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, isMo
                 <div>
                     <h2 id="commentTitle" style="margin:0; font-size:1.4rem; color:var(--accent);">${wordText}</h2>
                     <div style="font-size:1rem; color:var(--text-muted); margin-top:5px; font-style:italic;">${wordDef}</div>
+                    ${exampleHTML}
                 </div>
                 <button class="close-icon-btn" onclick="closeCommentView()">✕</button>
             </div>

@@ -65,21 +65,12 @@
 
             <form class="form-fields" onsubmit="handleWordSubmit(event)">
                 
-                <div class="form-group span-half">
+                <div class="form-group span-full">
                     <label>Sözcük</label>
                     <input type="text" id="inputWord" maxlength="50"
                         placeholder="Örn: Gönül"
                         onkeypress="return allowOnlyLetters(event, true)" 
                         oninput="this.value = this.value.replace(/^\s+/g, '')">
-                </div>
-
-                <div class="form-group span-half">
-                    <label>Ekleyenin Takma Adı</label>
-                    <input type="text" id="inputNick" maxlength="20" 
-                           placeholder="{% if request.user.is_authenticated %}{{ request.user.username }}{% else %}Anonim{% endif %}" 
-                           value="{% if request.user.is_authenticated %}{{ request.user.username }}{% endif %}"
-                           {% if request.user.is_authenticated %}readonly{% endif %}
-                           onkeypress="return allowOnlyLetters(event, false)">
                 </div>
 
                 <div class="form-group def-wrapper span-full">
@@ -91,11 +82,19 @@
                 <div class="form-group span-full">
                     <label>Örnek Cümle <span style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;">(Zorunlu)</span></label>
                     <textarea id="inputExample" rows="2" maxlength="200" 
-                              placeholder="Sözcüğü bir cümle içinde kullanın..." 
-                              onkeypress="return allowOnlyLetters(event, true)"></textarea>
+                            placeholder="Sözcüğü bir cümle içinde kullanın..." 
+                            onkeypress="return allowOnlyLetters(event, true)"></textarea>
                 </div>
 
                 <div class="form-submit-wrapper">
+                    
+                    <div class="submission-hint">
+                        Ekleyen: 
+                        <span class="author-trigger" id="authorTrigger">
+                            {% if request.user.is_authenticated %}{{ request.user.username }}{% else %}Anonim{% endif %}
+                        </span>
+                    </div>
+
                     <button type="submit">Sözlüğe Ekle</button>
                 </div>
 
