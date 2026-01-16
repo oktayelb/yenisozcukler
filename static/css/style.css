@@ -1,5 +1,5 @@
 /* ========================================
-   style.css - Final Version (With Mobile Modal Fixes)
+   style.css - Final Version
    ======================================= */
 
 /* 1. TEMEL DEĞİŞKENLER */
@@ -280,7 +280,7 @@ header { text-align: center; margin: 50px 0 40px; }
 .word-card.is-profane-content > *:not(.profane-wrapper) { filter: blur(12px); opacity: 0.15; }
 .profane-badge { background: var(--error-color); color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 1.4rem; margin-bottom: 15px; }
 
-/* FORM LAYOUT (REDESIGNED) */
+/* FORM LAYOUT (DESKTOP) */
 .form-card { 
     background: var(--card-bg); 
     padding: 35px; 
@@ -295,10 +295,10 @@ header { text-align: center; margin: 50px 0 40px; }
     color: var(--accent); 
 }
 
-/* Grid System for Form */
+/* Grid System for Form - DESKTOP SPLIT 1fr 2fr */
 .form-fields { 
     display: grid; 
-    grid-template-columns: 1fr 1fr; /* 2 Equal Columns */
+    grid-template-columns: 1fr 2fr; 
     column-gap: 20px; 
     row-gap: 20px; 
     align-items: start; 
@@ -424,7 +424,7 @@ input:focus, textarea:focus {
 .auth-overlay, .about-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: var(--z-modal-base); display: flex; justify-content: center; align-items: center; pointer-events: none; opacity: 0; transition: opacity 0.4s ease; }
 .auth-overlay.show, .about-overlay.show { opacity: 1; pointer-events: auto; }
 
-/* --- UPDATED ABOUT BOX & AUTH BOX --- */
+/* --- ABOUT BOX & AUTH BOX --- */
 .auth-box { 
     background: var(--card-bg); 
     color: var(--text-main); 
@@ -440,7 +440,7 @@ input:focus, textarea:focus {
     transition: transform 0.5s cubic-bezier(0.34, 1.3, 0.64, 1), opacity 0.5s ease; 
 }
 
-/* ABOUT BOX - FLEX & SCROLL UPDATES */
+/* ABOUT BOX - FLEX & SCROLL */
 .about-box { 
     background: var(--card-bg); 
     color: var(--text-main); 
@@ -461,7 +461,6 @@ input:focus, textarea:focus {
     padding: 30px;   
 }
 
-/* Internal Scroll Container for About Box */
 .about-scroll-content {
     overflow-y: auto;
     flex: 1; 
@@ -648,12 +647,16 @@ input:focus, textarea:focus {
 /* ========================================
    MOBILE RESPONSIVE
    ======================================= */
+/* ========================================
+   MOBILE RESPONSIVE
+   ======================================= */
 @media (max-width: 900px) { 
     /* FORM FIXES: Vertical Stack */
     .form-fields { 
         display: flex;           
         flex-direction: column;  
-        gap: 20px;               
+        gap: 20px;
+        align-items: stretch; /* Keeps the boxes full width */
     } 
 
     .span-half, .span-full { 
@@ -661,7 +664,35 @@ input:focus, textarea:focus {
         grid-column: auto; 
     }
 
+    .form-group {
+        width: 100%;
+    }
+
     .form-card { padding: 25px 20px; }
+    
+    /* --- ALIGNMENT RULES (Mobile Only) --- */
+    
+    /* 1. Center the Title */
+    .form-title { 
+        text-align: center; 
+    }
+
+    /* 2. Center the Labels above the inputs */
+    .form-group label {
+        display: block;
+        text-align: center;
+        width: 100%;
+    }
+
+    /* 3. REMOVED: The rule that centered the input text is gone. 
+          Inputs will now default to left-align text. */
+
+    /* 4. Keep Char Count on the right (or center if you prefer) 
+          Removing center alignment so it sits naturally or you can force right: */
+    .char-limit {
+        text-align: right; 
+    }
+    /* ------------------------------------------- */
     
     /* Mobile Footer: Side-by-Side */
     .form-submit-wrapper {
@@ -705,7 +736,6 @@ input:focus, textarea:focus {
         padding: 20px;    
     }
     
-    /* Ensure close button is easy to hit */
     .close-btn svg {
         width: 32px;
         height: 32px;

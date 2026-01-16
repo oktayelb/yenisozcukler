@@ -4,6 +4,7 @@ from .models import Word, Comment
 import re
 import requests
 from decouple import config
+
 # --- OKUMA (READ) SERIALIZERS ---
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -29,7 +30,6 @@ class WordSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Word
-        # Added 'example' to the fields list
         fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition', 'example', 'comment_count'] 
 
     def get_user_vote(self, obj):
@@ -43,7 +43,6 @@ class WordSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data['def'] = instance.definition 
-        # We can also alias example if needed, but 'example' is fine
         return data
 
 # --- YAZMA (WRITE) SERIALIZERS ---
@@ -53,7 +52,6 @@ class WordCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Word
-        # Added 'example' to fields
         fields = ['word', 'definition', 'example', 'nickname', 'is_profane']
 
     def turkish_lower(self, text):
@@ -63,17 +61,18 @@ class WordCreateSerializer(serializers.ModelSerializer):
 
     def validate_word(self, value):
         value = value.strip()
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
-            raise serializers.ValidationError("Sözcük sadece harf, rakam ve temel noktalama işaretleri içerebilir.")
+        # Regex Updated: Added +, ?, # (comma was already present)
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]+$', value):
+            raise serializers.ValidationError("Sözcük geçersiz karakterler içeriyor (İzin verilenler: harf, rakam, boşluk ve . , - + ? # ( ) ).")
         return self.turkish_lower(value)
 
     def validate_definition(self, value):
         value = value.strip()
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
-            raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor.")
+        # Regex Updated: Added +, ?, # (comma was already present)
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-+?#]+$', value):
+            raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor (İzin verilenler: harf, rakam, boşluk ve . , - + ? # ( ) ).")
         return self.turkish_lower(value)
 
-    # --- NEW VALIDATION FOR EXAMPLE SENTENCE ---
     def validate_example(self, value):
         value = value.strip()
         if not value:
@@ -81,12 +80,10 @@ class WordCreateSerializer(serializers.ModelSerializer):
         if len(value) > 200:
              raise serializers.ValidationError("Örnek cümle 200 karakteri geçemez.")
         
-        # Regex: Extended to allow ? ! ' " : ; for proper sentence punctuation
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\'"?!:;-]+$', value):
+        # Regex Updated: Added +, # (comma and ? were already present)
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\'"?!:;\-+?#]+$', value):
             raise serializers.ValidationError("Örnek cümle geçersiz karakterler içeriyor.")
             
-        # Note: We do NOT apply turkish_lower() here. 
-        # Example sentences should preserve case (e.g. "Ali okula gitti" vs "ali okula gitti").
         return value
 
     def validate_nickname(self, value):
@@ -94,9 +91,12 @@ class WordCreateSerializer(serializers.ModelSerializer):
             return "Anonim"
         if value:
             value = value.strip()
+            # Nicknames generally kept cleaner, but can be updated if needed. 
+            # Currently keeps standard allowed chars.
             if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
                 raise serializers.ValidationError("Takma ad geçersiz karakterler içeriyor.")
         return value
+
 class CommentCreateSerializer(serializers.ModelSerializer):
     word_id = serializers.IntegerField()
     
@@ -122,7 +122,8 @@ class CommentCreateSerializer(serializers.ModelSerializer):
 class AuthSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=20)
     password = serializers.CharField(min_length=6, write_only=True)
-    token = serializers.CharField(write_only=True, required=True) # Yeni alan
+    token = serializers.CharField(write_only=True, required=True)
+    
     def validate_username(self, value):
         value = value.strip()
 
@@ -136,7 +137,6 @@ class AuthSerializer(serializers.Serializer):
     def validate(self, attrs):
         token = attrs.get('token')
         
-        # Cloudflare Verify API
         secret_key = config('CLOUDFLARE_SECRET_KEY')
         verify_url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
         
@@ -157,29 +157,23 @@ class AuthSerializer(serializers.Serializer):
 
         return attrs
 
-# --- YENİ EKLENEN SERIALIZER ---
 class ChangeUsernameSerializer(serializers.Serializer):
     new_username = serializers.CharField(max_length=20, required=True)
 
     def validate_new_username(self, value):
         value = value.strip()
-        # View'dan context ile gönderilen request'ten user'ı alıyoruz
         user = self.context['request'].user 
 
-        # 1. Boşluk kontrolü
         if not value:
             raise serializers.ValidationError("Kullanıcı adı boş olamaz.")
 
-        # 2. Yasaklı kelime kontrolü
         if value.lower() == 'anonim':
             raise serializers.ValidationError("Bu kullanıcı adı sistem tarafından ayrılmıştır.")
 
-        # 3. Regex (Karakter) kontrolü (AuthSerializer ile aynı)
         if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
             raise serializers.ValidationError("Kullanıcı adı geçersiz karakterler içeriyor.")
 
-        # 4. Müsaitlik kontrolü (Kendisi hariç başkası almış mı?)
         if User.objects.filter(username__iexact=value).exclude(id=user.id).exists():
             raise serializers.ValidationError("Bu kullanıcı adı zaten kullanımda.")
 
-        return value    
+        return value
