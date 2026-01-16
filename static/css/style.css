@@ -1,5 +1,5 @@
 /* ========================================
-   style.css - Final Version
+   style.css - Final Version (Width & Padding Matched)
    ======================================= */
 
 /* 1. TEMEL DEĞİŞKENLER */
@@ -280,20 +280,142 @@ header { text-align: center; margin: 50px 0 40px; }
 .word-card.is-profane-content > *:not(.profane-wrapper) { filter: blur(12px); opacity: 0.15; }
 .profane-badge { background: var(--error-color); color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 1.4rem; margin-bottom: 15px; }
 
-/* FORM LAYOUT (DESKTOP) */
+/* ========================================
+   FORM & BUTTON-TO-FORM TRANSFORMATION
+   ======================================= */
+   
 .form-card { 
     background: var(--card-bg); 
-    padding: 35px; 
-    border-radius: 12px; 
     box-shadow: var(--shadow-sm); 
-    border-top: 4px solid var(--accent); 
+    
+    /* MATCHING WORD CARD PADDING EXACTLY */
+    padding: 25px 30px; 
+    border-radius: 16px; 
+    
+    /* Common transitions */
+    transition: 
+        padding 0.4s ease, 
+        max-width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1),
+        border-radius 0.4s ease,
+        background-color 0.4s ease,
+        color 0.4s ease;
+    overflow: hidden;
+    
+    /* Ensure it behaves like a block element in the container */
+    width: auto; 
+    box-sizing: border-box; 
 }
+
+/* --- STATE: EXPANDED (The Form) --- */
+.form-card.expanded {
+    max-width: 100%; /* Resets any button restrictions */
+    margin: 0;       /* Aligns seamlessly with content flow */
+    
+    border-top: 4px solid var(--accent);
+    cursor: default;
+}
+
+/* --- STATE: COLLAPSED (The Button) --- */
+.form-card.collapsed {
+    max-width: 280px; 
+    margin: 0 auto;   /* Center horizontally */
+    
+    background: var(--accent); 
+    color: var(--card-bg); 
+    
+    border-top: none; 
+    border-radius: 50px; 
+    padding: 15px 30px; /* Smaller padding for button state */
+    
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(142, 127, 127, 0.4);
+}
+
+.form-card.collapsed:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(142, 127, 127, 0.5);
+}
+
+/* HEADER ELEMENTS */
+.form-header-toggle {
+    display: flex;
+    justify-content: space-between; 
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    transition: justify-content 0.3s ease;
+}
+
 .form-title { 
     font-family: var(--font-heading); 
     font-size: 2.3rem; 
-    margin-bottom: 25px; 
+    margin-bottom: 0;
     color: var(--accent); 
+    transition: color 0.3s ease, font-size 0.3s ease;
 }
+
+.toggle-icon {
+    display: inline-block;
+    font-weight: bold;
+    font-size: 2rem;
+    line-height: 1rem;
+    color: var(--accent);
+    transition: transform 0.4s ease, color 0.3s ease;
+    margin-left: 10px;
+}
+
+/* ADAPTATIONS FOR COLLAPSED STATE */
+.form-card.collapsed .form-header-toggle {
+    justify-content: center; 
+}
+
+.form-card.collapsed .form-title {
+    color: var(--card-bg); 
+    font-size: 1.5rem; 
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.form-card.collapsed .toggle-icon {
+    color: var(--card-bg); 
+    transform: rotate(0deg);
+}
+.form-card.expanded .toggle-icon {
+    transform: rotate(45deg); 
+    color: var(--error-color);
+}
+
+/* Subtitle visibility control */
+.form-subtitle-text {
+    color: var(--text-muted); 
+    font-size: 0.9rem; 
+    font-weight: normal; 
+    margin-left: 10px;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+.form-card.collapsed .form-subtitle-text {
+    display: none; 
+    opacity: 0;
+}
+
+/* CONTENT WRAPPER ANIMATION */
+.form-collapsible-wrapper {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1), 
+                opacity 0.4s ease;
+}
+
+.form-card.expanded .form-collapsible-wrapper {
+    max-height: 1200px; 
+    opacity: 1;
+}
+
+/* ======================================== */
+
 
 /* Grid System for Form - DESKTOP SPLIT 1fr 2fr */
 .form-fields { 
@@ -647,9 +769,6 @@ input:focus, textarea:focus {
 /* ========================================
    MOBILE RESPONSIVE
    ======================================= */
-/* ========================================
-   MOBILE RESPONSIVE
-   ======================================= */
 @media (max-width: 900px) { 
     /* FORM FIXES: Vertical Stack */
     .form-fields { 
@@ -667,14 +786,18 @@ input:focus, textarea:focus {
     .form-group {
         width: 100%;
     }
-
-    .form-card { padding: 25px 20px; }
+    
+    /* Mobile - Collapsed button state tweaks */
+    .form-card.collapsed {
+        width: 80%; /* Slightly wider on mobile */
+        padding: 12px 20px;
+    }
     
     /* --- ALIGNMENT RULES (Mobile Only) --- */
     
-    /* 1. Center the Title */
-    .form-title { 
-        text-align: center; 
+    /* 1. Center the Title logic (now toggle logic) */
+    .form-header-toggle {
+        justify-content: center; 
     }
 
     /* 2. Center the Labels above the inputs */
@@ -684,15 +807,10 @@ input:focus, textarea:focus {
         width: 100%;
     }
 
-    /* 3. REMOVED: The rule that centered the input text is gone. 
-          Inputs will now default to left-align text. */
-
-    /* 4. Keep Char Count on the right (or center if you prefer) 
-          Removing center alignment so it sits naturally or you can force right: */
+    /* 4. Keep Char Count on the right */
     .char-limit {
         text-align: right; 
     }
-    /* ------------------------------------------- */
     
     /* Mobile Footer: Side-by-Side */
     .form-submit-wrapper {

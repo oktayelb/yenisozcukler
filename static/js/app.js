@@ -1,5 +1,5 @@
 /* ========================================
-   app.js - Final Corrected Version
+   app.js - Final Version with Accordion
    ========================================
 */
 
@@ -128,6 +128,23 @@ function updateLogoVisuals(theme) {
         red.className = 'logo-card theme-red pos-behind';
     }
 }
+
+/* --- FORM TOGGLE LOGIC --- */
+function toggleContributionForm() {
+    const card = document.getElementById('contributionCard');
+    if (card) {
+        const isExpanded = card.classList.contains('expanded');
+        
+        if (isExpanded) {
+            card.classList.remove('expanded');
+            card.classList.add('collapsed');
+        } else {
+            card.classList.remove('collapsed');
+            card.classList.add('expanded');
+        }
+    }
+}
+
 
 /* --- AUTHENTICATION --- */
 
@@ -431,6 +448,10 @@ async function submitWord() {
         document.getElementById('inputExample').value='';
         updateCount({value:''});
         showCustomAlert("Sözcük gönderildi (Onay bekleniyor)!");
+        
+        // Optional: Collapse form after success to save space
+        // toggleContributionForm();
+        
     } catch (e) { showCustomAlert(e.message, "error"); }
     finally { btn.disabled = false; btn.innerText = "Sözlüğe Ekle"; }
 }
