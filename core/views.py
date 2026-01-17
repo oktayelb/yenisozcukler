@@ -17,7 +17,8 @@ from .models import Word, Comment, WordVote, CommentVote
 from .serializers import (
     WordSerializer, CommentSerializer, 
     WordCreateSerializer, CommentCreateSerializer,
-    AuthSerializer, ChangeUsernameSerializer 
+    AuthSerializer, ChangeUsernameSerializer,
+    WordAddExampleSerializer
 )
 
 # --- YARDIMCI FONKSİYONLAR ---
@@ -39,13 +40,11 @@ def get_words(request):
     limit = min(limit, 50)
     mode = request.GET.get('mode', 'all') 
 
-    # --- UPDATED QUERY ---
-    # Added 'example' to the .only() list
+    # --- QUERYSET ---
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
         .only('id', 'word', 'definition', 'example', 'author', 'timestamp', 'is_profane', 'score')\
         .order_by('-timestamp')
-    # ---------------------
     
     if mode == 'profane':
         words_queryset = words_queryset.filter(is_profane=True)
@@ -65,7 +64,6 @@ def get_words(request):
     except (PageNotAnInteger, EmptyPage):
         words_page = []
 
-    # (The rest of the function remains exactly the same...)
     session_id = request.COOKIES.get('user_id')
     user_votes = {}
     
@@ -249,19 +247,17 @@ def add_word(request):
     
     serializer = WordCreateSerializer(data=request.data)
     if serializer.is_valid():
-        # 1. IP adresini al (Mevcut helper fonksiyonunu kullanıyoruz)
         client_ip = get_client_ip(request)
 
         save_kwargs = {
             'status': 'pending',
-            'ip_address': client_ip  # <--- BURAYA EKLENDİ
+            'ip_address': client_ip 
         }
         
         if request.user.is_authenticated:
             save_kwargs['user'] = request.user
             save_kwargs['author'] = request.user.username
         
-        # Serializer'ın save metoduna ip_address'i keyword argument olarak geçiyoruz
         serializer.save(**save_kwargs)
         
         cache.delete('total_approved_words_count_all')
@@ -270,6 +266,46 @@ def add_word(request):
     else:
         first_error = next(iter(serializer.errors.values()))[0]
         return Response({'success': False, 'error': first_error}, status=400)
+
+# --- YENİ EKLENEN ENDPOINT: ÖRNEK CÜMLE EKLEME ---
+@ratelimit(key='ip', rate='5/m', method='POST', block=False)
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_example(request):
+    if getattr(request, 'limited', False):
+        return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
+
+    serializer = WordAddExampleSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        word_id = serializer.validated_data['word_id']
+        new_example = serializer.validated_data['example']
+
+        word = get_object_or_404(Word, id=word_id)
+
+        # 1. Kullanıcı bu kelimenin sahibi mi?
+        if word.user != request.user:
+            return Response({
+                'success': False, 
+                'error': 'Bu kelimeyi düzenleme yetkiniz yok.'
+            }, status=403)
+
+        # 2. Zaten örnek cümle var mı? (Sadece 1 kez izin veriyoruz)
+        if word.example and word.example.strip():
+            return Response({
+                'success': False, 
+                'error': 'Bu kelimenin zaten bir örnek cümlesi var.'
+            }, status=400)
+
+        word.example = new_example
+        word.save()
+
+        return Response({'success': True, 'message': 'Örnek cümle başarıyla eklendi.'})
+
+    else:
+        first_error = next(iter(serializer.errors.values()))[0]
+        return Response({'success': False, 'error': first_error}, status=400)
+# ---------------------------------------------------
 
 @ratelimit(key='ip', rate='1/15s', method='POST', block=False)
 @api_view(['POST'])
@@ -334,7 +370,6 @@ def login_view(request):
 @authentication_classes([])
 @permission_classes([])
 def register_view(request):
-    # Manual check allows us to return a custom 429 error message
     if getattr(request, 'limited', False):
          return Response({'success': False, 'error': 'Çok fazla kayıt denemesi. Lütfen daha sonra tekrar deneyin.'}, status=429)
 
@@ -349,7 +384,6 @@ def register_view(request):
         try:
             user = User.objects.create_user(username=username, password=password)
             
-            # Zimmetleme (Claiming orphan content) logic
             Word.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
             Comment.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
             
@@ -375,7 +409,6 @@ def logout_view(request):
 @api_view(['GET'])
 @permission_classes([]) 
 def get_user_profile(request):
-    # Eğer username parametresi varsa o kullanıcıyı getir, yoksa giriş yapanı
     target_username = request.GET.get('username')
 
     if target_username:
@@ -386,7 +419,6 @@ def get_user_profile(request):
         else:
             return Response({'error': 'Kullanıcı bulunamadı.'}, status=404)
     
-    # İstatistikler (Sadece onaylanmış sözcükleri saymak daha güvenlidir)
     word_count = Word.objects.filter(user=user, status='approved').count()
     comment_count = Comment.objects.filter(user=user).count()
     total_score = Word.objects.filter(user=user, status='approved').aggregate(Sum('score'))['score__sum'] or 0
@@ -443,7 +475,6 @@ def change_username(request):
 @api_view(['GET'])
 @permission_classes([]) 
 def get_my_words(request):
-    # Eğer parametre varsa o kullanıcının kelimeleri, yoksa oturum açanın
     target_username = request.GET.get('username')
     
     if target_username:
@@ -455,7 +486,6 @@ def get_my_words(request):
 
     words = Word.objects.filter(user=user, status='approved').order_by('-timestamp')
     
-    # --- OYLARI DA GETİRELİM Kİ LİSTEDE RENKLİ GÖRÜNSÜN ---
     session_id = request.COOKIES.get('user_id')
     user_votes = {}
     try:

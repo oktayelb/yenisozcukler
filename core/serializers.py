@@ -46,6 +46,22 @@ class WordSerializer(serializers.ModelSerializer):
         return data
 
 # --- YAZMA (WRITE) SERIALIZERS ---
+class WordAddExampleSerializer(serializers.Serializer):
+    word_id = serializers.IntegerField(required=True)
+    example = serializers.CharField(max_length=200, required=True)
+
+    def validate_example(self, value):
+        # Reusing the exact logic from WordCreateSerializer for consistency
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Örnek cümle boş olamaz.")
+        if len(value) > 200:
+             raise serializers.ValidationError("Örnek cümle 200 karakteri geçemez.")
+        
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\'"?!:;\-+?#]+$', value):
+            raise serializers.ValidationError("Örnek cümle geçersiz karakterler içeriyor.")
+            
+        return value
 
 class WordCreateSerializer(serializers.ModelSerializer):
     nickname = serializers.CharField(source='author', required=False, allow_blank=True, max_length=50)
@@ -61,38 +77,25 @@ class WordCreateSerializer(serializers.ModelSerializer):
 
     def validate_word(self, value):
         value = value.strip()
-        # Regex Updated: Added +, ?, # (comma was already present)
         if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]+$', value):
             raise serializers.ValidationError("Sözcük geçersiz karakterler içeriyor (İzin verilenler: harf, rakam, boşluk ve . , - + ? # ( ) ).")
         return self.turkish_lower(value)
 
     def validate_definition(self, value):
         value = value.strip()
-        # Regex Updated: Added +, ?, # (comma was already present)
         if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-+?#]+$', value):
             raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor (İzin verilenler: harf, rakam, boşluk ve . , - + ? # ( ) ).")
         return self.turkish_lower(value)
 
     def validate_example(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("Örnek cümle zorunludur.")
-        if len(value) > 200:
-             raise serializers.ValidationError("Örnek cümle 200 karakteri geçemez.")
         
-        # Regex Updated: Added +, # (comma and ? were already present)
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\'"?!:;\-+?#]+$', value):
-            raise serializers.ValidationError("Örnek cümle geçersiz karakterler içeriyor.")
-            
-        return value
+        return WordAddExampleSerializer().validate_example(value)
 
     def validate_nickname(self, value):
         if not value or not value.strip():
             return "Anonim"
         if value:
             value = value.strip()
-            # Nicknames generally kept cleaner, but can be updated if needed. 
-            # Currently keeps standard allowed chars.
             if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
                 raise serializers.ValidationError("Takma ad geçersiz karakterler içeriyor.")
         return value
