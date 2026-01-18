@@ -61,24 +61,18 @@
     <div class="container">
         
         <div class="form-card collapsed" id="contributionCard">
-            
             <div class="form-header-toggle" onclick="toggleContributionForm()">
-                <div class="form-title" style="margin:0; font-size: 1.8rem;">
-                    Katkıda Bulun 
-                    <span class="toggle-icon">+</span>
-                </div>
-                <div class="form-subtitle-text">
-                    (Yeni bir sözcük eklemek için tıkla)
+                <div class="form-title" id="contributionTitle" style="margin:0; font-size: 1.8rem;">
+                    Katkıda Bulun <span class="toggle-icon">+</span>
                 </div>
             </div>
-
             <div class="form-collapsible-wrapper">
                 <form class="form-fields" onsubmit="handleWordSubmit(event)" style="padding-top: 25px;">
                     
                     <div class="form-group">
                         <label>Sözcük</label>
                         <input type="text" id="inputWord" maxlength="50"
-                            placeholder="Örn: Gönül"
+                            placeholder=""
                             onkeypress="return allowOnlyLetters(event, true)" 
                             oninput="this.value = this.value.replace(/^\s+/g, '')">
                     </div>
@@ -90,7 +84,7 @@
                     </div>
 
                     <div class="form-group span-full">
-                        <label>Örnek Cümle <span style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;">(Zorunlu)</span></label>
+                        <label>Örnek Cümle <span style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;"></span></label>
                         <textarea id="inputExample" rows="2" maxlength="200" 
                                 placeholder="Sözcüğü bir cümle içinde kullanın..." 
                                 onkeypress="return allowOnlyLetters(event, true)"></textarea>

@@ -1,5 +1,5 @@
 /* ========================================
-   app.js - Final Version with Add Example Feature
+   app.js - Final Version (Dynamic Contribution Text)
    ========================================
 */
 
@@ -130,18 +130,28 @@ function updateLogoVisuals(theme) {
     }
 }
 
-/* --- FORM TOGGLE LOGIC --- */
+/* --- FORM TOGGLE LOGIC (UPDATED) --- */
 function toggleContributionForm() {
     const card = document.getElementById('contributionCard');
+    const title = document.getElementById('contributionTitle');
+
     if (card) {
         const isExpanded = card.classList.contains('expanded');
         
         if (isExpanded) {
+            // Closing the form
             card.classList.remove('expanded');
             card.classList.add('collapsed');
+            
+            // Set text back to "Katkıda Bulun" with + icon
+            if(title) title.innerHTML = 'Katkıda Bulun <span class="toggle-icon">+</span>';
         } else {
+            // Opening the form
             card.classList.remove('collapsed');
             card.classList.add('expanded');
+            
+            // Set text to "Vazgeç" with - icon
+            if(title) title.innerHTML = '';
         }
     }
 }
@@ -373,8 +383,7 @@ function createCardElement(item, isModalMode) {
     const exampleHTML = item.example ? `<div class="word-example">"${decode(item.example)}"</div>` : '';
     contentDiv.innerHTML = `<h3>${decode(item.word)}</h3><p>${decode(item.def)}</p>${exampleHTML}`;
     
-    // --- NEW LOGIC: Add Example Button ---
-    // If logged in, current user is author, and example is missing
+    // --- Add Example Button ---
     if (isUserLoggedIn && 
         currentUserUsername === item.author && 
         (!item.example || item.example.trim() === "")) {
@@ -384,14 +393,12 @@ function createCardElement(item, isModalMode) {
         addExBtn.innerText = '+ Örnek Ekle';
         addExBtn.onclick = (e) => {
             e.stopPropagation();
-            // Pass the decoded word to the modal function
             openAddExampleModal(item.id, decode(item.word));
         };
         addExBtn.style.cssText = "background:none; border:1px dashed var(--accent); color:var(--accent); cursor:pointer; font-size:0.75rem; padding:4px 8px; border-radius:4px; margin-top:8px; opacity:0.8;";
         
         contentDiv.appendChild(addExBtn);
     }
-    // -------------------------------------
 
     card.appendChild(contentDiv);
 
