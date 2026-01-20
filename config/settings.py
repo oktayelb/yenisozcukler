@@ -27,7 +27,7 @@ CSRF_TRUSTED_ORIGINS = [
 # Cloudflare ile SSL (HTTPS) iletişimini Django'ya bildirir.
 # Bu ayar olmadan Django, isteğin güvenli olduğunu anlamayıp işlemi reddedebilir.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_REFERRER_POLICY = 'same-origin' 
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
