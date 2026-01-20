@@ -7,9 +7,6 @@ class Word(models.Model):
         ('approved', 'Approved'),
     ]
     
-    # --- YENİ EKLENEN ALAN ---
-    # Mevcut verileri bozmamak için null=True, blank=True
-    # Kullanıcı silinirse sözcük silinmesin, sadece user bağı kopsun (SET_NULL)
     user = models.ForeignKey(
         User, 
         on_delete=models.SET_NULL, 
@@ -18,15 +15,17 @@ class Word(models.Model):
         related_name='words',
         db_index=True
     )
-    # -------------------------
 
     is_profane = models.BooleanField(default=False)
     word = models.CharField(max_length=50)
     definition = models.CharField(max_length=300)
     
+    # --- NEW FIELD ---
+    # We use default="" so existing database rows don't crash.
+    example = models.CharField(max_length=200, default="")
+    # -----------------
+    
     ip_address = models.GenericIPAddressField(null=True, blank=True)
-    # Author alanı duruyor. Anonimse buraya yazılan string,
-    # üyeyse User'ın username'i veya display_name'i buraya kopyalanabilir (denormalizasyon).
     author = models.CharField(max_length=50, default='Anonim')    
     
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending', db_index=True)

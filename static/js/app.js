@@ -1,5 +1,5 @@
 /* ========================================
-   app.js - Final Corrected Version
+   app.js - Final Version (Dynamic Contribution Text)
    ========================================
 */
 
@@ -15,6 +15,7 @@ let currentPage = 1;
 let currentCommentPage = 1;
 let isLoading = false;
 let currentProfileUser = null; 
+let wordIdForExample = null; 
 
 // Auth State
 let currentAuthMode = 'login'; // 'login' or 'register'
@@ -129,6 +130,33 @@ function updateLogoVisuals(theme) {
     }
 }
 
+/* --- FORM TOGGLE LOGIC (UPDATED) --- */
+function toggleContributionForm() {
+    const card = document.getElementById('contributionCard');
+    const title = document.getElementById('contributionTitle');
+
+    if (card) {
+        const isExpanded = card.classList.contains('expanded');
+        
+        if (isExpanded) {
+            // Closing the form
+            card.classList.remove('expanded');
+            card.classList.add('collapsed');
+            
+            // Set text back to "Katkıda Bulun" with + icon
+            if(title) title.innerHTML = 'Katkıda Bulun <span class="toggle-icon">+</span>';
+        } else {
+            // Opening the form
+            card.classList.remove('collapsed');
+            card.classList.add('expanded');
+            
+            // Set text to "Vazgeç" with - icon
+            if(title) title.innerHTML = '';
+        }
+    }
+}
+
+
 /* --- AUTHENTICATION --- */
 
 function toggleAuthMode(mode) {
@@ -162,17 +190,26 @@ function toggleAuthMode(mode) {
 
 function setupAuthTriggers() {
     const def = document.getElementById('inputDef');
-    const nick = document.getElementById('inputNick');
-    
-    if (def) def.addEventListener('keydown', (e) => { 
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitWord(); } 
-    });
-    
-    if (nick && !isUserLoggedIn) nick.addEventListener('focus', (e) => { 
-        e.preventDefault(); 
-        e.target.blur(); 
-        openAuthModal(); 
-    });
+    if (def) {
+        def.addEventListener('keydown', (e) => { 
+            if (e.key === 'Enter' && !e.shiftKey) { 
+                e.preventDefault(); 
+                submitWord(); 
+            } 
+        });
+    }
+
+    const authorBtn = document.getElementById('authorTrigger');
+    if (authorBtn) {
+        authorBtn.addEventListener('click', (e) => {
+            e.preventDefault(); 
+            if (!isUserLoggedIn) {
+                openAuthModal();
+            } else {
+                openProfileModal(currentUserUsername);
+            }
+        });
+    }
 }
 
 function handleAuthSubmit() {
@@ -183,72 +220,46 @@ function handleAuthSubmit() {
     const err = document.getElementById('authErrorMsg');
     const btn = document.getElementById('authSubmitBtn');
 
-    // Her denemede hata mesajını gizle
     if (err) err.style.display = 'none';
 
-    // Temel Doğrulamalar
     if (!u || !p) {
-        if (err) {
-            err.innerText = "Kullanıcı adı ve şifre gerekli.";
-            err.style.display = 'block';
-        }
+        if (err) { err.innerText = "Kullanıcı adı ve şifre gerekli."; err.style.display = 'block'; }
         return;
     }
 
-    // Kayıt Moduna Özel Doğrulamalar (Register Validation)
     if (currentAuthMode === 'register') {
         if (p.length < 6) {
-            if (err) {
-                err.innerText = "Şifre en az 6 karakter olmalı.";
-                err.style.display = 'block';
-            }
+            if (err) { err.innerText = "Şifre en az 6 karakter olmalı."; err.style.display = 'block'; }
             return;
         }
         if (p !== pConfirm) {
-            if (err) {
-                err.innerText = "Şifreler eşleşmiyor.";
-                err.style.display = 'block';
-            }
+            if (err) { err.innerText = "Şifreler eşleşmiyor."; err.style.display = 'block'; }
             return;
         }
     }
 
     if (!t) {
-        if (err) {
-            err.innerText = "Robot doğrulaması gerekli.";
-            err.style.display = 'block';
-        }
+        if (err) { err.innerText = "Robot doğrulaması gerekli."; err.style.display = 'block'; }
         return;
     }
 
     btn.disabled = true; 
     btn.innerText = "İşleniyor...";
-
-    // --- DEĞİŞİKLİK BAŞLANGICI ---
     
-    // 1. Mod'a göre doğru endpoint'i seçiyoruz
     const endpoint = currentAuthMode === 'login' ? '/api/login' : '/api/register';
 
-    // 2. apiRequest artık 'mode' parametresini göndermiyor, çünkü URL zaten belli
     apiRequest(endpoint, 'POST', { 
         username: u, 
         password: p, 
         token: t
     })
-    // --- DEĞİŞİKLİK BİTİŞİ ---
-    
     .then(data => {
         closeModal('authModal', true);
         showCustomAlert(data.message, "success");
-        // Token cookie'ye yazıldığı için sayfayı yenilemek yeterlidir
         setTimeout(() => window.location.reload(), 1000);
     })
     .catch(e => { 
-        if (err) {
-            err.innerText = e.message; 
-            err.style.display = 'block'; 
-        }
-        // Turnstile widget'ını sıfırla ki tekrar deneyebilsinler
+        if (err) { err.innerText = e.message; err.style.display = 'block'; }
         if(window.turnstile) window.turnstile.reset(); 
     })
     .finally(() => { 
@@ -273,6 +284,10 @@ function closeModal(id, force = false, e = null) {
         m.classList.remove('show');
         if(id === 'aboutModal') document.body.style.overflow = '';
         if(id === 'authModal') document.getElementById('authErrorMsg').style.display = 'none';
+        
+        if(id === 'addExampleModal') {
+             wordIdForExample = null;
+        }
     }
 }
 
@@ -352,8 +367,12 @@ function createCardElement(item, isModalMode) {
     const decode = (s) => s ? parser.parseFromString(s, "text/html").documentElement.textContent : '';
 
     card.onclick = (e) => {
-        if (e.target.closest('.vote-btn') || e.target.closest('.user-badge') || card.classList.contains('is-profane-content')) return;
-        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), isModalMode);
+        if (e.target.closest('.vote-btn') || 
+            e.target.closest('.user-badge') || 
+            e.target.closest('.add-example-btn') || 
+            card.classList.contains('is-profane-content')) return;
+            
+        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), decode(item.example), isModalMode);
     };
 
     const votePill = createVoteControls('word', item);
@@ -361,19 +380,36 @@ function createCardElement(item, isModalMode) {
     card.appendChild(votePill);
 
     const contentDiv = document.createElement('div');
-    contentDiv.innerHTML = `<h3>${decode(item.word)}</h3><p>${decode(item.def)}</p>`;
+    const exampleHTML = item.example ? `<div class="word-example">"${decode(item.example)}"</div>` : '';
+    contentDiv.innerHTML = `<h3>${decode(item.word)}</h3><p>${decode(item.def)}</p>${exampleHTML}`;
+    
+    // --- Add Example Button ---
+    if (isUserLoggedIn && 
+        currentUserUsername === item.author && 
+        (!item.example || item.example.trim() === "")) {
+        
+        const addExBtn = document.createElement('button');
+        addExBtn.className = 'add-example-btn';
+        addExBtn.innerText = '+ Örnek Ekle';
+        addExBtn.onclick = (e) => {
+            e.stopPropagation();
+            openAddExampleModal(item.id, decode(item.word));
+        };
+        addExBtn.style.cssText = "background:none; border:1px dashed var(--accent); color:var(--accent); cursor:pointer; font-size:0.75rem; padding:4px 8px; border-radius:4px; margin-top:8px; opacity:0.8;";
+        
+        contentDiv.appendChild(addExBtn);
+    }
+
     card.appendChild(contentDiv);
 
     const foot = document.createElement('div'); 
     foot.className = 'word-footer';
     
-    // --- CHANGED: Added comment count display ---
     const hint = document.createElement('div'); 
     hint.className = 'click-hint'; 
     const cCount = item.comment_count || 0; 
     hint.innerHTML = `Detaylar & Yorumlar (${cCount}) <span>&rarr;</span>`;
     foot.appendChild(hint);
-    // --------------------------------------------
 
     const authorName = item.author ? decode(item.author) : 'Anonim';
     const authorSpan = document.createElement('div');
@@ -418,29 +454,111 @@ function handleWordSubmit(e) { e.preventDefault(); submitWord(); }
 async function submitWord() {
     const w = document.getElementById('inputWord').value.trim();
     const d = document.getElementById('inputDef').value.trim();
-    const n = document.getElementById('inputNick').value.trim();
+    const ex = document.getElementById('inputExample').value.trim();
+    const n = isUserLoggedIn ? currentUserUsername : 'Anonim';
+
     const btn = document.querySelector(".form-card button");
-    
     const prof = localStorage.getItem(COLOR_THEME_KEY) === 'red';
 
-    if (!w || !d) return showCustomAlert("Lütfen alanları doldurun.", "error");
+    if (!w || !d) return showCustomAlert("Lütfen tüm alanları doldurun.", "error");
+    if (!ex) return showCustomAlert("Lütfen bir örnek cümle yazın.", "error");
+    
     if (d.length > 300) return showCustomAlert("Tanım çok uzun.", "error");
+    if (ex.length > 200) return showCustomAlert("Örnek cümle çok uzun.", "error");
 
     btn.disabled = true; btn.innerText = "Kaydediliyor...";
     try {
         await apiRequest('/api/add', 'POST', { 
             word: w, 
             definition: d, 
+            example: ex, 
             nickname: n, 
             is_profane: prof 
         });
+        
         document.getElementById('inputWord').value=''; 
         document.getElementById('inputDef').value='';
-        if(!isUserLoggedIn) document.getElementById('inputNick').value='';
+        document.getElementById('inputExample').value='';
         updateCount({value:''});
         showCustomAlert("Sözcük gönderildi (Onay bekleniyor)!");
+        
     } catch (e) { showCustomAlert(e.message, "error"); }
     finally { btn.disabled = false; btn.innerText = "Sözlüğe Ekle"; }
+}
+
+/* --- ADD EXAMPLE FEATURE (NEW) --- */
+function openAddExampleModal(wordId, wordText) {
+    wordIdForExample = wordId;
+    
+    // Set the word in the header
+    const wordDisplay = document.getElementById('exampleModalWord');
+    if (wordDisplay) {
+        wordDisplay.innerText = wordText ? `"${wordText}"` : '';
+    }
+
+    const input = document.getElementById('newExampleInput');
+    const count = document.getElementById('exampleCharCount');
+    
+    // Reset state
+    if(input) input.value = '';
+    if(count) count.innerText = '0 / 200';
+    
+    if (input) {
+        input.oninput = function() {
+            if(count) count.innerText = `${this.value.length} / 200`;
+        };
+    }
+
+    openModal('addExampleModal');
+    setTimeout(() => { if(input) input.focus(); }, 100);
+}
+
+async function submitExample() {
+    const input = document.getElementById('newExampleInput');
+    const btn = document.getElementById('submitExampleBtn');
+    const exampleText = input.value.trim();
+
+    if (!exampleText) return showCustomAlert("Lütfen bir cümle yazın.", "error");
+    if (exampleText.length > 200) return showCustomAlert("Cümle çok uzun.", "error");
+
+    btn.disabled = true;
+    btn.innerText = "Kaydediliyor...";
+
+    try {
+        await apiRequest('/api/add-example', 'POST', {
+            word_id: wordIdForExample,
+            example: exampleText
+        });
+
+        showCustomAlert("Örnek cümle başarıyla eklendi!");
+        closeModal('addExampleModal');
+        
+        // Update the UI immediately without reloading
+        updateCardWithExample(wordIdForExample, exampleText);
+        
+    } catch (e) {
+        showCustomAlert(e.message, "error");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Kaydet";
+        wordIdForExample = null;
+    }
+}
+
+function updateCardWithExample(wordId, text) {
+    const card = document.querySelector(`.word-card[data-id="${wordId}"]`);
+    if (!card) return;
+
+    const addBtn = card.querySelector('.add-example-btn');
+    if (addBtn) addBtn.remove();
+
+    const contentDiv = card.querySelector('div:nth-child(2)'); 
+    if (contentDiv) {
+        const exampleDiv = document.createElement('div');
+        exampleDiv.className = 'word-example';
+        exampleDiv.innerText = `"${text}"`;
+        contentDiv.appendChild(exampleDiv);
+    }
 }
 
 /* --- VOTING SYSTEM --- */
@@ -477,7 +595,7 @@ async function sendVote(type, id, act, con) {
 }
 
 /* === DETAIL VIEW & COMMENTS === */
-function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, isModalMode = false) { 
+function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, wordExample, isModalMode = false) { 
     if (activeCardClone) return; 
     if (originalCard.classList.contains('is-profane-content')) return;
 
@@ -493,6 +611,8 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, isMo
 
     const userValue = isUserLoggedIn ? currentUserUsername : '';
     const readOnlyAttr = isUserLoggedIn ? 'readonly' : '';
+    
+    const exampleHTML = wordExample ? `<div class="word-example" style="margin-top:8px;">"${wordExample}"</div>` : '';
 
     const contentHTML = `
         <div class="view-header">
@@ -500,6 +620,7 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, isMo
                 <div>
                     <h2 id="commentTitle" style="margin:0; font-size:1.4rem; color:var(--accent);">${wordText}</h2>
                     <div style="font-size:1rem; color:var(--text-muted); margin-top:5px; font-style:italic;">${wordDef}</div>
+                    ${exampleHTML}
                 </div>
                 <button class="close-icon-btn" onclick="closeCommentView()">✕</button>
             </div>

@@ -4,6 +4,7 @@ from .models import Word, Comment
 import re
 import requests
 from decouple import config
+
 # --- OKUMA (READ) SERIALIZERS ---
 
 class CommentSerializer(serializers.ModelSerializer):
@@ -25,13 +26,11 @@ class CommentSerializer(serializers.ModelSerializer):
 class WordSerializer(serializers.ModelSerializer):
     score = serializers.IntegerField(read_only=True)
     user_vote = serializers.SerializerMethodField()
-    # --- CHANGED: Added comment_count field definition ---
     comment_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Word
-        # --- CHANGED: Added 'comment_count' to fields list ---
-        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition', 'comment_count'] 
+        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition', 'example', 'comment_count'] 
 
     def get_user_vote(self, obj):
         votes = self.context.get('user_votes', {})
@@ -45,42 +44,52 @@ class WordSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         data['def'] = instance.definition 
         return data
+
 # --- YAZMA (WRITE) SERIALIZERS ---
+class WordAddExampleSerializer(serializers.Serializer):
+    word_id = serializers.IntegerField(required=True)
+    example = serializers.CharField(max_length=200, required=True)
+
+    def validate_example(self, value):
+        # Reusing the exact logic from WordCreateSerializer for consistency
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Örnek cümle boş olamaz.")
+        if len(value) > 200:
+             raise serializers.ValidationError("Örnek cümle 200 karakteri geçemez.")
+        
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\'"?!:;\-+?#]+$', value):
+            raise serializers.ValidationError("Örnek cümle geçersiz karakterler içeriyor.")
+            
+        return value
 
 class WordCreateSerializer(serializers.ModelSerializer):
     nickname = serializers.CharField(source='author', required=False, allow_blank=True, max_length=50)
     
     class Meta:
         model = Word
-        fields = ['word', 'definition', 'nickname', 'is_profane']
+        fields = ['word', 'definition', 'example', 'nickname', 'is_profane']
 
     def turkish_lower(self, text):
-        """
-        Custom helper to lowercase Turkish characters correctly.
-        Standard .lower() converts 'I' to 'i' instead of 'ı'.
-        """
         if not text:
             return ""
-        # First handle the special cases, then apply standard lower()
         return text.replace('I', 'ı').replace('İ', 'i').lower()
 
     def validate_word(self, value):
         value = value.strip()
-        # Regex: Turkish chars allowed
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
-            raise serializers.ValidationError("Sözcük sadece harf, rakam ve temel noktalama işaretleri içerebilir.")
-        
-        # Apply Turkish lowercase
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]+$', value):
+            raise serializers.ValidationError("Sözcük geçersiz karakterler içeriyor (İzin verilenler: harf, rakam, boşluk ve . , - + ? # ( ) ).")
         return self.turkish_lower(value)
 
     def validate_definition(self, value):
         value = value.strip()
-        # Regex: Turkish chars allowed
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]+$', value):
-            raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor.")
-        
-        # Apply Turkish lowercase
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-+?#]+$', value):
+            raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor (İzin verilenler: harf, rakam, boşluk ve . , - + ? # ( ) ).")
         return self.turkish_lower(value)
+
+    def validate_example(self, value):
+        
+        return WordAddExampleSerializer().validate_example(value)
 
     def validate_nickname(self, value):
         if not value or not value.strip():
@@ -116,7 +125,8 @@ class CommentCreateSerializer(serializers.ModelSerializer):
 class AuthSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=20)
     password = serializers.CharField(min_length=6, write_only=True)
-    token = serializers.CharField(write_only=True, required=True) # Yeni alan
+    token = serializers.CharField(write_only=True, required=True)
+    
     def validate_username(self, value):
         value = value.strip()
 
@@ -130,7 +140,6 @@ class AuthSerializer(serializers.Serializer):
     def validate(self, attrs):
         token = attrs.get('token')
         
-        # Cloudflare Verify API
         secret_key = config('CLOUDFLARE_SECRET_KEY')
         verify_url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
         
@@ -151,29 +160,23 @@ class AuthSerializer(serializers.Serializer):
 
         return attrs
 
-# --- YENİ EKLENEN SERIALIZER ---
 class ChangeUsernameSerializer(serializers.Serializer):
     new_username = serializers.CharField(max_length=20, required=True)
 
     def validate_new_username(self, value):
         value = value.strip()
-        # View'dan context ile gönderilen request'ten user'ı alıyoruz
         user = self.context['request'].user 
 
-        # 1. Boşluk kontrolü
         if not value:
             raise serializers.ValidationError("Kullanıcı adı boş olamaz.")
 
-        # 2. Yasaklı kelime kontrolü
         if value.lower() == 'anonim':
             raise serializers.ValidationError("Bu kullanıcı adı sistem tarafından ayrılmıştır.")
 
-        # 3. Regex (Karakter) kontrolü (AuthSerializer ile aynı)
         if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
             raise serializers.ValidationError("Kullanıcı adı geçersiz karakterler içeriyor.")
 
-        # 4. Müsaitlik kontrolü (Kendisi hariç başkası almış mı?)
         if User.objects.filter(username__iexact=value).exclude(id=user.id).exists():
             raise serializers.ValidationError("Bu kullanıcı adı zaten kullanımda.")
 
-        return value    
+        return value

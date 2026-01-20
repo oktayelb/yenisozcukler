@@ -60,34 +60,47 @@
 
     <div class="container">
         
-        <div class="form-card">
-            <div class="form-title">Katkıda Bulun</div>
-
-            <form class="form-fields" onsubmit="handleWordSubmit(event)">
-                <div class="form-group">
-                    <label>Sözcük</label>
-                    <input type="text" id="inputWord" maxlength="50"
-                        onkeypress="return allowOnlyLetters(event, true)" 
-                        oninput="this.value = this.value.replace(/^\s+/g, '')">
+        <div class="form-card collapsed" id="contributionCard">
+            <div class="form-header-toggle" onclick="toggleContributionForm()">
+                <div class="form-title" id="contributionTitle" style="margin:0; font-size: 1.8rem;">
+                    Katkıda Bulun <span class="toggle-icon">+</span>
                 </div>
+            </div>
+            <div class="form-collapsible-wrapper">
+                <form class="form-fields" onsubmit="handleWordSubmit(event)" style="padding-top: 25px;">
+                    
+                    <div class="form-group">
+                        <label>Sözcük</label>
+                        <input type="text" id="inputWord" maxlength="50"
+                            placeholder=""
+                            onkeypress="return allowOnlyLetters(event, true)" 
+                            oninput="this.value = this.value.replace(/^\s+/g, '')">
+                    </div>
 
-                <div class="form-group def-wrapper">
-                    <label>Tanım</label>
-                    <textarea id="inputDef" rows="2" maxlength="300" oninput="updateCount(this)" placeholder="Tanımı buraya yazın..." onkeypress="return allowOnlyLetters(event, true)"></textarea>
-                    <div class="char-limit" id="charCount">0 / 300</div>
-                </div>
+                    <div class="form-group def-wrapper">
+                        <label>Tanım</label>
+                        <textarea id="inputDef" rows="2" maxlength="300" oninput="updateCount(this)" placeholder="Sözcüğün anlamını açıklayın..." onkeypress="return allowOnlyLetters(event, true)"></textarea>
+                        <div class="char-limit" id="charCount">0 / 300</div>
+                    </div>
 
-                <div class="form-group">
-                    <label>Ekleyenin Takma Adı</label>
-                    <input type="text" id="inputNick" maxlength="20" 
-                           placeholder="{% if request.user.is_authenticated %}{{ request.user.username }}{% else %}Anonim{% endif %}" 
-                           value="{% if request.user.is_authenticated %}{{ request.user.username }}{% endif %}"
-                           {% if request.user.is_authenticated %}readonly{% endif %}
-                           onkeypress="return allowOnlyLetters(event, false)">
-                </div>
-                
-                <button type="submit">Sözlüğe Ekle</button>
-            </form>
+                    <div class="form-group span-full">
+                        <label>Örnek Cümle <span style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;"></span></label>
+                        <textarea id="inputExample" rows="2" maxlength="200" 
+                                placeholder="Sözcüğü bir cümle içinde kullanın..." 
+                                onkeypress="return allowOnlyLetters(event, true)"></textarea>
+                    </div>
+
+                    <div class="form-submit-wrapper">
+                        <div class="submission-hint">
+                            Ekleyen: 
+                            <span class="author-trigger" id="authorTrigger">
+                                {% if request.user.is_authenticated %}{{ request.user.username }}{% else %}Anonim{% endif %}
+                            </span>
+                        </div>
+                        <button type="submit">Sözlüğe Ekle</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <div class="feed-container" id="feedList">
@@ -107,82 +120,106 @@
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
             </div>
-            <h2 class="about-heading">Bu Site Nedir?</h2>
-            <p>
-                Bu site, kullanıcıların türettikleri yepyeni sözcükleri paylaşarak Türkçe'nin gelişmesine ve ilerlemesine katkıda
-                bulunabilecekleri, Türk dilinin ifade yelpazesini geliştirebilecekleri bir platformdur.
-            </p>           
-            <div class="about-text">
+            
+            <div class="about-scroll-content">
+                <h2 class="about-heading">Bu Site Nedir?</h2>
+                <p>
+                    Bu site, kullanıcıların türettikleri yepyeni sözcükleri paylaşarak Türkçe'nin gelişmesine ve ilerlemesine katkıda
+                    bulunabilecekleri, Türk dilinin ifade yelpazesini geliştirebilecekleri bir platformdur.
+                </p>           
+                <div class="about-text">
+                    <div class="about-section-title">Görevimiz</div>
+                    <p>
+                        Amacımız, dilimizin zenginliklerini korumak ve modern ya da eski alıntı sözcükler yerine yeni türetilen Türkçe sözcükleri modern bir platformda toplamaktır.
+                    </p>
+                    <div class="about-section-title">Nedenimiz</div>
+                    <p>     
+                        Yüzyıllar öncesinde yaşanan alıntı sözcük modası, günümüzde de yaşanıyor, ancak yaşanırken kimse farkında olamıyor.
+                        Bu nedenle bu siteyi kurarak gelecek nesillere, yaşayan ve sürekli gelişen bir Türkçe sözlük mirası bırakmayı hedefliyoruz.
+                    </p>    
+                    <div class="about-section-title">Nasıl Çalışır?</div>
+                    <p>
+                        Sözcüklerinizi "Katkıda Bulun" formunu kullanarak ekleyebilirsiniz. 
+                        Sözcüklerin üstüne dokunarak yorum bırakamayı unutmayın! 
+                    </p>
+                    <div class="about-section-title">İletişim</div>
+                    <p>
+                        admin@yenisozcukler.com email adresine şikayet ve tavsiyelerinizi iletebilirsiniz.
+                    </p>
+                    <div class="about-section-title">Teşekkürler</div>
+                    <p>
+                        Sitenin yapım aşamasındaki teknik destekleri için Ozan Yanık'a teşekkürü borç biliriz.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                <div class="about-section-title">Görevimiz</div>
-                <p>
-                    Amacımız, dilimizin zenginliklerini korumak ve modern ya da eski alıntı sözcükler yerine yeni türetilen Türkçe sözcükleri modern bir platformda toplamaktır.
+    <div id="addExampleModal" class="auth-overlay" onclick="closeModal('addExampleModal', false, event)">
+        <div class="auth-box" style="max-width: 500px;">
+            <button class="close-btn auth-close" onclick="closeModal('addExampleModal', true)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            
+            <div class="auth-header">
+                <h2>Örnek Cümle Ekle</h2>
+                <h3 id="exampleModalWord" style="color:var(--accent); margin: 5px 0 10px 0; font-size: 1.4rem;"></h3>
+                <p style="color:var(--text-muted); font-size:0.9rem;">
+                    Bu işlem sadece bir kez yapılabilir ve sonrasında düzenlenemez.
                 </p>
-                
-                <div class="about-section-title">Nedenimiz</div>
-                <p>     
-                    Yüzyıllar öncesinde yaşanan alıntı sözcük modası, günümüzde de yaşanıyor, ancak yaşanırken kimse farkında olamıyor.
-                    Bu nedenle bu siteyi kurarak gelecek nesillere, yaşayan ve sürekli gelişen bir Türkçe sözlük mirası bırakmayı hedefliyoruz.
-                </p>    
-                
-                <div class="about-section-title">Nasıl Çalışır?</div>
-                <p>
-                    Sözcüklerinizi "Katkıda Bulun" formunu kullanarak ekleyebilirsiniz. 
-                    Sözcüklerin üstüne dokunarak yorum bırakamayı unutmayın! 
-                </p>
-                
-                <div class="about-section-title">İletişim</div>
-                <p>
-                    admin@yenisozcukler.com email adresine şikayet ve tavsiyelerinizi iletebilirsiniz.
-                </p>
-
-                <div class="about-section-title">Teşekkürler</div>
-                <p>
-                    Sitenin yapım aşamasındaki teknik destekleri için Ozan Yanık'a teşekkürü borç biliriz.
-                </p>
+            </div>
+            
+            <div class="auth-form" style="margin-top:15px;">
+                <div class="form-group">
+                    <textarea id="newExampleInput" class="custom-textarea" rows="3" maxlength="200" 
+                              placeholder="Örnek cümleni buraya yaz..." 
+                              style="width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid var(--border-light); background:var(--input-bg); color:var(--text-main);"></textarea>
+                    <div class="char-count" id="exampleCharCount" style="text-align:right; font-size:0.8rem; color:var(--text-muted); margin-top:5px;">0 / 200</div>
+                </div>
+                <button id="submitExampleBtn" class="auth-submit-btn" onclick="submitExample()">Kaydet</button>
             </div>
         </div>
     </div>
 
     <div id="authModal" class="auth-overlay" onclick="closeAuthModal(event)">
-    <div class="auth-box">
-        <button class="close-btn auth-close" onclick="closeAuthModal(event, true)">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
+        <div class="auth-box">
+            <button class="close-btn auth-close" onclick="closeAuthModal(event, true)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
 
-        <div class="auth-tabs">
-            <button class="auth-tab active" id="tabLogin" onclick="toggleAuthMode('login')">Giriş Yap</button>
-            <button class="auth-tab" id="tabRegister" onclick="toggleAuthMode('register')">Kayıt Ol</button>
-        </div>
-
-        <div class="auth-header">
-            <p id="authSubtitle">Hesabına giriş yap ve paylaşmaya başla.</p>
-            <p id="authSubtitle">Giriş yapmadan yalnızca anonim olarak paylaşım yapabilirsin</p>
-        </div>
-
-        <div class="auth-form" id="authForm">
-            <div class="form-group">
-                <label>Kullanıcı Adı</label>
-                <input type="text" id="authUsername" placeholder="Kullanıcı Adı" autocomplete="username">
-            </div>
-            <div class="form-group">
-                <label>Şifre</label>
-                <input type="password" id="authPassword" placeholder="••••••" autocomplete="current-password">
-            </div>
-            
-            <div class="form-group" id="confirmPassGroup" style="display: none;">
-                <label>Şifre (Tekrar)</label>
-                <input type="password" id="authPasswordConfirm" placeholder="••••••" autocomplete="new-password">
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tabLogin" onclick="toggleAuthMode('login')">Giriş Yap</button>
+                <button class="auth-tab" id="tabRegister" onclick="toggleAuthMode('register')">Kayıt Ol</button>
             </div>
 
-            <div class="cf-turnstile" data-sitekey="0x4AAAAAACKXoAcWo8k1VLPm" data-theme="auto"></div>
-            
-            <p id="authErrorMsg" style="color: var(--error-color); font-size: 0.9rem; margin-bottom: 10px; display: none;"></p>
-            
-            <button class="auth-submit-btn" id="authSubmitBtn" type="button" onclick="handleAuthSubmit()">Giriş Yap</button>
+            <div class="auth-header">
+                <p id="authSubtitle">Hesabına giriş yap ve paylaşmaya başla.</p>
+                <p id="authSubtitle">Giriş yapmadan yalnızca anonim olarak paylaşım yapabilirsin</p>
+            </div>
+
+            <div class="auth-form" id="authForm">
+                <div class="form-group">
+                    <label>Kullanıcı Adı</label>
+                    <input type="text" id="authUsername" placeholder="Kullanıcı Adı" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>Şifre</label>
+                    <input type="password" id="authPassword" placeholder="••••••" autocomplete="current-password">
+                </div>
+                
+                <div class="form-group" id="confirmPassGroup" style="display: none;">
+                    <label>Şifre (Tekrar)</label>
+                    <input type="password" id="authPasswordConfirm" placeholder="••••••" autocomplete="new-password">
+                </div>
+
+                <div class="cf-turnstile" data-sitekey="0x4AAAAAACKXoAcWo8k1VLPm" data-theme="auto"></div>
+                
+                <p id="authErrorMsg" style="color: var(--error-color); font-size: 0.9rem; margin-bottom: 10px; display: none;"></p>
+                
+                <button class="auth-submit-btn" id="authSubmitBtn" type="button" onclick="handleAuthSubmit()">Giriş Yap</button>
+            </div>
         </div>
     </div>
-</div>
 
     <div id="profileModal" class="auth-overlay" onclick="closeProfileModal(event)">
         <div class="auth-box" style="max-width: 450px;">
@@ -233,8 +270,7 @@
                 <p style="color:var(--text-muted);">Onaylanmış ve yayına alınmış sözcüklerin.</p>
             </div>
 
-            <div id="myWordsFeed" class="custom-scrollbar">
-                </div>
+            <div id="myWordsFeed" class="custom-scrollbar"></div>
             
             <button onclick="openProfileModal(); document.getElementById('myWordsModal').classList.remove('show');" 
                     style="width:100%; padding:10px; background:none; border:none; color:var(--text-muted); cursor:pointer; margin-top:10px;">
