@@ -13,12 +13,12 @@ from django.db.models import Count, F , Sum
 from django.db import transaction
 
 import uuid
-from .models import Word, Comment, WordVote, CommentVote
+from .models import Word, Comment, WordVote, CommentVote, Category
 from .serializers import (
     WordSerializer, CommentSerializer, 
     WordCreateSerializer, CommentCreateSerializer,
     AuthSerializer, ChangeUsernameSerializer,
-    WordAddExampleSerializer
+    WordAddExampleSerializer, CategorySerializer
 )
 
 # --- YARDIMCI FONKSİYONLAR ---
@@ -34,29 +34,57 @@ def get_or_create_session_id(request):
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([])
+def get_categories(request):
+    """
+    Returns the list of active categories for the frontend to render pills/hashtags.
+    """
+    cache_key = 'all_active_categories'
+    categories_data = cache.get(cache_key)
+    
+    if not categories_data:
+        categories = Category.objects.filter(is_active=True)
+        serializer = CategorySerializer(categories, many=True)
+        categories_data = serializer.data
+        cache.set(cache_key, categories_data, 60 * 60) # Cache for 1 hour
+
+    return Response({'success': True, 'categories': categories_data})
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([])
 def get_words(request):
     page_number = request.GET.get('page', 1)
     limit = int(request.GET.get('limit', 20))
     limit = min(limit, 50)
     mode = request.GET.get('mode', 'all') 
+    tag_slug = request.GET.get('tag') 
 
-    # --- QUERYSET ---
+    # --- QUERYSET FIX ---
+    # Removed .select_related('user') to fix the FieldError with .only()
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
+        .prefetch_related('categories')\
         .only('id', 'word', 'definition', 'example', 'author', 'timestamp', 'is_profane', 'score')\
         .order_by('-timestamp')
     
+    # 1. Profanity Filter
     if mode == 'profane':
         words_queryset = words_queryset.filter(is_profane=True)
     else:  
         words_queryset = words_queryset.filter(is_profane=False)
-        
-    cache_key = f'total_approved_words_count_{mode}'
-    total_count = cache.get(cache_key)
     
-    if total_count is None:
+    # 2. Tag (Category) Filter
+    if tag_slug:
+        words_queryset = words_queryset.filter(categories__slug=tag_slug)
+
+    if not tag_slug:
+        cache_key = f'total_approved_words_count_{mode}'
+        total_count = cache.get(cache_key)
+        if total_count is None:
+            total_count = words_queryset.count()
+            cache.set(cache_key, total_count, 60 * 5)
+    else:
         total_count = words_queryset.count()
-        cache.set(cache_key, total_count, 60 * 5)
 
     paginator = Paginator(words_queryset, limit)
     try:
@@ -267,7 +295,6 @@ def add_word(request):
         first_error = next(iter(serializer.errors.values()))[0]
         return Response({'success': False, 'error': first_error}, status=400)
 
-# --- YENİ EKLENEN ENDPOINT: ÖRNEK CÜMLE EKLEME ---
 @ratelimit(key='ip', rate='5/m', method='POST', block=False)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -305,7 +332,6 @@ def add_example(request):
     else:
         first_error = next(iter(serializer.errors.values()))[0]
         return Response({'success': False, 'error': first_error}, status=400)
-# ---------------------------------------------------
 
 @ratelimit(key='ip', rate='1/15s', method='POST', block=False)
 @api_view(['POST'])

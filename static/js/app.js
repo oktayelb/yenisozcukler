@@ -1,5 +1,5 @@
 /* ========================================
-   app.js - Final Version (Dynamic Contribution Text)
+   app.js - Final Version
    ========================================
 */
 
@@ -17,6 +17,11 @@ let isLoading = false;
 let currentProfileUser = null; 
 let wordIdForExample = null; 
 
+// --- CATEGORY VARIABLES ---
+let activeCategorySlug = null; // Current filter
+let allCategories = [];        // Loaded from API
+let selectedFormCategories = new Set(); // For submission
+
 // Auth State
 let currentAuthMode = 'login'; // 'login' or 'register'
 const isUserLoggedIn = document.body.getAttribute('data-user-auth') === 'true';
@@ -32,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAuthTriggers();
     setupTheme();
     initLogoSystem();
+    fetchCategories(); // Load tags for the form
     fetchWords(currentPage);
 });
 
@@ -109,6 +115,13 @@ function initLogoSystem() {
 
 function animateLogo(el) {
     const curr = localStorage.getItem(COLOR_THEME_KEY) || 'default';
+    
+    // If we are filtered by a category, clicking logo resets it.
+    if (activeCategorySlug) {
+        clearCategoryFilter();
+        return; 
+    }
+
     const next = curr === 'default' ? 'red' : 'default';
     localStorage.setItem(COLOR_THEME_KEY, next);
     document.body.setAttribute('data-theme', next);
@@ -130,7 +143,7 @@ function updateLogoVisuals(theme) {
     }
 }
 
-/* --- FORM TOGGLE LOGIC (UPDATED) --- */
+/* --- FORM TOGGLE LOGIC --- */
 function toggleContributionForm() {
     const card = document.getElementById('contributionCard');
     const title = document.getElementById('contributionTitle');
@@ -139,18 +152,12 @@ function toggleContributionForm() {
         const isExpanded = card.classList.contains('expanded');
         
         if (isExpanded) {
-            // Closing the form
             card.classList.remove('expanded');
             card.classList.add('collapsed');
-            
-            // Set text back to "Katkıda Bulun" with + icon
             if(title) title.innerHTML = 'Katkıda Bulun <span class="toggle-icon">+</span>';
         } else {
-            // Opening the form
             card.classList.remove('collapsed');
             card.classList.add('expanded');
-            
-            // Set text to "Vazgeç" with - icon
             if(title) title.innerHTML = '';
         }
     }
@@ -303,7 +310,74 @@ const closeProfileModal = (e, f) => closeModal('profileModal', f, e);
 const closeEditProfileModal = (e, f) => closeModal('editProfileModal', f, e);
 const closeMyWordsModal = (e, f) => closeModal('myWordsModal', f, e);
 
+/* --- CATEGORIES & HASHTAGS --- */
+
+async function fetchCategories() {
+    try {
+        const data = await apiRequest('/api/categories');
+        if(data.success) {
+            allCategories = data.categories || [];
+            renderCategorySelection();
+        }
+    } catch (e) {
+        console.error("Failed to load categories:", e);
+    }
+}
+
+function renderCategorySelection() {
+    const container = document.getElementById('categoryPillsList');
+    const wrapper = document.getElementById('categorySelectionContainer');
+    
+    if (!allCategories.length) {
+        if(wrapper) wrapper.style.display = 'none';
+        return;
+    }
+    
+    if(wrapper) wrapper.style.display = 'block';
+    container.innerHTML = '';
+    
+    allCategories.forEach(cat => {
+        const pill = document.createElement('div');
+        pill.className = 'category-pill';
+        pill.textContent = cat.name;
+        
+        // Ensure description is treated as an empty string if null
+        const desc = cat.description || ""; 
+        
+        if (desc) pill.setAttribute('data-desc', desc);
+        
+        // Pass the description directly to the toggle function
+        pill.onclick = () => toggleCategorySelection(cat.id, pill, desc);
+        container.appendChild(pill);
+    });
+}
+
+function toggleCategorySelection(id, el, description) {
+    // 1. Handle Selection Visuals
+    if (selectedFormCategories.has(id)) {
+        selectedFormCategories.delete(id);
+        el.classList.remove('selected');
+    } else {
+        selectedFormCategories.add(id);
+        el.classList.add('selected');
+    }
+
+    // 2. Handle Helper Text (The "Tap Display" for Form)
+    const helpText = document.getElementById('categoryHelpText');
+    if (helpText) {
+        if (description) {
+             helpText.innerHTML = `<strong>${el.textContent}:</strong> ${description}`;
+             helpText.classList.add('active');
+        } else {
+             // Optional: Clear text if category has no description
+             helpText.innerHTML = '';
+             helpText.classList.remove('active');
+        }
+    }
+}
+
 /* --- FEED & WORDS --- */
+
 async function fetchWords(page) {
     if (isLoading) return;
     isLoading = true;
@@ -311,6 +385,14 @@ async function fetchWords(page) {
     const loadBtn = document.querySelector('#loadMoreContainer button');
     
     const mode = localStorage.getItem(COLOR_THEME_KEY) === 'red' ? 'profane' : 'all';
+
+    // Build URL with tag filter if active
+    let url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}`;
+    if (activeCategorySlug) {
+        url += `&tag=${activeCategorySlug}`;
+        // Note: Banner update happens in handleTagClick usually, 
+        // but if we load page with defaults, we might call this.
+    }
 
     if (page === 1) { 
         list.innerHTML = '<div class="spinner"></div>'; 
@@ -321,7 +403,7 @@ async function fetchWords(page) {
     }
 
     try {
-        const data = await apiRequest(`/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}`);
+        const data = await apiRequest(url);
         if(page === 1) list.innerHTML = '';
         
         if (data.words?.length > 0) {
@@ -337,6 +419,91 @@ async function fetchWords(page) {
         isLoading = false; 
         loadBtn.textContent = 'Daha Fazla Göster'; 
         loadBtn.disabled = false;
+    }
+}
+
+function handleTagClick(slug, name, description) {
+    activeCategorySlug = slug;
+    currentPage = 1;
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Pass description to the banner updater
+    updateFilterBanner(true, name, description);
+    
+    fetchWords(currentPage);
+}
+
+function showTagDescription(name, description, element) {
+    // Create a temporary tooltip element positioned near the tag
+    const tooltip = document.createElement('div');
+    tooltip.className = 'mobile-tag-tooltip';
+    tooltip.innerHTML = `<strong>${name}:</strong> ${description}<br><small style="opacity:0.7; font-size:0.7rem;">Tekrar dokun: Kategoriye git</small>`;
+    
+    // Style the tooltip
+    tooltip.style.cssText = `
+        position: fixed;
+        background: var(--text-main);
+        color: var(--card-bg);
+        padding: 10px 15px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        max-width: 280px;
+        z-index: 10000;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        pointer-events: none;
+        animation: fadeIn 0.2s ease;
+    `;
+    
+    // Position near the tag
+    const rect = element.getBoundingClientRect();
+    const tooltipHeight = 80; // approximate
+    
+    if (rect.top > tooltipHeight + 20) {
+        // Show above
+        tooltip.style.bottom = `${window.innerHeight - rect.top + 10}px`;
+    } else {
+        // Show below
+        tooltip.style.top = `${rect.bottom + 10}px`;
+    }
+    tooltip.style.left = `${Math.max(10, Math.min(window.innerWidth - 290, rect.left))}px`;
+    
+    document.body.appendChild(tooltip);
+    
+    // Remove after 2 seconds
+    setTimeout(() => {
+        tooltip.style.animation = 'fadeOut 0.2s ease';
+        setTimeout(() => tooltip.remove(), 200);
+    }, 2000);
+}
+
+function clearCategoryFilter() {
+    activeCategorySlug = null;
+    currentPage = 1;
+    updateFilterBanner(false);
+    fetchWords(currentPage);
+}
+
+function updateFilterBanner(show, name = '', description = '') {
+    const banner = document.getElementById('activeFilterBanner');
+    const nameDisplay = document.getElementById('filterNameDisplay');
+    const descDisplay = document.getElementById('filterDescDisplay');
+    
+    if (banner) {
+        banner.style.display = show ? 'flex' : 'none';
+        
+        if (show) {
+            if(nameDisplay) nameDisplay.innerText = name;
+            
+            if(descDisplay) {
+                if(description) {
+                    descDisplay.innerText = description;
+                    descDisplay.style.display = 'block';
+                } else {
+                    descDisplay.style.display = 'none';
+                }
+            }
+        }
     }
 }
 
@@ -357,7 +524,7 @@ function appendCards(words, container, isModalMode) {
     });
 }
 
-/* === CARD GENERATION === */
+/* === CARD GENERATION (Updated with Tags) === */
 function createCardElement(item, isModalMode) {
     const card = document.createElement('div');
     card.className = 'word-card fade-in';
@@ -370,6 +537,7 @@ function createCardElement(item, isModalMode) {
         if (e.target.closest('.vote-btn') || 
             e.target.closest('.user-badge') || 
             e.target.closest('.add-example-btn') || 
+            e.target.closest('.tag-badge') || 
             card.classList.contains('is-profane-content')) return;
             
         animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), decode(item.example), isModalMode);
@@ -383,7 +551,6 @@ function createCardElement(item, isModalMode) {
     const exampleHTML = item.example ? `<div class="word-example">"${decode(item.example)}"</div>` : '';
     contentDiv.innerHTML = `<h3>${decode(item.word)}</h3><p>${decode(item.def)}</p>${exampleHTML}`;
     
-    // --- Add Example Button ---
     if (isUserLoggedIn && 
         currentUserUsername === item.author && 
         (!item.example || item.example.trim() === "")) {
@@ -401,6 +568,66 @@ function createCardElement(item, isModalMode) {
     }
 
     card.appendChild(contentDiv);
+
+    // --- TAGS RENDERING ---
+    if (item.categories && item.categories.length > 0) {
+        const tagsDiv = document.createElement('div');
+        tagsDiv.className = 'tag-list';
+        
+        item.categories.forEach(cat => {
+            const tag = document.createElement('span');
+            tag.className = 'tag-badge';
+            tag.innerText = cat.name;
+            
+            // Tooltip attribute (still useful for desktop)
+            if(cat.description) {
+                tag.setAttribute('data-desc', cat.description);
+            }
+            
+            // Mobile-friendly: show description on click/tap, navigate on second tap
+            let tapCount = 0;
+            let tapTimer = null;
+            
+            tag.onclick = (e) => {
+                e.stopPropagation();
+                
+                // Check if device supports hover (desktop)
+                const hasHover = window.matchMedia('(hover: hover)').matches;
+                
+                if (hasHover) {
+                    // Desktop: click goes directly to filter
+                    handleTagClick(cat.slug, cat.name, cat.description);
+                } else {
+                    // Mobile: show description on first tap, navigate on second tap
+                    tapCount++;
+                    
+                    if (tapCount === 1) {
+                        // First tap: show description as temporary notification
+                        if (cat.description) {
+                            showTagDescription(cat.name, cat.description, tag);
+                        } else {
+                            // No description, go directly
+                            handleTagClick(cat.slug, cat.name, cat.description);
+                        }
+                        
+                        // Reset tap count after 2 seconds
+                        tapTimer = setTimeout(() => {
+                            tapCount = 0;
+                        }, 2000);
+                    } else {
+                        // Second tap: navigate to filter
+                        clearTimeout(tapTimer);
+                        tapCount = 0;
+                        handleTagClick(cat.slug, cat.name, cat.description);
+                    }
+                }
+            };
+            tagsDiv.appendChild(tag);
+        });
+        
+        card.appendChild(tagsDiv);
+    }
+    // ----------------------
 
     const foot = document.createElement('div'); 
     foot.className = 'word-footer';
@@ -473,13 +700,20 @@ async function submitWord() {
             definition: d, 
             example: ex, 
             nickname: n, 
-            is_profane: prof 
+            is_profane: prof,
+            category_ids: Array.from(selectedFormCategories) // Send IDs
         });
         
+        // Reset inputs
         document.getElementById('inputWord').value=''; 
         document.getElementById('inputDef').value='';
         document.getElementById('inputExample').value='';
         updateCount({value:''});
+        
+        // Reset category pills
+        selectedFormCategories.clear();
+        document.querySelectorAll('.category-pill.selected').forEach(el => el.classList.remove('selected'));
+
         showCustomAlert("Sözcük gönderildi (Onay bekleniyor)!");
         
     } catch (e) { showCustomAlert(e.message, "error"); }

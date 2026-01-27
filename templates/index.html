@@ -84,10 +84,16 @@
                     </div>
 
                     <div class="form-group span-full">
-                        <label>Örnek Cümle <span style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;"></span></label>
+                        <label>Örnek Cümle</label>
                         <textarea id="inputExample" rows="2" maxlength="200" 
                                 placeholder="Sözcüğü bir cümle içinde kullanın..." 
                                 onkeypress="return allowOnlyLetters(event, true)"></textarea>
+                    </div>
+
+                    <div class="form-group span-full" id="categorySelectionContainer" style="display:none;">
+                         <label>Kategoriler <span style="font-weight:normal; font-size:0.85rem; color:var(--text-muted);">(Birden fazla seçilebilir)</span></label>
+                         <div class="category-pills-container" id="categoryPillsList"></div>
+                         <div id="categoryHelpText" class="category-help-text"></div>
                     </div>
 
                     <div class="form-submit-wrapper">
@@ -101,6 +107,14 @@
                     </div>
                 </form>
             </div>
+        </div>
+
+        <div id="activeFilterBanner" class="filter-banner" style="display:none; flex-direction:column; gap:8px;">
+             <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                 <span><span style="opacity:0.8">Kategori:</span> <strong id="filterNameDisplay"></strong></span>
+                 <button onclick="clearCategoryFilter()" style="margin-left:auto;">Filtreyi Temizle ✕</button>
+             </div>
+             <div id="filterDescDisplay" style="font-size:0.9rem; font-style:italic; border-top:1px solid rgba(255,255,255,0.2); padding-top:4px; display:none;"></div>
         </div>
 
         <div class="feed-container" id="feedList">
@@ -260,20 +274,20 @@
     </div>
 
     <div id="myWordsModal" class="auth-overlay" onclick="closeMyWordsModal(event)">
-        <div class="auth-box" style="max-width: 600px; width: 95%; height:auto;">
+        <div class="auth-box" style="max-width: 600px; width: 95%; max-height: 85vh; display: flex; flex-direction: column;">
             <button class="close-btn auth-close" onclick="closeMyWordsModal(event, true)">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
 
-            <div class="auth-header" style="margin-bottom:15px;">
+            <div class="auth-header" style="margin-bottom:15px; flex-shrink: 0;">
                 <h2>Sözcüklerim</h2>
                 <p style="color:var(--text-muted);">Onaylanmış ve yayına alınmış sözcüklerin.</p>
             </div>
 
-            <div id="myWordsFeed" class="custom-scrollbar"></div>
+            <div id="myWordsFeed" class="custom-scrollbar" style="flex-grow: 1; overflow-y: auto;"></div>
             
             <button onclick="openProfileModal(); document.getElementById('myWordsModal').classList.remove('show');" 
-                    style="width:100%; padding:10px; background:none; border:none; color:var(--text-muted); cursor:pointer; margin-top:10px;">
+                    style="width:100%; padding:10px; background:none; border:none; color:var(--text-muted); cursor:pointer; margin-top:10px; flex-shrink: 0;">
                 &larr; Profile Dön
             </button>
         </div>

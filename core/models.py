@@ -1,5 +1,19 @@
 from django.db import models
-from django.contrib.auth.models import User  # User modelini ekledik
+from django.contrib.auth.models import User
+
+class Category(models.Model):
+    name = models.CharField(max_length=30)  # e.g., "Teknoloji"
+    slug = models.SlugField(unique=True)    # e.g., "teknoloji" (URL friendly)
+    description = models.CharField(max_length=150) # Tooltip text
+    order = models.IntegerField(default=0)  # To control sorting in the list
+    is_active = models.BooleanField(default=True) # To hide categories if needed without deleting
+
+    class Meta:
+        verbose_name_plural = "Categories"
+        ordering = ['order', 'name']
+
+    def __str__(self):
+        return self.name
 
 class Word(models.Model):
     STATUS_CHOICES = [
@@ -16,14 +30,18 @@ class Word(models.Model):
         db_index=True
     )
 
+    # --- NEW RELATIONSHIP ---
+    categories = models.ManyToManyField(
+        Category, 
+        related_name='words', 
+        blank=True
+    )
+    # ------------------------
+
     is_profane = models.BooleanField(default=False)
     word = models.CharField(max_length=50)
     definition = models.CharField(max_length=300)
-    
-    # --- NEW FIELD ---
-    # We use default="" so existing database rows don't crash.
     example = models.CharField(max_length=200, default="")
-    # -----------------
     
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     author = models.CharField(max_length=50, default='Anonim')    
@@ -37,7 +55,6 @@ class Word(models.Model):
         return self.word
 
 class Comment(models.Model):
-    # --- YENİ EKLENEN ALAN ---
     user = models.ForeignKey(
         User, 
         on_delete=models.SET_NULL, 
@@ -46,7 +63,6 @@ class Comment(models.Model):
         related_name='comments',
         db_index=True
     )
-    # -------------------------
 
     word = models.ForeignKey(Word, on_delete=models.CASCADE, related_name='comments')
     author = models.CharField(max_length=50, default='Anonim')
@@ -59,7 +75,7 @@ class Comment(models.Model):
         return f"{self.author}: {self.comment[:20]}"
 
 
-# --- VOTE MODELLERİ ---
+# --- VOTE MODELS ---
 
 class WordVote(models.Model):
     VALUE_CHOICES = [
@@ -67,8 +83,6 @@ class WordVote(models.Model):
         (-1, 'Dislike')
     ]
     
-    # --- YENİ EKLENEN ALAN ---
-    # Oylarda kullanıcı silinirse oyun da silinmesini tercih edebiliriz (CASCADE).
     user = models.ForeignKey(
         User, 
         on_delete=models.CASCADE, 
@@ -77,7 +91,6 @@ class WordVote(models.Model):
         related_name='word_votes',
         db_index=True
     )
-    # -------------------------
 
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     session_id = models.CharField(max_length=40, db_index=True)
@@ -87,9 +100,6 @@ class WordVote(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        # DİKKAT: Şimdilik unique constraint'i ('session_id', 'word') olarak bırakıyoruz.
-        # İleride hem session hem user kontrolü yapan karmaşık bir constraint veya 
-        # kod tarafında validasyon gerekebilir. Şimdilik migration'ı patlatmamak için dokunmuyoruz.
         unique_together = ('session_id', 'word')
 
 class CommentVote(models.Model):
@@ -98,7 +108,6 @@ class CommentVote(models.Model):
         (-1, 'Dislike')
     ]
     
-    # --- YENİ EKLENEN ALAN ---
     user = models.ForeignKey(
         User, 
         on_delete=models.CASCADE, 
@@ -107,7 +116,6 @@ class CommentVote(models.Model):
         related_name='comment_votes',
         db_index=True
     )
-    # -------------------------
 
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     session_id = models.CharField(max_length=40, db_index=True)

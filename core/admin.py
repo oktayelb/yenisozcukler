@@ -3,7 +3,8 @@ from django.contrib import messages
 from django.http import HttpResponseRedirect, HttpResponse
 from django.template import Template, RequestContext
 from django.contrib.admin import helpers
-from .models import Word, Comment, WordVote, CommentVote
+# Added Category to imports
+from .models import Word, Comment, WordVote, CommentVote, Category
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin
 
@@ -104,12 +105,21 @@ def change_author(modeladmin, request, queryset):
 
 # --- Define Admin Classes ---
 
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'is_active', 'order')
+    list_editable = ('is_active', 'order') # Edit these directly in the list
+    prepopulated_fields = {'slug': ('name',)} # Auto-fill slug from name
+    ordering = ('order', 'name')
+
 class WordAdmin(admin.ModelAdmin):
     actions = [make_approved, make_pending, change_author]
     
     list_display = ('word', 'status', 'score', 'author', 'user', 'timestamp', 'is_profane')
-    list_filter = ('status', 'is_profane', 'timestamp')
+    # Added 'categories' to list_filter so you can filter words by category
+    list_filter = ('status', 'is_profane', 'categories', 'timestamp')
     search_fields = ('word', 'definition', 'author')
+    # Use a better widget for selecting multiple categories
+    filter_horizontal = ('categories',)
 
 class CommentAdmin(admin.ModelAdmin):
     list_display = ('author', 'word', 'score', 'timestamp')
@@ -136,6 +146,7 @@ class CustomUserAdmin(UserAdmin):
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
 
+admin.site.register(Category, CategoryAdmin) # Registered Category
 admin.site.register(Word, WordAdmin)
 admin.site.register(Comment, CommentAdmin)
 admin.site.register(WordVote, WordVoteAdmin)

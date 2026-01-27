@@ -1,11 +1,16 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Word, Comment
+from .models import Word, Comment, Category
 import re
 import requests
 from decouple import config
 
 # --- OKUMA (READ) SERIALIZERS ---
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'slug', 'description']
 
 class CommentSerializer(serializers.ModelSerializer):
     score = serializers.IntegerField(read_only=True)
@@ -27,10 +32,11 @@ class WordSerializer(serializers.ModelSerializer):
     score = serializers.IntegerField(read_only=True)
     user_vote = serializers.SerializerMethodField()
     comment_count = serializers.IntegerField(read_only=True)
+    categories = CategorySerializer(many=True, read_only=True) # Nested Serializer for tags
 
     class Meta:
         model = Word
-        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition', 'example', 'comment_count'] 
+        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition', 'example', 'comment_count', 'categories'] 
 
     def get_user_vote(self, obj):
         votes = self.context.get('user_votes', {})
@@ -46,12 +52,12 @@ class WordSerializer(serializers.ModelSerializer):
         return data
 
 # --- YAZMA (WRITE) SERIALIZERS ---
+
 class WordAddExampleSerializer(serializers.Serializer):
     word_id = serializers.IntegerField(required=True)
     example = serializers.CharField(max_length=200, required=True)
 
     def validate_example(self, value):
-        # Reusing the exact logic from WordCreateSerializer for consistency
         value = value.strip()
         if not value:
             raise serializers.ValidationError("Örnek cümle boş olamaz.")
@@ -65,10 +71,30 @@ class WordAddExampleSerializer(serializers.Serializer):
 
 class WordCreateSerializer(serializers.ModelSerializer):
     nickname = serializers.CharField(source='author', required=False, allow_blank=True, max_length=50)
+    # We accept a list of IDs for the tags
+    category_ids = serializers.PrimaryKeyRelatedField(
+        many=True, 
+        queryset=Category.objects.filter(is_active=True), 
+        required=False, 
+        write_only=True
+    )
     
     class Meta:
         model = Word
-        fields = ['word', 'definition', 'example', 'nickname', 'is_profane']
+        fields = ['word', 'definition', 'example', 'nickname', 'is_profane', 'category_ids']
+
+    def create(self, validated_data):
+        # Extract categories before creating the word
+        categories = validated_data.pop('category_ids', [])
+        
+        # Create the word instance
+        word = Word.objects.create(**validated_data)
+        
+        # Set the ManyToMany relation
+        if categories:
+            word.categories.set(categories)
+            
+        return word
 
     def turkish_lower(self, text):
         if not text:
@@ -88,7 +114,6 @@ class WordCreateSerializer(serializers.ModelSerializer):
         return self.turkish_lower(value)
 
     def validate_example(self, value):
-        
         return WordAddExampleSerializer().validate_example(value)
 
     def validate_nickname(self, value):
