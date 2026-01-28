@@ -434,49 +434,6 @@ function handleTagClick(slug, name, description) {
     fetchWords(currentPage);
 }
 
-function showTagDescription(name, description, element) {
-    // Create a temporary tooltip element positioned near the tag
-    const tooltip = document.createElement('div');
-    tooltip.className = 'mobile-tag-tooltip';
-    tooltip.innerHTML = `<strong>${name}:</strong> ${description}<br><small style="opacity:0.7; font-size:0.7rem;">Tekrar dokun: Kategoriye git</small>`;
-    
-    // Style the tooltip
-    tooltip.style.cssText = `
-        position: fixed;
-        background: var(--text-main);
-        color: var(--card-bg);
-        padding: 10px 15px;
-        border-radius: 8px;
-        font-size: 0.85rem;
-        max-width: 280px;
-        z-index: 10000;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        pointer-events: none;
-        animation: fadeIn 0.2s ease;
-    `;
-    
-    // Position near the tag
-    const rect = element.getBoundingClientRect();
-    const tooltipHeight = 80; // approximate
-    
-    if (rect.top > tooltipHeight + 20) {
-        // Show above
-        tooltip.style.bottom = `${window.innerHeight - rect.top + 10}px`;
-    } else {
-        // Show below
-        tooltip.style.top = `${rect.bottom + 10}px`;
-    }
-    tooltip.style.left = `${Math.max(10, Math.min(window.innerWidth - 290, rect.left))}px`;
-    
-    document.body.appendChild(tooltip);
-    
-    // Remove after 2 seconds
-    setTimeout(() => {
-        tooltip.style.animation = 'fadeOut 0.2s ease';
-        setTimeout(() => tooltip.remove(), 200);
-    }, 2000);
-}
-
 function clearCategoryFilter() {
     activeCategorySlug = null;
     currentPage = 1;
@@ -584,43 +541,10 @@ function createCardElement(item, isModalMode) {
                 tag.setAttribute('data-desc', cat.description);
             }
             
-            // Mobile-friendly: show description on click/tap, navigate on second tap
-            let tapCount = 0;
-            let tapTimer = null;
-            
+            // Pass description to the handler
             tag.onclick = (e) => {
                 e.stopPropagation();
-                
-                // Check if device supports hover (desktop)
-                const hasHover = window.matchMedia('(hover: hover)').matches;
-                
-                if (hasHover) {
-                    // Desktop: click goes directly to filter
-                    handleTagClick(cat.slug, cat.name, cat.description);
-                } else {
-                    // Mobile: show description on first tap, navigate on second tap
-                    tapCount++;
-                    
-                    if (tapCount === 1) {
-                        // First tap: show description as temporary notification
-                        if (cat.description) {
-                            showTagDescription(cat.name, cat.description, tag);
-                        } else {
-                            // No description, go directly
-                            handleTagClick(cat.slug, cat.name, cat.description);
-                        }
-                        
-                        // Reset tap count after 2 seconds
-                        tapTimer = setTimeout(() => {
-                            tapCount = 0;
-                        }, 2000);
-                    } else {
-                        // Second tap: navigate to filter
-                        clearTimeout(tapTimer);
-                        tapCount = 0;
-                        handleTagClick(cat.slug, cat.name, cat.description);
-                    }
-                }
+                handleTagClick(cat.slug, cat.name, cat.description);
             };
             tagsDiv.appendChild(tag);
         });
