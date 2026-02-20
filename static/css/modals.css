@@ -1,0 +1,71 @@
+/* ========================================
+   4. modals.css - Popups & Overlays
+   ======================================= */
+.modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(6px); z-index: var(--z-modal-backdrop); display: none; opacity: 0; transition: opacity 0.4s ease; }
+.modal-backdrop.show { display: block; opacity: 1; }
+.auth-overlay, .about-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: var(--z-modal-base); display: flex; justify-content: center; align-items: center; pointer-events: none; opacity: 0; transition: opacity 0.4s ease; }
+.auth-overlay.show, .about-overlay.show { opacity: 1; pointer-events: auto; }
+
+/* SHARED BOX STYLES */
+.auth-box, .about-box { 
+    background: var(--card-bg); color: var(--text-main); width: 90%; border-radius: 16px; border-top: 6px solid var(--accent); position: relative; 
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2); transform: scale(0.92) translateY(20px); opacity: 0; transition: transform 0.5s cubic-bezier(0.34, 1.3, 0.64, 1), opacity 0.5s ease; padding: 30px;
+}
+.auth-box { max-width: 400px; }
+.about-box { max-width: 700px; display: flex; flex-direction: column; max-height: 90vh; }
+
+.about-scroll-content { overflow-y: auto; flex: 1; padding-right: 10px; }
+.auth-overlay.show .auth-box, .about-overlay.show .about-box { transform: scale(1) translateY(0); opacity: 1; }
+.auth-overlay { z-index: var(--z-auth-overlay); }
+.close-btn, .auth-close { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; color: var(--text-muted); }
+.auth-submit-btn { width: 100%; padding: 12px; margin-top: 10px; background: var(--text-main); color: var(--card-bg); border: none; border-radius: 12px; font-weight: bold; cursor: pointer; }
+
+/* ABOUT TITLES */
+.about-text .about-section-title {
+    font-family: var(--font-heading); font-size: 1.6rem; font-weight: bold; color: var(--accent); margin-top: 25px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--border-light); width: 100%; display: block;
+}
+.about-text .about-section-title:first-child { margin-top: 0; }
+
+/* PROFILE SPECIFIC */
+#profileModal { z-index: var(--z-modal-base); }
+.edit-profile-btn { display: flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--border-light); color: var(--text-muted); padding: 6px 14px; border-radius: 20px; cursor: pointer; }
+.clickable-stat { cursor: pointer; transition: all 0.2s; }
+.clickable-stat:hover { background: var(--input-bg); transform: translateY(-2px); border-color: var(--accent) !important; }
+#userWordsList { padding-right: 10px; margin-top: 15px; }
+#userWordsList .word-card { border: 1px solid var(--border-light); background-color: var(--card-bg); transition: all 0.2s; padding: 15px; }
+#userWordsList .word-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+#editProfileModal, #myWordsModal { z-index: var(--z-modal-base); }
+#myWordsModal .auth-box { max-width: 600px; display: flex; flex-direction: column; }
+#myWordsFeed { padding: 10px; overflow-y: auto; max-height: 60vh; display: flex; flex-direction: column; gap: 15px; }
+
+/* FULL COMMENT VIEW */
+.full-comment-view { 
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -45%) scale(0.95);
+    width: min(95vw, 600px); max-height: 90vh; z-index: var(--z-drawer); background: var(--card-bg); 
+    border-radius: 12px; box-shadow: 0 15px 50px rgba(0,0,0,0.3); border-left: 5px solid var(--accent); 
+    display: flex; flex-direction: column; overflow: hidden; opacity: 0; pointer-events: none;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease; will-change: transform, opacity;
+}
+.full-comment-view.expanded { transform: translate(-50%, -50%) scale(1); opacity: 1; pointer-events: auto; }
+.full-comment-view.mode-modal { width: min(90vw, 500px); max-height: 85vh; }
+.view-header { padding: 15px 20px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
+.view-body { flex: 1; overflow-y: auto; padding: 20px; background: var(--bg-color); }
+.view-footer { padding: 15px; border-top: 1px solid var(--border-light); background: var(--comment-box-bg); flex-shrink: 0; transition: background 0.3s; }
+.close-icon-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; }
+
+/* CUSTOM COMMENT BOX */
+.custom-comment-wrapper { background: var(--comment-box-bg); border: 1px solid var(--comment-box-border); border-radius: 12px; overflow: hidden; transition: background 0.3s, border-color 0.3s; }
+.custom-comment-header { padding: 8px 15px; border-bottom: 1px dashed var(--comment-box-border); }
+.custom-input-minimal { width: 100%; border: none; background: transparent; font-weight: bold; color: var(--comment-box-text); outline: none; }
+.custom-textarea-minimal { width: 100%; border: none; background: transparent; padding: 15px; resize: none; color: var(--comment-box-text); outline: none; min-height: 60px; }
+.custom-input-minimal::placeholder, .custom-textarea-minimal::placeholder { color: var(--comment-placeholder); opacity: 1; }
+.custom-comment-footer { padding: 8px 15px; display: flex; justify-content: flex-end; }
+.send-btn-minimal { background: var(--comment-btn-bg); color: var(--comment-btn-text); border: none; padding: 6px 20px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: all 0.3s; }
+.comment-card { background: var(--input-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--input-border); border-left: 5px solid var(--accent); margin-bottom: 10px; font-size: 0.95rem; display: flex; flex-direction: column; gap: 6px; color: var(--input-text); }
+
+/* AUTH TABS */
+.auth-tabs { display: flex; justify-content: center; gap: var(--spacing-md); margin-bottom: var(--spacing-md); border-bottom: 1px solid var(--border-light); padding-bottom: 0; }
+.auth-tab { background: none; border: none; font-family: var(--font-heading); font-size: 1.5rem; color: var(--text-muted); cursor: pointer; padding: 10px 15px; position: relative; transition: color 0.3s; }
+.auth-tab:hover { color: var(--text-main); }
+.auth-tab.active { color: var(--accent); font-weight: bold; }
+.auth-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 3px; background-color: var(--accent); border-radius: 3px 3px 0 0; }

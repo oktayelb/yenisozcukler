@@ -1,0 +1,43 @@
+/* ========================================
+   5. responsive.css - Mobile Overrides
+   ======================================= */
+
+@media (max-width: 900px) { 
+    .form-fields { display: flex; flex-direction: column; gap: var(--spacing-md); align-items: stretch; } 
+    .span-half, .span-full { width: 100%; grid-column: auto; }
+    .form-group { width: 100%; }
+    .form-card.collapsed { width: 80%; padding: 12px 20px; }
+    .form-header-toggle { justify-content: center; }
+    .form-group label { display: block; text-align: center; width: 100%; }
+    .char-limit { text-align: right; }
+    .form-submit-wrapper { flex-direction: row; justify-content: space-between; align-items: center; gap: 10px; }
+    .submission-hint { text-align: left; font-size: 1rem; }
+    .form-card button { width: auto; min-width: 0; padding: 12px 20px; font-size: 1rem; }
+    
+    header { margin: 80px 0 20px; }
+    .logo-card { padding: 15px 20px; width: auto; max-width: 100%; }
+    .logo-card h1 { font-size: 2.8rem; }
+    .logo-card .subtitle { font-size: 1.1rem; }
+    .logo-card.pos-behind { transform: rotate(-6deg) translate(-5px, -5px) scale(0.95); }
+    
+    .about-box { max-height: 80vh; padding: 20px; }
+    .close-btn svg { width: 32px; height: 32px; }
+    
+    .category-pills-container { justify-content: center; }
+
+    /* Fix for My Words Modal on Mobile */
+    #myWordsModal .auth-box {
+        max-height: 80vh;
+        width: 90% !important;
+        display: flex;
+        flex-direction: column;
+        margin: auto;
+    }
+
+    #myWordsFeed {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+        max-height: none;
+    }
+}

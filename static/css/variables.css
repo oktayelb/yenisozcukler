@@ -1,0 +1,163 @@
+/* ========================================
+   1. variables.css - Configuration & Themes
+   ======================================= */
+
+:root {
+    --font-heading: 'Caveat', cursive;
+    --font-body: 'Merriweather', serif;
+    --radius: 12px;
+    --spacing-md: 20px;
+    
+    /* KATMANLAR (Z-INDEX) */
+    --z-base: 1;
+    --z-card-profane: 10;
+    --z-header: 1000;
+    --z-modal-backdrop: 1050;
+    --z-tooltip: 1100;
+    
+    /* MODAL HİYERARŞİSİ */
+    --z-modal-base: 3000;     
+    --z-drawer: 4000;         
+    --z-auth-overlay: 5000;   
+    --z-notification: 9999;   
+
+    /* RENKLER (DEFAULT / LIGHT) */
+    --bg-color: #f4f1ea;
+    --card-bg: #fffbf6;
+    --text-main: #2c2c2c;
+    --text-muted: #5d5c61;
+    --accent: #8e7f7f;
+    --border-light: rgba(142, 127, 127, 0.3);
+    
+    --subtitle-color: #5d5c61; 
+
+    /* Form Inputs */
+    --input-bg: #f4f1ea;        
+    --input-focus-bg: #ffffff;   
+    --input-text: #2c2c2c;     
+    --input-border: rgba(142, 127, 127, 0.2);
+    
+    /* İMZA VE YORUM KUTUSU */
+    --sig-color: #8899a6; 
+
+    /* Comment Box */
+    --comment-box-bg: #f4f1ea;
+    --comment-box-text: #2c2c2c;
+    --comment-box-border: rgba(142, 127, 127, 0.2);
+    --comment-placeholder: #999999;
+    --comment-btn-bg: #8e7f7f;
+    --comment-btn-text: #f4f1ea;
+    
+    --success-color: #4CAF50;
+    --error-color: #f44336;
+    --like-active: #E53935;
+    --dislike-active: #5C6BC0;
+
+    --shadow-sm: 0 4px 15px rgba(60, 50, 40, 0.1);
+    --shadow-lg: 0 15px 30px rgba(60, 50, 40, 0.15);
+    
+    /* TAG COLORS */
+    --tag-bg: #ebe7e0;
+    --tag-bg-hover: #e0dcd5;
+    --tag-text: #5d5c61;
+    --tag-selected-bg: #8e7f7f;
+    --tag-selected-text: #fffbf6;
+}
+
+/* DARK MODE */
+body.dark-mode {
+    --bg-color: #2c2c34; 
+    --card-bg: #3c3c45; 
+    --text-main: #f0f0f0; 
+    --text-muted: #a0a0a0;
+    --accent: #b8a9a9; 
+    --border-light: rgba(255, 255, 255, 0.1);
+    
+    --subtitle-color: #a0a0a0; 
+    
+    --input-bg: #2c2c34; 
+    --input-focus-bg: #3c3c45; 
+    --input-text: #f0f0f0; 
+    --input-border: rgba(255, 255, 255, 0.1);
+    
+    --sig-color: #aab8c2;
+    --comment-box-bg: #2c2c34;
+    --comment-box-text: #f0f0f0;
+    --comment-box-border: rgba(255, 255, 255, 0.1);
+    --comment-placeholder: #666;
+    --comment-btn-bg: #b8a9a9;
+    --comment-btn-text: #2c2c34;
+
+    --shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.4); 
+    --shadow-lg: 0 8px 25px rgba(0, 0, 0, 0.6);
+    --like-active: #FF7043; 
+    --dislike-active: #7986CB;
+    
+    --tag-bg: #464650;
+    --tag-bg-hover: #50505a;
+    --tag-text: #ccc;
+    --tag-selected-bg: #b8a9a9;
+    --tag-selected-text: #2c2c34;
+}
+
+/* RED THEME */
+body[data-theme="red"] {
+    --bg-color: #7f1d1d; 
+    --card-bg: #fff5f5;  
+    --text-main: #2b0b0b; 
+    --text-muted: #7f4f4f;
+    --accent: #b91c1c;   
+    --border-light: rgba(185, 28, 28, 0.15);
+    
+    --subtitle-color: #ffffff; 
+
+    --input-bg: #fff5f5; 
+    --input-focus-bg: #ffffff;
+    --input-text: #2b0b0b;
+    --input-border: rgba(185, 28, 28, 0.2); 
+    
+    --comment-box-bg: #ffffff; 
+    --comment-box-text: #2b0b0b; 
+    --comment-box-border: rgba(185, 28, 28, 0.2); 
+    --comment-placeholder: #9ca3af; 
+    
+    --comment-btn-bg: #b91c1c; 
+    --comment-btn-text: #ffffff;
+    
+    --sig-color: #7f4f4f; 
+
+    --like-active: #d32f2f; 
+    --dislike-active: #1a1a1a;
+    
+    --tag-bg: #ffebeb;
+    --tag-bg-hover: #ffdcdc;
+    --tag-text: #7f4f4f;
+    --tag-selected-bg: #b91c1c;
+    --tag-selected-text: #fff;
+}
+
+/* Dark Mode + Red Theme */
+body.dark-mode[data-theme="red"] {
+    --bg-color: #2a0505; 
+    --card-bg: #3f1010; 
+    --text-main: #ffdada; 
+    --text-muted: #cc8e8e;
+    --accent: #ff5252; 
+    --border-light: #450a0a;
+    
+    --input-bg: #2a0505; 
+    --input-focus-bg: #3f1010; 
+    --input-text: #ffdada; 
+    --input-border: #450a0a;
+
+    --comment-box-bg: #3f1010;
+    --comment-box-text: #ffdada;
+    --comment-placeholder: rgba(255, 218, 218, 0.4);
+    --comment-btn-bg: #ff5252;
+    
+    --tag-bg: #501515;
+    --tag-bg-hover: #601a1a;
+    --tag-text: #ffdada;
+    --tag-selected-bg: #ff5252;
+    --tag-selected-text: #2a0505;
+}

@@ -109,7 +109,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
 
     def validate_definition(self, value):
         value = value.strip()
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-+?#]+$', value):
+        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#]+$', value):
             raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor (İzin verilenler: harf, rakam, boşluk ve . , - + ? # ( ) ).")
         return self.turkish_lower(value)
 
