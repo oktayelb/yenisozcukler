@@ -30,4 +30,4 @@ urlpatterns = [
 
     path('api/my-words', views.get_my_words, name='get_my_words'),
     path('api/add-example', views.add_example, name='add_example'),
-]
+] 

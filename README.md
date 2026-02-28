@@ -10,4 +10,4 @@ Platform, içerik kalitesini korumak için gönderim ve moderasyon aşamalarınd
 
 ## Tavsiyeleriniz 
 
-Beklerim
+Sitenin UI ve UX kısmının büyük gelişime ihtiyacı var. Bu konuda bir fikriniz varsa lütfen paylaşınız.
