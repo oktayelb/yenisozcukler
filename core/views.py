@@ -24,10 +24,35 @@ from .serializers import (
 # --- YARDIMCI FONKSİYONLAR ---
 
 def get_client_ip(request):
-    return request.META.get('HTTP_CF_CONNECTING_IP') or request.META.get('REMOTE_ADDR')
+    """
+    Retrieves the client IP.
+    SECURITY WARNING: This function trusts the CF-Connecting-IP and X-Forwarded-For headers.
+    Because you do not have a local reverse proxy (like Nginx), this is ONLY secure if you 
+    have configured your OS firewall (e.g., UFW) to block all traffic to this server EXCEPT 
+    from trusted sources like Cloudflare's IP ranges.
+    """
+    cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
+    if cf_ip:
+        return cf_ip
+        
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+
+    return request.META.get('REMOTE_ADDR')
+
+def get_valid_session_id(request):
+    """
+    Attempts to retrieve and cryptographically verify the session ID from the cookie.
+    Returns None if the cookie is missing, tampered with, or forged.
+    """
+    try:
+        return request.get_signed_cookie('user_id', salt='vote_session')
+    except Exception:
+        return None
 
 def get_or_create_session_id(request):
-    return request.COOKIES.get('user_id') or str(uuid.uuid4())
+    return get_valid_session_id(request) or str(uuid.uuid4())
 
 # --- OKUMA (READ) ENDPOINTLERİ ---
 
@@ -92,7 +117,7 @@ def get_words(request):
     except (PageNotAnInteger, EmptyPage):
         words_page = []
 
-    session_id = request.COOKIES.get('user_id')
+    session_id = get_valid_session_id(request)
     user_votes = {}
     
     try:
@@ -127,7 +152,8 @@ def get_words(request):
     })
     
     if not session_id:
-        response.set_cookie('user_id', str(uuid.uuid4()), max_age=31536000, httponly=True)
+        session_id = str(uuid.uuid4())
+        response.set_signed_cookie('user_id', session_id, salt='vote_session', max_age=31536000, httponly=True)
         
     return response
 
@@ -147,7 +173,7 @@ def get_comments(request, word_id):
     except (EmptyPage, PageNotAnInteger):
         comments_page = []
 
-    session_id = request.COOKIES.get('user_id')
+    session_id = get_valid_session_id(request)
     user_votes = {} 
 
     try:
@@ -181,17 +207,21 @@ def get_comments(request, word_id):
     })
     
     if not session_id:
-        response.set_cookie('user_id', str(uuid.uuid4()), max_age=31536000, httponly=True)
+        session_id = str(uuid.uuid4())
+        response.set_signed_cookie('user_id', session_id, salt='vote_session', max_age=31536000, httponly=True)
 
     return response
 
 # --- YAZMA (WRITE) ENDPOINTLERİ ---
-
+@ratelimit(key='ip', rate='3/5s', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([]) 
 @permission_classes([])
 @transaction.atomic 
 def vote(request, entity_type, entity_id):
+    if getattr(request, 'limited', False):
+        return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
+
     client_ip = get_client_ip(request)
     session_id = get_or_create_session_id(request)
     user = request.user if request.user.is_authenticated else None
@@ -263,7 +293,7 @@ def vote(request, entity_type, entity_id):
         'new_score': obj.score, 
         'user_action': response_action 
     })
-    response.set_cookie('user_id', session_id, max_age=31536000, httponly=True)
+    response.set_signed_cookie('user_id', session_id, salt='vote_session', max_age=31536000, httponly=True)
     return response
 
 @ratelimit(key='ip', rate='2/15s', method='POST', block=False)
@@ -512,7 +542,7 @@ def get_my_words(request):
 
     words = Word.objects.filter(user=user, status='approved').order_by('-timestamp')
     
-    session_id = request.COOKIES.get('user_id')
+    session_id = get_valid_session_id(request)
     user_votes = {}
     try:
         if words:
