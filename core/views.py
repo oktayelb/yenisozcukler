@@ -83,14 +83,25 @@ def get_words(request):
     limit = min(limit, 50)
     mode = request.GET.get('mode', 'all') 
     tag_slug = request.GET.get('tag') 
+    sort = request.GET.get('sort', 'date_desc')
 
     # --- QUERYSET FIX ---
     # Removed .select_related('user') to fix the FieldError with .only()
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
         .prefetch_related('categories')\
-        .only('id', 'word', 'definition', 'example', 'author', 'timestamp', 'is_profane', 'score')\
-        .order_by('-timestamp')
+        .only('id', 'word', 'definition', 'example', 'author', 'timestamp', 'is_profane', 'score')
+
+    # 0. Sorting
+    if sort == 'date_asc':
+        words_queryset = words_queryset.order_by('timestamp')
+    elif sort == 'score_desc':
+        words_queryset = words_queryset.order_by('-score', '-timestamp')
+    elif sort == 'score_asc':
+        words_queryset = words_queryset.order_by('score', '-timestamp')
+    else:
+        # Default: newest first
+        words_queryset = words_queryset.order_by('-timestamp')
     
     # 1. Profanity Filter
     if mode == 'profane':

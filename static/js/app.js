@@ -22,6 +22,9 @@ let activeCategorySlug = null; // Current filter
 let allCategories = [];        // Loaded from API
 let selectedFormCategories = new Set(); // For submission
 
+// Sorting
+let currentSort = 'date_desc'; // 'date_desc', 'date_asc', 'score_desc', 'score_asc'
+
 // Auth State
 let currentAuthMode = 'login'; // 'login' or 'register'
 const isUserLoggedIn = document.body.getAttribute('data-user-auth') === 'true';
@@ -35,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     setupAuthTriggers();
+    setupSortBar();
     setupTheme();
     initLogoSystem();
     fetchCategories(); // Load tags for the form
@@ -141,6 +145,28 @@ function updateLogoVisuals(theme) {
         def.className = 'logo-card theme-default pos-center';
         red.className = 'logo-card theme-red pos-behind';
     }
+}
+
+/* --- SORTING --- */
+function setupSortBar() {
+    const bar = document.getElementById('sortBar');
+    if (!bar) return;
+
+    const buttons = bar.querySelectorAll('.sort-btn');
+    buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sortVal = btn.getAttribute('data-sort');
+            if (!sortVal || sortVal === currentSort) return;
+
+            currentSort = sortVal;
+
+            buttons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            currentPage = 1;
+            fetchWords(currentPage);
+        });
+    });
 }
 
 /* --- FORM TOGGLE LOGIC --- */
@@ -386,8 +412,8 @@ async function fetchWords(page) {
     
     const mode = localStorage.getItem(COLOR_THEME_KEY) === 'red' ? 'profane' : 'all';
 
-    // Build URL with tag filter if active
-    let url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}`;
+    // Build URL with tag filter and sort if active
+    let url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}&sort=${encodeURIComponent(currentSort)}`;
     if (activeCategorySlug) {
         url += `&tag=${activeCategorySlug}`;
         // Note: Banner update happens in handleTagClick usually, 

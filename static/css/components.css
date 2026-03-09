@@ -125,6 +125,43 @@
 .filter-banner button { background: rgba(255,255,255,0.2); border: none; color: inherit; font-weight: bold; cursor: pointer; padding: 5px 12px; border-radius: 15px; font-size: 0.85rem; }
 .filter-banner button:hover { background: rgba(255,255,255,0.3); }
 
+/* SORT BAR (WORDS LIST) */
+.sort-bar {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 8px 12px;
+    margin-bottom: var(--spacing-md);
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    box-shadow: var(--shadow-sm);
+}
+.sort-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-right: 4px;
+}
+.sort-btn {
+    border: 1px solid var(--border-light);
+    background: var(--input-bg);
+    color: var(--text-main);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.sort-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.sort-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--card-bg);
+}
+
 /* FORMS (CONTRIBUTION CARD) */
 .form-card { 
     background: var(--card-bg); box-shadow: var(--shadow-sm); padding: 25px 30px; border-radius: 16px; 
