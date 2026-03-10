@@ -41,9 +41,21 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSortBar();
     setupTheme();
     initLogoSystem();
+    initTopAppBar();
     fetchCategories(); // Load tags for the form
     fetchWords(currentPage);
 });
+
+function focusContributionForm() {
+    const card = document.getElementById('contributionCard');
+    if (!card) return;
+
+    if (!card.classList.contains('expanded')) {
+        toggleContributionForm();
+    }
+
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 /* --- UTILS --- */
 function getCSRFToken() {
@@ -149,23 +161,48 @@ function updateLogoVisuals(theme) {
 
 /* --- SORTING --- */
 function setupSortBar() {
-    const bar = document.getElementById('sortBar');
-    if (!bar) return;
+    const bars = document.querySelectorAll('.sort-bar');
+    if (!bars.length) return;
 
-    const buttons = bar.querySelectorAll('.sort-btn');
-    buttons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const sortVal = btn.getAttribute('data-sort');
-            if (!sortVal || sortVal === currentSort) return;
+    bars.forEach(bar => {
+        const toggle = bar.querySelector('.sort-toggle-btn');
+        if (toggle) {
+            toggle.addEventListener('click', () => {
+                bar.classList.toggle('collapsed');
+            });
+        }
 
-            currentSort = sortVal;
-
-            buttons.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            currentPage = 1;
-            fetchWords(currentPage);
+        const buttons = bar.querySelectorAll('.sort-btn');
+        buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const sortVal = btn.getAttribute('data-sort');
+                changeSort(sortVal);
+            });
         });
+    });
+
+    updateSortButtonsActive();
+}
+
+function changeSort(sortVal) {
+    if (!sortVal || sortVal === currentSort) return;
+
+    currentSort = sortVal;
+    updateSortButtonsActive();
+
+    currentPage = 1;
+    fetchWords(currentPage);
+}
+
+function updateSortButtonsActive() {
+    const buttons = document.querySelectorAll('.sort-btn');
+    buttons.forEach(btn => {
+        const sortVal = btn.getAttribute('data-sort');
+        if (sortVal === currentSort) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
     });
 }
 
@@ -187,6 +224,22 @@ function toggleContributionForm() {
             if(title) title.innerHTML = '';
         }
     }
+}
+
+function initTopAppBar() {
+    const bar = document.getElementById('topAppBar');
+    if (!bar) return;
+
+    const onScroll = () => {
+        if (window.scrollY > 150) {
+            bar.classList.add('is-visible');
+        } else {
+            bar.classList.remove('is-visible');
+        }
+    };
+
+    window.addEventListener('scroll', onScroll);
+    onScroll();
 }
 
 

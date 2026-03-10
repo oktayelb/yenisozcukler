@@ -48,6 +48,43 @@
             </div>
         </header>
 
+        <div class="top-app-bar" id="topAppBar">
+            <div class="top-app-inner">
+                <div class="top-app-left">
+                    <button class="header-btn" onclick="focusContributionForm()">+ Sözcük Ekle</button>
+                </div>
+
+                <div class="top-app-center">
+                    <div class="sort-bar collapsed">
+                        <button type="button" class="sort-toggle-btn">
+                            Sırala
+                            <span class="sort-toggle-icon">▼</span>
+                        </button>
+                        <div class="sort-options">
+                            <span class="sort-label">Sırala:</span>
+                            <button class="sort-btn" data-sort="date_desc">Yeni eklenenler</button>
+                            <button class="sort-btn" data-sort="date_asc">Eski eklenenler</button>
+                            <button class="sort-btn" data-sort="score_desc">En çok beğenilen</button>
+                            <button class="sort-btn" data-sort="score_asc">En az beğenilen</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="top-app-right">
+                    {% if request.user.is_authenticated %}
+                        <button class="header-btn" onclick="openProfileModal('{{ request.user.username }}')">
+                            {{ request.user.username }}
+                        </button>
+                        <button class="header-btn logout-btn" onclick="handleLogout()" title="Çıkış Yap">
+                            Çıkış
+                        </button>
+                    {% else %}
+                        <button class="header-btn" onclick="openModal('authModal')">Giriş Yap</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
         <div class="container">
             
             <div class="form-card collapsed" id="contributionCard">
@@ -113,12 +150,18 @@
                 <div id="filterDescDisplay" style="font-size:0.9rem; font-style:italic; border-top:1px solid rgba(255,255,255,0.2); padding-top:4px; display:none;"></div>
             </div>
 
-            <div class="sort-bar" id="sortBar">
-                <span class="sort-label">Sırala:</span>
-                <button class="sort-btn active" data-sort="date_desc">Yeni eklenenler</button>
-                <button class="sort-btn" data-sort="date_asc">Eski eklenenler</button>
-                <button class="sort-btn" data-sort="score_desc">En çok beğenilen</button>
-                <button class="sort-btn" data-sort="score_asc">En az beğenilen</button>
+            <div class="sort-bar collapsed" id="sortBar">
+                <button type="button" class="sort-toggle-btn">
+                    Sırala
+                    <span class="sort-toggle-icon">▼</span>
+                </button>
+                <div class="sort-options">
+                    <span class="sort-label">Sırala:</span>
+                    <button class="sort-btn active" data-sort="date_desc">Yeni eklenenler</button>
+                    <button class="sort-btn" data-sort="date_asc">Eski eklenenler</button>
+                    <button class="sort-btn" data-sort="score_desc">En çok beğenilen</button>
+                    <button class="sort-btn" data-sort="score_asc">En az beğenilen</button>
+                </div>
             </div>
 
             <div class="feed-container" id="feedList">

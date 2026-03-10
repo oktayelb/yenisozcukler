@@ -128,20 +128,90 @@
 /* SORT BAR (WORDS LIST) */
 .sort-bar {
     background: var(--card-bg);
-    border-radius: 12px;
-    padding: 8px 12px;
+    border-radius: 50px;
+    padding: 6px;
     margin-bottom: var(--spacing-md);
     display: inline-flex;
-    flex-wrap: wrap;
+    /* Changed to min-content to ensure it wraps tightly around visible children */
+    width: max-content; 
+    align-items: center;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+    overflow: hidden;
+}
+
+.sort-bar:not(.collapsed) {
+    padding-right: 16px;
+}
+
+.sort-bar.collapsed {
+    padding-right: 6px;
+}
+
+.sort-toggle-btn {
+    border: 1px solid var(--border-light);
+    background: var(--input-bg);
+    color: var(--text-main);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    flex-shrink: 0; /* Prevents the button from squishing during animation */
+    transition: all 0.2s ease;
+}
+
+.sort-toggle-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.sort-toggle-icon {
+    display: inline-block;
+    font-size: 0.7rem;
+    transform-origin: center;
+    transition: transform 0.4s ease;
+}
+
+.sort-bar:not(.collapsed) .sort-toggle-icon {
+    transform: rotate(180deg);
+}
+
+.sort-options {
+    display: inline-flex;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 8px;
-    box-shadow: var(--shadow-sm);
+    max-width: 800px;
+    margin-left: 8px; 
+    opacity: 1;
+    /* Added visibility to prevent interaction/spacing issues when hidden */
+    visibility: visible;
+    overflow: hidden;
+    transition: 
+        max-width 0.5s cubic-bezier(0.25, 1, 0.5, 1), 
+        opacity 0.4s ease, 
+        margin-left 0.5s cubic-bezier(0.25, 1, 0.5, 1),
+        visibility 0.5s;
 }
+
+.sort-bar.collapsed .sort-options {
+    max-width: 0;
+    margin-left: 0;
+    opacity: 0;
+    visibility: hidden;
+}
+
 .sort-label {
     font-size: 0.85rem;
     color: var(--text-muted);
-    margin-right: 4px;
+    margin-right: 2px;
+    white-space: nowrap;
 }
+
 .sort-btn {
     border: 1px solid var(--border-light);
     background: var(--input-bg);
@@ -150,12 +220,15 @@
     padding: 5px 12px;
     font-size: 0.85rem;
     cursor: pointer;
+    white-space: nowrap;
     transition: all 0.2s ease;
 }
+
 .sort-btn:hover {
     border-color: var(--accent);
     color: var(--accent);
 }
+
 .sort-btn.active {
     background: var(--accent);
     border-color: var(--accent);
