@@ -578,7 +578,9 @@ function createCardElement(item, isModalMode) {
     const decode = (s) => s ? parser.parseFromString(s, "text/html").documentElement.textContent : '';
 
     card.onclick = (e) => {
+        // Exclude the vote container background as well so clicking it does nothing
         if (e.target.closest('.vote-btn') || 
+            e.target.closest('.vote-container-floating') || 
             e.target.closest('.user-badge') || 
             e.target.closest('.add-example-btn') || 
             e.target.closest('.tag-badge') || 
