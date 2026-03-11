@@ -127,51 +127,76 @@
 
 /* SORT BAR (WORDS LIST) */
 .sort-bar {
-    background: var(--card-bg);
-    border-radius: 50px;
-    padding: 6px;
-    margin-bottom: var(--spacing-md);
-    display: inline-flex;
-    /* Changed to min-content to ensure it wraps tightly around visible children */
-    width: max-content; 
-    align-items: center;
-    box-shadow: var(--shadow-sm);
+    background: var(--input-bg);
+    border-radius: 12px;
+    padding: 0; /* Removed internal padding to make buttons span full height */
+    margin-bottom: 25px;
+    display: flex;
+    width: 100%; 
+    box-sizing: border-box;
+    align-items: stretch; /* Stretches the children vertically */
+    border: 1px solid var(--border-light);
+    border-bottom: 4px solid var(--border-light);
+    box-shadow: none;
     transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
     overflow: hidden;
 }
 
+.top-app-center .sort-bar {
+    background: transparent;
+    width: max-content;
+    border: none;
+    margin-bottom: 0;
+    padding: 0;
+}
+
 .sort-bar:not(.collapsed) {
-    padding-right: 16px;
+    padding-right: 20px;
 }
 
 .sort-bar.collapsed {
-    padding-right: 6px;
+    padding-right: 0;
 }
 
 .sort-toggle-btn {
-    border: 1px solid var(--border-light);
-    background: var(--input-bg);
+    border: none;
+    background: transparent;
     color: var(--text-main);
-    border-radius: 999px;
-    padding: 6px 14px;
-    font-size: 0.85rem;
+    border-radius: 0;
+    padding: 16px 30px; 
+    font-size: 1.15rem;
+    font-weight: 700;
     cursor: pointer;
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center; /* Centers the text properly */
+    gap: 8px;
     white-space: nowrap;
-    flex-shrink: 0; /* Prevents the button from squishing during animation */
-    transition: all 0.2s ease;
+    flex-shrink: 0;
+    flex-grow: 0; /* Ensures it shrinks to text width when options appear */
+    transition: flex-grow 0.5s cubic-bezier(0.25, 1, 0.5, 1), background 0.2s ease, color 0.2s ease;
+}
+
+.sort-bar.collapsed .sort-toggle-btn {
+    flex-grow: 1; /* Causes the button to expand and naturally push text to center when closed */
 }
 
 .sort-toggle-btn:hover {
-    border-color: var(--accent);
     color: var(--accent);
+    background: rgba(142, 127, 127, 0.05); /* Slight wash to show the full hit area */
+}
+
+.top-app-center .sort-toggle-btn {
+    padding: 8px 15px; /* Adjust scale for header */
+}
+
+.top-app-center .sort-toggle-btn:hover {
+    background: transparent;
 }
 
 .sort-toggle-icon {
     display: inline-block;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     transform-origin: center;
     transition: transform 0.4s ease;
 }
@@ -184,11 +209,10 @@
     display: inline-flex;
     flex-wrap: nowrap;
     align-items: center;
-    gap: 8px;
-    max-width: 800px;
-    margin-left: 8px; 
+    gap: 12px;
+    max-width: 1000px;
+    margin-left: 10px; 
     opacity: 1;
-    /* Added visibility to prevent interaction/spacing issues when hidden */
     visibility: visible;
     overflow: hidden;
     transition: 
@@ -206,27 +230,25 @@
 }
 
 .sort-label {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-right: 2px;
-    white-space: nowrap;
+    display: none;
 }
 
 .sort-btn {
     border: 1px solid var(--border-light);
-    background: var(--input-bg);
-    color: var(--text-main);
-    border-radius: 999px;
-    padding: 5px 12px;
-    font-size: 0.85rem;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 30px;
+    padding: 8px 18px;
+    font-size: 0.95rem;
+    font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.2s ease;
 }
 
 .sort-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
+    color: var(--text-main);
+    border-color: var(--text-muted);
 }
 
 .sort-btn.active {

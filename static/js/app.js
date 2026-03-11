@@ -165,18 +165,26 @@ function setupSortBar() {
     if (!bars.length) return;
 
     bars.forEach(bar => {
-        const toggle = bar.querySelector('.sort-toggle-btn');
-        if (toggle) {
-            toggle.addEventListener('click', () => {
+        // Explicitly set pointer so the entire block feels clickable
+        bar.style.cursor = 'pointer'; 
+        
+        // Listen on the entire bar container instead of just the button
+        bar.addEventListener('click', (e) => {
+            // Prevent toggling if the user specifically clicked a sorting option
+            if (!e.target.closest('.sort-btn')) {
                 bar.classList.toggle('collapsed');
-            });
-        }
+            }
+        });
 
         const buttons = bar.querySelectorAll('.sort-btn');
         buttons.forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Stop the event from bubbling back up to the bar
                 const sortVal = btn.getAttribute('data-sort');
                 changeSort(sortVal);
+                
+                // Automatically collapse after a selection is made
+                bar.classList.add('collapsed');
             });
         });
     });
