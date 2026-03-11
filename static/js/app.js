@@ -799,6 +799,8 @@ function updateCardWithExample(wordId, text) {
 }
 
 /* --- VOTING SYSTEM --- */
+const pendingVotes = {};
+
 function createVoteControls(type, data) {
     const div = document.createElement('div'); div.className = 'vote-container';
     const mkBtn = (act, icon) => {
@@ -816,19 +818,92 @@ function createVoteControls(type, data) {
     return div;
 }
 
-async function sendVote(type, id, act, con) {
-    const btns = con.querySelectorAll('.vote-btn'); btns.forEach(b => b.disabled = true);
-    try {
-        const data = await apiRequest(`/api/vote/${type}/${id}`, 'POST', { action: act });
+function sendVote(type, id, act, con) {
+    const uniqueId = `${type}_${id}`;
+    
+    const likeBtn = con.querySelector('.like');
+    const dislikeBtn = con.querySelector('.dislike');
+    const scoreSpan = con.querySelector('.vote-score');
+    
+    if (!pendingVotes[uniqueId]) {
+        let state = 'none';
+        if (likeBtn.classList.contains('active')) state = 'like';
+        else if (dislikeBtn.classList.contains('active')) state = 'dislike';
         
-        con.querySelector('.vote-score').innerText = data.new_score;
-        con.querySelectorAll('.vote-btn').forEach(b => b.classList.remove('active'));
-        if(data.user_action && data.user_action !== 'none') {
-            const cls = data.user_action === 'liked' ? 'like' : 'dislike';
-            con.querySelector(`.${cls}`).classList.add('active');
+        pendingVotes[uniqueId] = {
+            originalState: state,
+            originalScore: parseInt(scoreSpan.innerText, 10) || 0,
+            currentState: state,
+            currentScore: parseInt(scoreSpan.innerText, 10) || 0,
+            timer: null
+        };
+    }
+    
+    const voteData = pendingVotes[uniqueId];
+    clearTimeout(voteData.timer);
+    
+    // Calculate new optimistic state and score based on the click
+    if (voteData.currentState === act) {
+        voteData.currentState = 'none';
+        voteData.currentScore -= (act === 'like' ? 1 : -1);
+    } else {
+        let diff = 0;
+        if (voteData.currentState === 'none') {
+            diff = (act === 'like') ? 1 : -1;
+        } else {
+            diff = (act === 'like') ? 2 : -2; 
         }
-    } catch (e) { showCustomAlert("Hata oluştu.", "error"); }
-    finally { setTimeout(() => btns.forEach(b => b.disabled = false), 300); }
+        voteData.currentState = act;
+        voteData.currentScore += diff;
+    }
+    
+    // Optimistic UI Update immediately
+    likeBtn.classList.remove('active');
+    dislikeBtn.classList.remove('active');
+    if (voteData.currentState === 'like') likeBtn.classList.add('active');
+    if (voteData.currentState === 'dislike') dislikeBtn.classList.add('active');
+    scoreSpan.innerText = voteData.currentScore;
+    
+    // Debounce the API call
+    voteData.timer = setTimeout(async () => {
+        const finalState = voteData.currentState;
+        const initialState = voteData.originalState;
+        
+        // If the final state is identical to the beginning, do not hit the server
+        if (finalState === initialState) {
+            delete pendingVotes[uniqueId];
+            return;
+        }
+        
+        // Determine correct action string: To revert to 'none', send the initial state to trigger the toggle
+        const actionToSend = (finalState === 'none') ? initialState : finalState;
+        
+        const btns = con.querySelectorAll('.vote-btn');
+        btns.forEach(b => b.disabled = true);
+        
+        try {
+            const data = await apiRequest(`/api/vote/${type}/${id}`, 'POST', { action: actionToSend });
+            
+            // Sync with backend truth
+            scoreSpan.innerText = data.new_score;
+            likeBtn.classList.remove('active');
+            dislikeBtn.classList.remove('active');
+            if(data.user_action === 'liked') likeBtn.classList.add('active');
+            else if(data.user_action === 'disliked') dislikeBtn.classList.add('active');
+        } catch (e) {
+            showCustomAlert("Hata oluştu, oy kaydedilemedi.", "error");
+            
+            // Revert UI on failure
+            likeBtn.classList.remove('active');
+            dislikeBtn.classList.remove('active');
+            if (initialState === 'like') likeBtn.classList.add('active');
+            if (initialState === 'dislike') dislikeBtn.classList.add('active');
+            scoreSpan.innerText = voteData.originalScore;
+        } finally {
+            btns.forEach(b => b.disabled = false);
+            delete pendingVotes[uniqueId];
+        }
+    }, 500);
 }
 
 /* === DETAIL VIEW & COMMENTS === */
