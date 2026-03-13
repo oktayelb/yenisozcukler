@@ -1,4 +1,5 @@
 # core/views.py
+import hashlib
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -12,7 +13,6 @@ from django.core.cache import cache
 from django.db.models import Count, F, Sum 
 from django.db import transaction
 
-import uuid
 from .models import Word, Comment, WordVote, CommentVote, Category
 from .serializers import (
     WordSerializer, CommentSerializer, 
@@ -34,40 +34,26 @@ def get_client_ip(request):
 
     return request.META.get('REMOTE_ADDR')
 
-def get_valid_session_id(request):
-    try:
-        return request.get_signed_cookie('user_id', salt='vote_session')
-    except Exception:
-        return None
+def get_fingerprint(request):
+    ip = get_client_ip(request) or ""
+    user_agent = request.META.get('HTTP_USER_AGENT', '')
+    raw_fingerprint = f"{ip}_{user_agent}"
+    return hashlib.sha256(raw_fingerprint.encode('utf-8')).hexdigest()
 
 def get_or_create_session_id(request):
-    session_id = get_valid_session_id(request)
-    if not session_id:
-        session_id = getattr(request, '_cached_session_id', str(uuid.uuid4()))
-        request._cached_session_id = session_id
-    return session_id
-
-def set_secure_cookie(response, session_id):
-    response.set_signed_cookie(
-        'user_id', 
-        session_id, 
-        salt='vote_session',    
-        max_age=31536000, 
-        httponly=True,
-        secure=True,
-        samesite='Lax'
-    )
-    return response
+    if not request.session.session_key:
+        request.session.create()
+    return request.session.session_key
 
 def universal_rate_key(group, request):
     if hasattr(request, 'user') and request.user.is_authenticated:
         return f"user_{request.user.id}"
     
-    session_id = get_valid_session_id(request)
-    if session_id:
-        return f"session_{session_id}"
+    session_key = request.session.session_key
+    if session_key:
+        return f"session_{session_key}"
         
-    return getattr(request, '_cached_session_id', get_client_ip(request))
+    return f"fingerprint_{get_fingerprint(request)}"
 
 # --- OKUMA (READ) ENDPOINTLERİ ---
 
@@ -170,13 +156,11 @@ def get_words(request):
 
     serializer = WordSerializer(words_page, many=True, context={'user_votes': user_votes})
     
-    response = Response({
+    return Response({
         'status': 'full', 
         'words': serializer.data, 
         'total_count': total_count
     })
-    
-    return set_secure_cookie(response, session_id)
 
 @ratelimit(key='ip', rate='120/m', method='GET', block=False)
 @api_view(['GET'])
@@ -224,13 +208,11 @@ def get_comments(request, word_id):
 
     serializer = CommentSerializer(comments_page, many=True, context={'user_votes': user_votes})
     
-    response = Response({
+    return Response({
         'success': True, 
         'comments': serializer.data,
         'has_next': comments_page.has_next() if hasattr(comments_page, 'has_next') else False
     })
-    
-    return set_secure_cookie(response, session_id)
 
 # --- YAZMA (WRITE) ENDPOINTLERİ ---
 
@@ -250,8 +232,7 @@ def vote(request, entity_type, entity_id):
     
     action = request.data.get('action') 
     if action not in ['like', 'dislike']:
-        response = Response({'error': 'Geçersiz işlem.'}, status=400)
-        return set_secure_cookie(response, session_id)
+        return Response({'error': 'Geçersiz işlem.'}, status=400)
 
     vote_val = 1 if action == 'like' else -1
 
@@ -264,14 +245,12 @@ def vote(request, entity_type, entity_id):
         VoteClass = CommentVote
         lookup_field = 'comment'
     else:
-        response = Response({'error': 'Geçersiz tip.'}, status=404)
-        return set_secure_cookie(response, session_id)
+        return Response({'error': 'Geçersiz tip.'}, status=404)
 
     obj = get_object_or_404(ModelClass.objects.select_for_update(), id=entity_id)
     
     if entity_type == 'word' and obj.status != 'approved':
-        response = Response({'error': 'Geçersiz içerik.'}, status=404)
-        return set_secure_cookie(response, session_id)
+        return Response({'error': 'Geçersiz içerik.'}, status=404)
 
     existing_vote = None
 
@@ -313,12 +292,11 @@ def vote(request, entity_type, entity_id):
     obj.save()
     obj.refresh_from_db()
 
-    response = Response({
+    return Response({
         'success': True, 
         'new_score': obj.score, 
         'user_action': response_action 
     })
-    return set_secure_cookie(response, session_id)
 
 @ratelimit(key='ip', rate='30/m', method='POST', block=False)
 @ratelimit(key=universal_rate_key, rate='5/m', method='POST', block=False)
@@ -342,12 +320,10 @@ def add_word(request):
         serializer.save(**save_kwargs)
         cache.delete_many(['total_approved_words_count_all', 'total_approved_words_count_profane'])
         
-        response = Response({'success': True})
+        return Response({'success': True})
     else:
         first_error = next(iter(serializer.errors.values()))[0]
-        response = Response({'success': False, 'error': first_error}, status=400)
-        
-    return set_secure_cookie(response, session_id)
+        return Response({'success': False, 'error': first_error}, status=400)
 
 @ratelimit(key='ip', rate='20/m', method='POST', block=False)
 @ratelimit(key=universal_rate_key, rate='5/m', method='POST', block=False)
@@ -403,12 +379,10 @@ def add_comment(request):
             user=user_obj, 
             score=0
         )
-        response = Response({'success': True, 'comment': CommentSerializer(new_comment).data}, status=201)
+        return Response({'success': True, 'comment': CommentSerializer(new_comment).data}, status=201)
     else:
         first_error = next(iter(serializer.errors.values()))[0]
-        response = Response({'success': False, 'error': first_error}, status=400)
-        
-    return set_secure_cookie(response, session_id)
+        return Response({'success': False, 'error': first_error}, status=400)
     
 ## Profil İşlemleri
 
@@ -600,9 +574,8 @@ def get_my_words(request):
 
     serializer = WordSerializer(words_page, many=True, context={'user_votes': user_votes})
     
-    response = Response({
+    return Response({
         'success': True, 
         'words': serializer.data,
         'total_count': paginator.count
     })
-    return set_secure_cookie(response, session_id)
