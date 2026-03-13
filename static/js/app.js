@@ -22,6 +22,9 @@ let activeCategorySlug = null; // Current filter
 let allCategories = [];        // Loaded from API
 let selectedFormCategories = new Set(); // For submission
 
+// Sorting
+let currentSort = 'date_desc'; // 'date_desc', 'date_asc', 'score_desc', 'score_asc'
+
 // Auth State
 let currentAuthMode = 'login'; // 'login' or 'register'
 const isUserLoggedIn = document.body.getAttribute('data-user-auth') === 'true';
@@ -35,11 +38,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     setupAuthTriggers();
+    setupSortBar();
     setupTheme();
     initLogoSystem();
+    initTopAppBar();
     fetchCategories(); // Load tags for the form
     fetchWords(currentPage);
 });
+
+function focusContributionForm() {
+    const card = document.getElementById('contributionCard');
+    if (!card) return;
+
+    if (!card.classList.contains('expanded')) {
+        toggleContributionForm();
+    }
+
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 /* --- UTILS --- */
 function getCSRFToken() {
@@ -143,6 +159,61 @@ function updateLogoVisuals(theme) {
     }
 }
 
+/* --- SORTING --- */
+function setupSortBar() {
+    const bars = document.querySelectorAll('.sort-bar');
+    if (!bars.length) return;
+
+    bars.forEach(bar => {
+        // Explicitly set pointer so the entire block feels clickable
+        bar.style.cursor = 'pointer'; 
+        
+        // Listen on the entire bar container instead of just the button
+        bar.addEventListener('click', (e) => {
+            // Prevent toggling if the user specifically clicked a sorting option
+            if (!e.target.closest('.sort-btn')) {
+                bar.classList.toggle('collapsed');
+            }
+        });
+
+        const buttons = bar.querySelectorAll('.sort-btn');
+        buttons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Stop the event from bubbling back up to the bar
+                const sortVal = btn.getAttribute('data-sort');
+                changeSort(sortVal);
+                
+                // Automatically collapse after a selection is made
+                bar.classList.add('collapsed');
+            });
+        });
+    });
+
+    updateSortButtonsActive();
+}
+
+function changeSort(sortVal) {
+    if (!sortVal || sortVal === currentSort) return;
+
+    currentSort = sortVal;
+    updateSortButtonsActive();
+
+    currentPage = 1;
+    fetchWords(currentPage);
+}
+
+function updateSortButtonsActive() {
+    const buttons = document.querySelectorAll('.sort-btn');
+    buttons.forEach(btn => {
+        const sortVal = btn.getAttribute('data-sort');
+        if (sortVal === currentSort) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
 /* --- FORM TOGGLE LOGIC --- */
 function toggleContributionForm() {
     const card = document.getElementById('contributionCard');
@@ -161,6 +232,22 @@ function toggleContributionForm() {
             if(title) title.innerHTML = '';
         }
     }
+}
+
+function initTopAppBar() {
+    const bar = document.getElementById('topAppBar');
+    if (!bar) return;
+
+    const onScroll = () => {
+        if (window.scrollY > 150) {
+            bar.classList.add('is-visible');
+        } else {
+            bar.classList.remove('is-visible');
+        }
+    };
+
+    window.addEventListener('scroll', onScroll);
+    onScroll();
 }
 
 
@@ -386,8 +473,8 @@ async function fetchWords(page) {
     
     const mode = localStorage.getItem(COLOR_THEME_KEY) === 'red' ? 'profane' : 'all';
 
-    // Build URL with tag filter if active
-    let url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}`;
+    // Build URL with tag filter and sort if active
+    let url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}&sort=${encodeURIComponent(currentSort)}`;
     if (activeCategorySlug) {
         url += `&tag=${activeCategorySlug}`;
         // Note: Banner update happens in handleTagClick usually, 
@@ -491,7 +578,9 @@ function createCardElement(item, isModalMode) {
     const decode = (s) => s ? parser.parseFromString(s, "text/html").documentElement.textContent : '';
 
     card.onclick = (e) => {
+        // Exclude the vote container background as well so clicking it does nothing
         if (e.target.closest('.vote-btn') || 
+            e.target.closest('.vote-container-floating') || 
             e.target.closest('.user-badge') || 
             e.target.closest('.add-example-btn') || 
             e.target.closest('.tag-badge') || 
@@ -720,6 +809,8 @@ function updateCardWithExample(wordId, text) {
 }
 
 /* --- VOTING SYSTEM --- */
+const pendingVotes = {};
+
 function createVoteControls(type, data) {
     const div = document.createElement('div'); div.className = 'vote-container';
     const mkBtn = (act, icon) => {
@@ -737,19 +828,92 @@ function createVoteControls(type, data) {
     return div;
 }
 
-async function sendVote(type, id, act, con) {
-    const btns = con.querySelectorAll('.vote-btn'); btns.forEach(b => b.disabled = true);
-    try {
-        const data = await apiRequest(`/api/vote/${type}/${id}`, 'POST', { action: act });
+function sendVote(type, id, act, con) {
+    const uniqueId = `${type}_${id}`;
+    
+    const likeBtn = con.querySelector('.like');
+    const dislikeBtn = con.querySelector('.dislike');
+    const scoreSpan = con.querySelector('.vote-score');
+    
+    if (!pendingVotes[uniqueId]) {
+        let state = 'none';
+        if (likeBtn.classList.contains('active')) state = 'like';
+        else if (dislikeBtn.classList.contains('active')) state = 'dislike';
         
-        con.querySelector('.vote-score').innerText = data.new_score;
-        con.querySelectorAll('.vote-btn').forEach(b => b.classList.remove('active'));
-        if(data.user_action && data.user_action !== 'none') {
-            const cls = data.user_action === 'liked' ? 'like' : 'dislike';
-            con.querySelector(`.${cls}`).classList.add('active');
+        pendingVotes[uniqueId] = {
+            originalState: state,
+            originalScore: parseInt(scoreSpan.innerText, 10) || 0,
+            currentState: state,
+            currentScore: parseInt(scoreSpan.innerText, 10) || 0,
+            timer: null
+        };
+    }
+    
+    const voteData = pendingVotes[uniqueId];
+    clearTimeout(voteData.timer);
+    
+    // Calculate new optimistic state and score based on the click
+    if (voteData.currentState === act) {
+        voteData.currentState = 'none';
+        voteData.currentScore -= (act === 'like' ? 1 : -1);
+    } else {
+        let diff = 0;
+        if (voteData.currentState === 'none') {
+            diff = (act === 'like') ? 1 : -1;
+        } else {
+            diff = (act === 'like') ? 2 : -2; 
         }
-    } catch (e) { showCustomAlert("Hata oluştu.", "error"); }
-    finally { setTimeout(() => btns.forEach(b => b.disabled = false), 300); }
+        voteData.currentState = act;
+        voteData.currentScore += diff;
+    }
+    
+    // Optimistic UI Update immediately
+    likeBtn.classList.remove('active');
+    dislikeBtn.classList.remove('active');
+    if (voteData.currentState === 'like') likeBtn.classList.add('active');
+    if (voteData.currentState === 'dislike') dislikeBtn.classList.add('active');
+    scoreSpan.innerText = voteData.currentScore;
+    
+    // Debounce the API call
+    voteData.timer = setTimeout(async () => {
+        const finalState = voteData.currentState;
+        const initialState = voteData.originalState;
+        
+        // If the final state is identical to the beginning, do not hit the server
+        if (finalState === initialState) {
+            delete pendingVotes[uniqueId];
+            return;
+        }
+        
+        // Determine correct action string: To revert to 'none', send the initial state to trigger the toggle
+        const actionToSend = (finalState === 'none') ? initialState : finalState;
+        
+        const btns = con.querySelectorAll('.vote-btn');
+        btns.forEach(b => b.disabled = true);
+        
+        try {
+            const data = await apiRequest(`/api/vote/${type}/${id}`, 'POST', { action: actionToSend });
+            
+            // Sync with backend truth
+            scoreSpan.innerText = data.new_score;
+            likeBtn.classList.remove('active');
+            dislikeBtn.classList.remove('active');
+            if(data.user_action === 'liked') likeBtn.classList.add('active');
+            else if(data.user_action === 'disliked') dislikeBtn.classList.add('active');
+        } catch (e) {
+            showCustomAlert("Hata oluştu, oy kaydedilemedi.", "error");
+            
+            // Revert UI on failure
+            likeBtn.classList.remove('active');
+            dislikeBtn.classList.remove('active');
+            if (initialState === 'like') likeBtn.classList.add('active');
+            if (initialState === 'dislike') dislikeBtn.classList.add('active');
+            scoreSpan.innerText = voteData.originalScore;
+        } finally {
+            btns.forEach(b => b.disabled = false);
+            delete pendingVotes[uniqueId];
+        }
+    }, 500);
 }
 
 /* === DETAIL VIEW & COMMENTS === */

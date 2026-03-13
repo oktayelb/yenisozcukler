@@ -125,11 +125,274 @@
 .filter-banner button { background: rgba(255,255,255,0.2); border: none; color: inherit; font-weight: bold; cursor: pointer; padding: 5px 12px; border-radius: 15px; font-size: 0.85rem; }
 .filter-banner button:hover { background: rgba(255,255,255,0.3); }
 
+/* SORT BAR (WORDS LIST) */
+.sort-bar {
+    background: var(--input-bg);
+    border-radius: 12px;
+    padding: 0; 
+    margin-bottom: 25px;
+    display: flex;
+    width: 100%; 
+    box-sizing: border-box;
+    align-items: stretch; 
+    border: 1px solid var(--border-light);
+    border-bottom: 4px solid var(--border-light);
+    box-shadow: none;
+    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+    overflow: hidden; 
+}
+
+.top-app-center .sort-bar {
+    background: transparent;
+    width: max-content;
+    border: none;
+    margin-bottom: 0;
+    padding: 0;
+}
+
+.sort-bar:not(.collapsed) {
+    padding-right: 20px;
+}
+
+.sort-bar.collapsed {
+    padding-right: 0;
+}
+
+.sort-toggle-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    border-radius: 0;
+    padding: 16px 30px; 
+    font-size: 1.15rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center; 
+    gap: 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    flex-grow: 0; 
+    transition: flex-grow 0.5s cubic-bezier(0.25, 1, 0.5, 1), background 0.2s ease, color 0.2s ease;
+}
+
+.sort-bar.collapsed .sort-toggle-btn {
+    flex-grow: 1; 
+}
+
+.sort-toggle-btn:hover {
+    color: var(--accent);
+    background: rgba(142, 127, 127, 0.05); 
+}
+
+.top-app-center .sort-toggle-btn {
+    padding: 8px 15px; 
+}
+
+.top-app-center .sort-toggle-btn:hover {
+    background: transparent;
+}
+
+.sort-toggle-icon {
+    display: inline-block;
+    font-size: 0.8rem;
+    transform-origin: center;
+    transition: transform 0.4s ease;
+}
+
+.sort-bar:not(.collapsed) .sort-toggle-icon {
+    transform: rotate(180deg);
+}
+
+.sort-options {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 12px;
+    max-width: 1000px;
+    margin-left: 10px; 
+    opacity: 1;
+    visibility: visible;
+    overflow: hidden;
+    transition: 
+        max-width 0.5s cubic-bezier(0.25, 1, 0.5, 1), 
+        opacity 0.4s ease, 
+        margin-left 0.5s cubic-bezier(0.25, 1, 0.5, 1),
+        visibility 0.5s;
+}
+
+.sort-bar.collapsed .sort-options {
+    max-width: 0;
+    margin-left: 0;
+    opacity: 0;
+    visibility: hidden;
+}
+
+.sort-label {
+    display: none;
+}
+
+.sort-btn {
+    border: 1px solid var(--border-light);
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 30px;
+    padding: 8px 18px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.sort-btn:hover {
+    color: var(--text-main);
+    border-color: var(--text-muted);
+}
+
+.sort-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--card-bg);
+}
+
+/* Mobile Dropdown Logic for Sort Bar */
+@media (max-width: 768px) {
+    /* --- NEW LAYOUT FIX FOR APP BAR --- */
+    .top-app-inner {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        gap: 4px !important;
+        overflow: visible !important; 
+        width: 100%;
+    }
+    
+    .top-app-left, 
+    .top-app-center, 
+    .top-app-right {
+        flex: 0 0 auto !important; 
+        width: auto !important;
+        display: flex;
+        align-items: center;
+    }
+
+    .top-app-bar .header-btn {
+        padding: 6px 10px !important;
+        font-size: 0.85rem !important;
+        white-space: nowrap !important;
+    }
+
+    .top-app-bar {
+        overflow: visible !important; 
+    }
+    /* ---------------------------------- */
+
+    .sort-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .sort-bar:not(.collapsed) {
+        padding-right: 0;
+        padding-bottom: 15px;
+    }
+    .sort-options {
+        flex-direction: column;
+        max-width: 100%;
+        max-height: 400px;
+        margin-left: 0;
+        margin-top: 10px;
+        padding: 0 15px;
+        transition: max-height 0.4s ease, opacity 0.4s ease, margin-top 0.4s ease, visibility 0.4s;
+    }
+    .sort-bar.collapsed .sort-options {
+        max-height: 0;
+        margin-top: 0;
+        padding: 0 15px;
+    }
+    .sort-btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    /* Strict isolation for the App Bar Sort Toggle */
+    .top-app-center .sort-bar {
+        position: relative;
+        display: inline-flex !important;
+        flex-direction: row; 
+        width: max-content !important; 
+        flex: 0 0 auto !important; /* Prevents stretching */
+        margin: 0 auto;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0 !important;
+        overflow: visible !important; 
+    }
+    
+    .top-app-center .sort-bar:not(.collapsed) {
+        padding-bottom: 0; 
+    }
+    
+    .top-app-center .sort-toggle-btn {
+        padding: 6px 10px !important;
+        font-size: 0.85rem !important;
+        border: 1px solid var(--border-light);
+        border-radius: 8px;
+        background: transparent;
+        width: max-content !important; 
+        flex: 0 0 auto !important; /* Overrides default flex-grow: 1 */
+        justify-content: center;
+        margin: 0 !important;
+    }
+
+    /* Critically removes the flex-grow 1 that was causing invisible width */
+    .top-app-center .sort-bar.collapsed .sort-toggle-btn {
+        flex-grow: 0 !important; 
+        width: max-content !important;
+    }
+
+    .top-app-center .sort-toggle-btn:hover {
+        background: var(--input-bg);
+    }
+    
+    .top-app-center .sort-options {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--card-bg);
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        padding: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        z-index: 99999; 
+        width: max-content; 
+        min-width: 180px;
+        margin-top: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .top-app-center .sort-bar.collapsed .sort-options {
+        padding: 0;
+        border: none;
+        max-height: 0;
+        opacity: 0;
+        visibility: hidden;
+        box-shadow: none;
+    }
+}
+
 /* FORMS (CONTRIBUTION CARD) */
 .form-card { 
     background: var(--card-bg); box-shadow: var(--shadow-sm); padding: 25px 30px; border-radius: 16px; 
     transition: padding 0.4s ease, max-width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), border-radius 0.4s ease, background-color 0.4s ease, color 0.4s ease;
-    overflow: hidden; width: auto; box-sizing: border-box; 
+    overflow: hidden; width: auto; box-sizing: border-box;
+    position: relative;
 }
 .form-card.expanded { max-width: 100%; margin: 0; border-top: 4px solid var(--accent); cursor: default; }
 .form-card.collapsed {
@@ -148,6 +411,43 @@
 .form-card.expanded .toggle-icon { transform: rotate(45deg); color: var(--error-color); }
 .form-collapsible-wrapper { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease; }
 .form-card.expanded .form-collapsible-wrapper { max-height: 1500px; opacity: 1; }
+
+.form-card .form-collapse-btn {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    padding: 0;
+    border-radius: 50%;
+    line-height: 1;
+    font-size: 0.9rem;
+    border: 1px solid var(--border-light);
+    background: var(--accent);
+    color: var(--card-bg);
+    font-size: 1.1rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    transition: opacity 0.25s ease, transform 0.25s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 2;
+}
+.form-card.expanded .form-collapse-btn {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+.form-card .form-collapse-btn:hover {
+    background: var(--card-bg);
+    color: var(--accent);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
 
 .form-fields { display: grid; grid-template-columns: 1fr 2fr; column-gap: var(--spacing-md); row-gap: var(--spacing-md); align-items: start; }
 .span-half { grid-column: span 1; }
@@ -184,13 +484,13 @@ input:focus, textarea:focus { border-color: var(--accent); background-color: var
 .form-card button:hover { background-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
 
 /* VOTE BUTTONS */
-.vote-container-floating { position: absolute; top: 25px; right: 25px; background: var(--accent); border-radius: 30px; padding: 6px 14px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.3s ease; z-index: 5; }
+.vote-container-floating { position: absolute; top: 25px; right: 25px; background: var(--accent); border-radius: 30px; padding: 8px 16px; display: flex; align-items: center; gap: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.3s ease; z-index: 5; cursor: default; }
 .word-card:hover .vote-container-floating { transform: scale(1.05); }
-.vote-container { display: flex; align-items: center; gap: 4px; background: var(--accent); padding: 3px 6px; border-radius: 20px; width: fit-content; }
+.vote-container { display: flex; align-items: center; gap: 6px; background: var(--accent); padding: 4px 8px; border-radius: 20px; width: fit-content; }
 .vote-btn { background: none; border: none; cursor: pointer; padding: 0; display: flex; color: var(--card-bg); opacity: 0.8; transition: transform 0.2s, opacity 0.2s; }
-.vote-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.5; }
+.vote-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.5; }
 .vote-btn:hover:not(:disabled) { opacity: 1; transform: scale(1.2); }
-.vote-score { font-size: 1rem; font-weight: 700; color: var(--card-bg); min-width: 20px; text-align: center; font-variant-numeric: tabular-nums; }
+.vote-score { font-size: 1.15rem; font-weight: 700; color: var(--card-bg); min-width: 20px; text-align: center; font-variant-numeric: tabular-nums; }
 .vote-btn.like.active { color: #81C784; opacity: 1; }
 .vote-btn.dislike.active { color: #E57373; opacity: 1; }
 
