@@ -648,7 +648,7 @@ function createCardElement(item, isModalMode) {
     const hint = document.createElement('div'); 
     hint.className = 'click-hint'; 
     const cCount = item.comment_count || 0; 
-    hint.innerHTML = `Detaylar & Yorumlar (${cCount}) <span>&rarr;</span>`;
+    hint.innerHTML = `Yorumlar (${cCount}) <span>&rarr;</span>`;
     foot.appendChild(hint);
 
     const authorName = item.author ? decode(item.author) : 'Anonim';
