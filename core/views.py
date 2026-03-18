@@ -325,9 +325,9 @@ def add_word(request):
         first_error = next(iter(serializer.errors.values()))[0]
         return Response({'success': False, 'error': first_error}, status=400)
 
-@ratelimit(key='ip', rate='20/m', method='POST', block=False)
-@ratelimit(key=universal_rate_key, rate='5/m', method='POST', block=False)
-@api_view(['POST'])
+@ratelimit(key='ip', rate='20/m', method='PATCH', block=False)
+@ratelimit(key=universal_rate_key, rate='5/m', method='PATCH', block=False)
+@api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def add_example(request):
     if getattr(request, 'limited', False):
@@ -401,13 +401,13 @@ def login_view(request):
         password = serializer.validated_data['password']
 
         if not User.objects.filter(username=username).exists():
-            return Response({'success': False, 'error': 'Bu kullanıcı adı kayıtlı değil.'}, status=404)
+            return Response({'success': False, 'error': 'Bu kullanıcı adı veya şifre hatalı.'}, status=400)
         
-        user = authenticate(request, username=username, password=password)
+        user = authenticate(request, username=username, password=password)  
         if user is None:
-            return Response({'success': False, 'error': 'Şifre hatalı.'}, status=400)
+            return Response({'success': False, 'error': 'Bu kullanıcı adı veya şifre hatalı.'}, status=400)
         
-        login(request, user)
+        login(request, user)    
         return Response({'success': True, 'username': user.username, 'message': 'Giriş başarılı.'})
     
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
@@ -481,8 +481,8 @@ def get_user_profile(request):
         'total_score': word_stats['total_score'] or 0
     })
 
-@ratelimit(key=universal_rate_key, rate='3/h', method='POST', block=False)
-@api_view(['POST'])
+@ratelimit(key=universal_rate_key, rate='3/h', method='PATCH', block=False)
+@api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def change_password(request):
     if getattr(request, 'limited', False):
@@ -500,8 +500,8 @@ def change_password(request):
     
     return Response({'success': True, 'message': 'Şifreniz başarıyla güncellendi.'})
 
-@ratelimit(key=universal_rate_key, rate='2/d', method='POST', block=False)
-@api_view(['POST'])
+@ratelimit(key=universal_rate_key, rate='2/d', method='PATCH', block=False)
+@api_view(['PATCH'])
 @permission_classes([IsAuthenticated])
 def change_username(request):
     if getattr(request, 'limited', False):

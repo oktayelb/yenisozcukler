@@ -708,7 +708,7 @@ async function submitWord() {
 
     btn.disabled = true; btn.innerText = "Kaydediliyor...";
     try {
-        await apiRequest('/api/add', 'POST', { 
+        await apiRequest('/api/word', 'POST', { 
             word: w, 
             definition: d, 
             example: ex, 
@@ -772,7 +772,7 @@ async function submitExample() {
     btn.innerText = "Kaydediliyor...";
 
     try {
-        await apiRequest('/api/add-example', 'POST', {
+        await apiRequest('/api/add-example', 'PATCH', {
             word_id: wordIdForExample,
             example: exampleText
         });
@@ -1162,7 +1162,7 @@ function handleChangePassword(){
     const p2 = document.getElementById('newPasswordConfirm').value;
     if(p1.length < 6 || p1 !== p2) return showCustomAlert("Hatalı veya eşleşmeyen şifre.", "error");
     
-    apiRequest('/api/change-password','POST',{new_password: p1})
+    apiRequest('/api/change-password','PATCH',{new_password: p1})
     .then(() => {
         showCustomAlert("Şifre değişti.");
         document.getElementById('newPassword').value = '';
@@ -1173,7 +1173,7 @@ function handleChangePassword(){
 
 function handleChangeUsername(){
     const u = document.getElementById('newUsernameInput').value.trim();
-    if(u) apiRequest('/api/change-username','POST',{new_username: u}).then(() => {
+    if(u) apiRequest('/api/change-username','PATCH',{new_username: u}).then(() => {
         showCustomAlert("Kullanıcı adı değişti."); 
         setTimeout(() => window.location.reload(), 1000);
     }).catch(e => showCustomAlert(e.message, "error"));
