@@ -772,7 +772,7 @@ async function submitExample() {
     btn.innerText = "Kaydediliyor...";
 
     try {
-        await apiRequest('/api/add-example', 'PATCH', {
+        await apiRequest('/api/example', 'PATCH', {
             word_id: wordIdForExample,
             example: exampleText
         });
@@ -1162,7 +1162,7 @@ function handleChangePassword(){
     const p2 = document.getElementById('newPasswordConfirm').value;
     if(p1.length < 6 || p1 !== p2) return showCustomAlert("Hatalı veya eşleşmeyen şifre.", "error");
     
-    apiRequest('/api/change-password','PATCH',{new_password: p1})
+    apiRequest('/api/password','PATCH',{new_password: p1})
     .then(() => {
         showCustomAlert("Şifre değişti.");
         document.getElementById('newPassword').value = '';
@@ -1173,7 +1173,7 @@ function handleChangePassword(){
 
 function handleChangeUsername(){
     const u = document.getElementById('newUsernameInput').value.trim();
-    if(u) apiRequest('/api/change-username','PATCH',{new_username: u}).then(() => {
+    if(u) apiRequest('/api/username','PATCH',{new_username: u}).then(() => {
         showCustomAlert("Kullanıcı adı değişti."); 
         setTimeout(() => window.location.reload(), 1000);
     }).catch(e => showCustomAlert(e.message, "error"));
