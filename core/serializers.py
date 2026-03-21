@@ -5,6 +5,24 @@ import re
 import requests
 from decouple import config
 
+# --- YARDIMCI FONKSİYONLAR (HELPER FUNCTIONS) ---
+
+def validate_example_text(value):
+    """Ortak örnek cümle doğrulama mantığı"""
+    value = value.strip()
+    if not value:
+        raise serializers.ValidationError("Örnek cümle boş olamaz.")
+    if len(value) > 200:
+         raise serializers.ValidationError("Örnek cümle 200 karakteri geçemez.")
+    
+    # Inverted regex: matches anything that is NOT in the allowed set
+    invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\'"?!:;\-+?#]', value))
+    if invalid_chars:
+        raise serializers.ValidationError(f"Örnek cümlede geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
+        
+    return value
+
+
 # --- OKUMA (READ) SERIALIZERS ---
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -32,7 +50,7 @@ class WordSerializer(serializers.ModelSerializer):
     score = serializers.IntegerField(read_only=True)
     user_vote = serializers.SerializerMethodField()
     comment_count = serializers.IntegerField(read_only=True)
-    categories = CategorySerializer(many=True, read_only=True) # Nested Serializer for tags
+    categories = CategorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Word
@@ -48,7 +66,8 @@ class WordSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        data['def'] = instance.definition 
+        # Pop removes the original 'definition' key and assigns its value to 'def'
+        data['def'] = data.pop('definition', None) 
         return data
 
 # --- YAZMA (WRITE) SERIALIZERS ---
@@ -58,20 +77,10 @@ class WordAddExampleSerializer(serializers.Serializer):
     example = serializers.CharField(max_length=200, required=True)
 
     def validate_example(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("Örnek cümle boş olamaz.")
-        if len(value) > 200:
-             raise serializers.ValidationError("Örnek cümle 200 karakteri geçemez.")
-        
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\'"?!:;\-+?#]+$', value):
-            raise serializers.ValidationError("Örnek cümle geçersiz karakterler içeriyor.")
-            
-        return value
+        return validate_example_text(value)
 
 class WordCreateSerializer(serializers.ModelSerializer):
     nickname = serializers.CharField(source='author', required=False, allow_blank=True, max_length=50)
-    # We accept a list of IDs for the tags
     category_ids = serializers.PrimaryKeyRelatedField(
         many=True, 
         queryset=Category.objects.filter(is_active=True), 
@@ -84,13 +93,9 @@ class WordCreateSerializer(serializers.ModelSerializer):
         fields = ['word', 'definition', 'example', 'nickname', 'is_profane', 'category_ids']
 
     def create(self, validated_data):
-        # Extract categories before creating the word
         categories = validated_data.pop('category_ids', [])
-        
-        # Create the word instance
         word = Word.objects.create(**validated_data)
         
-        # Set the ManyToMany relation
         if categories:
             word.categories.set(categories)
             
@@ -103,26 +108,31 @@ class WordCreateSerializer(serializers.ModelSerializer):
 
     def validate_word(self, value):
         value = value.strip()
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]+$', value):
-            raise serializers.ValidationError("Sözcük geçersiz karakterler içeriyor (İzin verilenler: harf, rakam, boşluk ve . , - + ? # ( ) ).")
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Sözcükte geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
         return self.turkish_lower(value)
 
     def validate_definition(self, value):
         value = value.strip()
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#]+$', value):
-            raise serializers.ValidationError("Tanım geçersiz karakterler içeriyor (İzin verilenler: harf, rakam, boşluk ve . , - + ? # ( ) ).")
+        # Apostrophe added to the allowed inverted set
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Tanımda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
         return self.turkish_lower(value)
 
     def validate_example(self, value):
-        return WordAddExampleSerializer().validate_example(value)
+        return validate_example_text(value)
 
     def validate_nickname(self, value):
         if not value or not value.strip():
             return "Anonim"
-        if value:
-            value = value.strip()
-            if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
-                raise serializers.ValidationError("Takma ad geçersiz karakterler içeriyor.")
+        
+        value = value.strip()
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Takma adda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
+            
         return value
 
 class CommentCreateSerializer(serializers.ModelSerializer):
@@ -158,8 +168,10 @@ class AuthSerializer(serializers.Serializer):
         if value.lower() == 'anonim':
             raise serializers.ValidationError("Bu kullanıcı adı sistem tarafından ayrılmıştır, alınamaz.")
         
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
-            raise serializers.ValidationError("Kullanıcı adı sadece harf, rakam ve '_' içerebilir.")
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ0-9_]', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Kullanıcı adında geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
+            
         return value
     
     def validate(self, attrs):
@@ -174,14 +186,15 @@ class AuthSerializer(serializers.Serializer):
         }
         
         try:
-            response = requests.post(verify_url, data=data)
+            # Added a 5-second timeout to prevent the thread from hanging indefinitely
+            response = requests.post(verify_url, data=data, timeout=5)
             result = response.json()
             
             if not result.get('success'):
                 raise serializers.ValidationError({"token": "Robot doğrulaması başarısız oldu. Lütfen tekrar deneyin."})
                 
         except requests.RequestException:
-             raise serializers.ValidationError({"token": "Doğrulama sunucusuna ulaşılamadı."})
+             raise serializers.ValidationError({"token": "Doğrulama sunucusuna ulaşılamadı. Lütfen internet bağlantınızı kontrol edin."})
 
         return attrs
 
@@ -198,8 +211,9 @@ class ChangeUsernameSerializer(serializers.Serializer):
         if value.lower() == 'anonim':
             raise serializers.ValidationError("Bu kullanıcı adı sistem tarafından ayrılmıştır.")
 
-        if not re.match(r'^[a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()-]*$', value):
-            raise serializers.ValidationError("Kullanıcı adı geçersiz karakterler içeriyor.")
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ0-9_]', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Kullanıcı adında geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
 
         if User.objects.filter(username__iexact=value).exclude(id=user.id).exists():
             raise serializers.ValidationError("Bu kullanıcı adı zaten kullanımda.")
