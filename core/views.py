@@ -59,7 +59,6 @@ def universal_rate_key(group, request):
 
 @ratelimit(key='ip', rate='60/m', method='GET', block=False)
 @api_view(['GET'])
-@authentication_classes([])
 @permission_classes([])
 def get_categories(request):
     if getattr(request, 'limited', False):
@@ -78,7 +77,6 @@ def get_categories(request):
 
 @ratelimit(key='ip', rate='120/m', method='GET', block=False)
 @api_view(['GET'])
-@authentication_classes([])
 @permission_classes([])
 def get_words(request):
     if getattr(request, 'limited', False):
@@ -164,7 +162,6 @@ def get_words(request):
 
 @ratelimit(key='ip', rate='120/m', method='GET', block=False)
 @api_view(['GET'])
-@authentication_classes([]) 
 @permission_classes([])
 def get_comments(request, word_id):
     if getattr(request, 'limited', False):
@@ -219,7 +216,6 @@ def get_comments(request, word_id):
 @ratelimit(key='ip', rate='100/m', method='POST', block=False)
 @ratelimit(key=universal_rate_key, rate='15/m', method='POST', block=False)
 @api_view(['POST'])
-@authentication_classes([]) 
 @permission_classes([])
 @transaction.atomic 
 def vote(request, entity_type, entity_id):
@@ -431,13 +427,21 @@ def register_view(request):
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
         
         try:
-            user = User.objects.create_user(username=username, password=password)
-            Word.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
-            Comment.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
-            
-            login(request, user)
-            return Response({'success': True, 'username': user.username, 'message': 'Kayıt başarılı.'}, status=201)
-        except Exception:
+            with transaction.atomic():
+                user = User.objects.create_user(username=username, password=password)
+                
+                # Migrate words and comments
+                Word.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
+                Comment.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
+                
+                # Migrate votes attached to the current session
+                session_id = get_or_create_session_id(request)
+                WordVote.objects.filter(session_id=session_id, user__isnull=True).update(user=user)
+                CommentVote.objects.filter(session_id=session_id, user__isnull=True).update(user=user)
+                
+                login(request, user)
+                return Response({'success': True, 'username': user.username, 'message': 'Kayıt başarılı.'}, status=201)
+        except Exception as e:
             return Response({'success': False, 'error': 'Kayıt oluşturulamadı.'}, status=500)
 
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
