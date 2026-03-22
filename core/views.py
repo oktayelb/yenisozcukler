@@ -1,8 +1,8 @@
 # core/views.py
-import hashlib
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
 
 from django.shortcuts import get_object_or_404
 from django_ratelimit.decorators import ratelimit
@@ -10,7 +10,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
-from django.db.models import Count, F, Sum 
+from django.db.models import Count, F, Sum
 from django.db import transaction
 
 from .models import Word, Comment, WordVote, CommentVote, Category
@@ -34,32 +34,15 @@ def get_client_ip(request):
 
     return request.META.get('REMOTE_ADDR')
 
-def get_fingerprint(request):
-    ip = get_client_ip(request) or ""
-    user_agent = request.META.get('HTTP_USER_AGENT', '')
-    raw_fingerprint = f"{ip}_{user_agent}"
-    return hashlib.sha256(raw_fingerprint.encode('utf-8')).hexdigest()
-
-def get_or_create_session_id(request):
-    if not request.session.session_key:
-        request.session.create()
-    return request.session.session_key
-
 def universal_rate_key(group, request):
     if hasattr(request, 'user') and request.user.is_authenticated:
         return f"user_{request.user.id}"
-    
-    session_key = request.session.session_key
-    if session_key:
-        return f"session_{session_key}"
-        
-    return f"fingerprint_{get_fingerprint(request)}"
+    return f"ip_{get_client_ip(request)}"
 
 # --- OKUMA (READ) ENDPOINTLERİ ---
 
 @ratelimit(key='ip', rate='60/m', method='GET', block=False)
 @api_view(['GET'])
-@authentication_classes([])
 @permission_classes([])
 def get_categories(request):
     if getattr(request, 'limited', False):
@@ -78,7 +61,7 @@ def get_categories(request):
 
 @ratelimit(key='ip', rate='120/m', method='GET', block=False)
 @api_view(['GET'])
-@authentication_classes([])
+@authentication_classes([SessionAuthentication])
 @permission_classes([])
 def get_words(request):
     if getattr(request, 'limited', False):
@@ -94,7 +77,7 @@ def get_words(request):
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
         .prefetch_related('categories')\
-        .only('id', 'word', 'definition', 'example', 'author', 'timestamp', 'is_profane', 'score')
+        .only('id', 'word', 'definition', 'example', 'etymology', 'author', 'timestamp', 'is_profane', 'score')
 
     if sort == 'date_asc':
         words_queryset = words_queryset.order_by('timestamp')
@@ -128,30 +111,20 @@ def get_words(request):
     except (PageNotAnInteger, EmptyPage):
         words_page = []
 
-    session_id = get_or_create_session_id(request)
     user_votes = {}
     
     try:
-        if words_page:
+        if words_page and request.user.is_authenticated:
             page_word_ids = [w.id for w in words_page]
-            votes = []
-
-            if request.user.is_authenticated:
-                votes = WordVote.objects.filter(
-                    user=request.user, 
-                    word_id__in=page_word_ids
-                ).values('word', 'value')
-            elif session_id:
-                votes = WordVote.objects.filter(
-                    session_id=session_id, 
-                    word_id__in=page_word_ids
-                ).values('word', 'value')
+            votes = WordVote.objects.filter(
+                user=request.user, 
+                word_id__in=page_word_ids
+            ).values('word', 'value')
             
             for v in votes:
                 user_votes[v['word']] = v['value']
                 
-    except Exception as e:
-        print(f"Word Vote Fetch Error: {e}")
+    except Exception:
         pass
 
     serializer = WordSerializer(words_page, many=True, context={'user_votes': user_votes})
@@ -164,7 +137,7 @@ def get_words(request):
 
 @ratelimit(key='ip', rate='120/m', method='GET', block=False)
 @api_view(['GET'])
-@authentication_classes([]) 
+@authentication_classes([SessionAuthentication])
 @permission_classes([])
 def get_comments(request, word_id):
     if getattr(request, 'limited', False):
@@ -182,24 +155,15 @@ def get_comments(request, word_id):
     except (EmptyPage, PageNotAnInteger):
         comments_page = []
 
-    session_id = get_or_create_session_id(request)
     user_votes = {} 
 
     try:
-        if comments_page:
+        if comments_page and request.user.is_authenticated:
             page_comment_ids = [c.id for c in comments_page]
-            votes = []
-
-            if request.user.is_authenticated:
-                votes = CommentVote.objects.filter(
-                    user=request.user,
-                    comment_id__in=page_comment_ids
-                ).values('comment', 'value')
-            elif session_id:
-                votes = CommentVote.objects.filter(
-                    session_id=session_id,
-                    comment_id__in=page_comment_ids
-                ).values('comment', 'value')
+            votes = CommentVote.objects.filter(
+                user=request.user,
+                comment_id__in=page_comment_ids
+            ).values('comment', 'value')
 
             for v in votes:
                 user_votes[v['comment']] = v['value']
@@ -219,16 +183,15 @@ def get_comments(request, word_id):
 @ratelimit(key='ip', rate='100/m', method='POST', block=False)
 @ratelimit(key=universal_rate_key, rate='15/m', method='POST', block=False)
 @api_view(['POST'])
-@authentication_classes([]) 
-@permission_classes([])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])  # VOTE REMAINS STRICTLY LOCKED TO USERS
 @transaction.atomic 
 def vote(request, entity_type, entity_id):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
 
     client_ip = get_client_ip(request)
-    session_id = get_or_create_session_id(request)
-    user = request.user if request.user.is_authenticated else None
+    user = request.user
     
     action = request.data.get('action') 
     if action not in ['like', 'dislike']:
@@ -252,18 +215,7 @@ def vote(request, entity_type, entity_id):
     if entity_type == 'word' and obj.status != 'approved':
         return Response({'error': 'Geçersiz içerik.'}, status=404)
 
-    existing_vote = None
-
-    if user:
-        existing_vote = VoteClass.objects.filter(user=user, **{lookup_field: obj}).first()
-        if not existing_vote:
-            stray_vote = VoteClass.objects.filter(session_id=session_id, user__isnull=True, **{lookup_field: obj}).first()
-            if stray_vote:
-                existing_vote = stray_vote
-                existing_vote.user = user 
-    else:
-        existing_vote = VoteClass.objects.filter(session_id=session_id, **{lookup_field: obj}).first()
-
+    existing_vote = VoteClass.objects.filter(user=user, **{lookup_field: obj}).first()
     response_action = 'none'
 
     if existing_vote:
@@ -273,7 +225,6 @@ def vote(request, entity_type, entity_id):
             response_action = 'none'
         else:
             existing_vote.value = vote_val
-            if user: existing_vote.user = user 
             existing_vote.save()
             obj.score = F('score') + (vote_val * 2)
             response_action = 'liked' if vote_val == 1 else 'disliked'
@@ -281,7 +232,6 @@ def vote(request, entity_type, entity_id):
         new_vote = VoteClass(
             value=vote_val, 
             ip_address=client_ip, 
-            session_id=session_id, 
             user=user,             
             **{lookup_field: obj}
         )
@@ -301,12 +251,12 @@ def vote(request, entity_type, entity_id):
 @ratelimit(key='ip', rate='30/m', method='POST', block=False)
 @ratelimit(key=universal_rate_key, rate='5/m', method='POST', block=False)
 @api_view(['POST'])
-@permission_classes([])
+@authentication_classes([SessionAuthentication])
+@permission_classes([])  # OPENED TO ANONYMOUS USERS
 def add_word(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
     
-    session_id = get_or_create_session_id(request)
     serializer = WordCreateSerializer(data=request.data)
     
     if serializer.is_valid():
@@ -316,6 +266,8 @@ def add_word(request):
         if request.user.is_authenticated:
             save_kwargs['user'] = request.user
             save_kwargs['author'] = request.user.username
+        else:
+            save_kwargs['author'] = 'Anonim'
         
         serializer.save(**save_kwargs)
         cache.delete_many(['total_approved_words_count_all', 'total_approved_words_count_profane'])
@@ -356,21 +308,19 @@ def add_example(request):
 @ratelimit(key='ip', rate='50/m', method='POST', block=False)
 @ratelimit(key=universal_rate_key, rate='10/m', method='POST', block=False)
 @api_view(['POST'])
-@permission_classes([])
+@authentication_classes([SessionAuthentication])
+@permission_classes([]) # OPENED TO ANONYMOUS USERS
 def add_comment(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
 
-    session_id = get_or_create_session_id(request)
     serializer = CommentCreateSerializer(data=request.data)
     
     if serializer.is_valid():
         word = get_object_or_404(Word, id=serializer.validated_data['word_id'])
-        author_name = serializer.validated_data.get('author', 'Anonim')
-        user_obj = request.user if request.user.is_authenticated else None
         
-        if user_obj:
-            author_name = user_obj.username
+        user_obj = request.user if request.user.is_authenticated else None
+        author_name = request.user.username if user_obj else 'Anonim'
             
         new_comment = Comment.objects.create(
             word=word,
@@ -389,7 +339,6 @@ def add_comment(request):
 @ratelimit(key='ip', rate='20/m', method='POST', block=False)
 @ratelimit(key='post:username', rate='5/10m', method='POST', block=False)
 @api_view(['POST'])
-@authentication_classes([])
 @permission_classes([])
 def login_view(request):
     if getattr(request, 'limited', False):
@@ -400,14 +349,12 @@ def login_view(request):
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
 
-        if not User.objects.filter(username=username).exists():
-            return Response({'success': False, 'error': 'Bu kullanıcı adı veya şifre hatalı.'}, status=400)
-        
         user = authenticate(request, username=username, password=password)  
         if user is None:
             return Response({'success': False, 'error': 'Bu kullanıcı adı veya şifre hatalı.'}, status=400)
         
         login(request, user)    
+
         return Response({'success': True, 'username': user.username, 'message': 'Giriş başarılı.'})
     
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
@@ -416,7 +363,6 @@ def login_view(request):
 @ratelimit(key='ip', rate='10/h', method='POST', block=False)
 @ratelimit(key=universal_rate_key, rate='2/h', method='POST', block=False)
 @api_view(['POST'])
-@authentication_classes([])
 @permission_classes([])
 def register_view(request):
     if getattr(request, 'limited', False):
@@ -431,20 +377,17 @@ def register_view(request):
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
         
         try:
-            user = User.objects.create_user(username=username, password=password)
-            Word.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
-            Comment.objects.filter(author__iexact=username, user__isnull=True).update(user=user)
-            
-            login(request, user)
-            return Response({'success': True, 'username': user.username, 'message': 'Kayıt başarılı.'}, status=201)
-        except Exception:
+            with transaction.atomic():
+                user = User.objects.create_user(username=username, password=password)
+                login(request, user)
+                return Response({'success': True, 'username': user.username, 'message': 'Kayıt başarılı.'}, status=201)
+        except Exception as e:
             return Response({'success': False, 'error': 'Kayıt oluşturulamadı.'}, status=500)
 
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
     return Response({'success': False, 'error': first_error}, status=400)
 
 @api_view(['POST'])
-@authentication_classes([])
 @permission_classes([])
 def logout_view(request):
     logout(request)
@@ -556,17 +499,12 @@ def get_my_words(request):
     except (PageNotAnInteger, EmptyPage):
         words_page = []
 
-    session_id = get_or_create_session_id(request)
     user_votes = {}
     
     try:
-        if words_page:
+        if words_page and request.user.is_authenticated:
             page_word_ids = [w.id for w in words_page]
-            votes = []
-            if request.user.is_authenticated:
-                votes = WordVote.objects.filter(user=request.user, word_id__in=page_word_ids).values('word', 'value')
-            elif session_id:
-                votes = WordVote.objects.filter(session_id=session_id, word_id__in=page_word_ids).values('word', 'value')
+            votes = WordVote.objects.filter(user=request.user, word_id__in=page_word_ids).values('word', 'value')
             for v in votes:
                 user_votes[v['word']] = v['value']
     except Exception:

@@ -54,7 +54,7 @@ class WordSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Word
-        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition', 'example', 'comment_count', 'categories'] 
+        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition', 'example', 'etymology', 'comment_count', 'categories'] 
 
     def get_user_vote(self, obj):
         votes = self.context.get('user_votes', {})
@@ -90,7 +90,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Word
-        fields = ['word', 'definition', 'example', 'nickname', 'is_profane', 'category_ids']
+        fields = ['word', 'definition', 'example', 'etymology', 'nickname', 'is_profane', 'category_ids']
 
     def create(self, validated_data):
         categories = validated_data.pop('category_ids', [])
@@ -123,6 +123,20 @@ class WordCreateSerializer(serializers.ModelSerializer):
 
     def validate_example(self, value):
         return validate_example_text(value)
+        
+    def validate_etymology(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError("Köken bilgisi boş olamaz.")
+        
+        value = value.strip()
+        if len(value) > 200:
+            raise serializers.ValidationError("Köken bilgisi 200 karakteri geçemez.")
+            
+        # Slightly more relaxed regex for etymology to allow < > for language derivations
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\'<>]', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Köken bilgisinde geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
+        return value
 
     def validate_nickname(self, value):
         if not value or not value.strip():
@@ -186,7 +200,6 @@ class AuthSerializer(serializers.Serializer):
         }
         
         try:
-            # Added a 5-second timeout to prevent the thread from hanging indefinitely
             response = requests.post(verify_url, data=data, timeout=5)
             result = response.json()
             

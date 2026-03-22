@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTheme();
     initLogoSystem();
     initTopAppBar();
-    fetchCategories(); // Load tags for the form
+    fetchCategories(); 
     fetchWords(currentPage);
 });
 
@@ -132,7 +132,6 @@ function initLogoSystem() {
 function animateLogo(el) {
     const curr = localStorage.getItem(COLOR_THEME_KEY) || 'default';
     
-    // If we are filtered by a category, clicking logo resets it.
     if (activeCategorySlug) {
         clearCategoryFilter();
         return; 
@@ -165,12 +164,9 @@ function setupSortBar() {
     if (!bars.length) return;
 
     bars.forEach(bar => {
-        // Explicitly set pointer so the entire block feels clickable
         bar.style.cursor = 'pointer'; 
         
-        // Listen on the entire bar container instead of just the button
         bar.addEventListener('click', (e) => {
-            // Prevent toggling if the user specifically clicked a sorting option
             if (!e.target.closest('.sort-btn')) {
                 bar.classList.toggle('collapsed');
             }
@@ -179,11 +175,10 @@ function setupSortBar() {
         const buttons = bar.querySelectorAll('.sort-btn');
         buttons.forEach(btn => {
             btn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Stop the event from bubbling back up to the bar
+                e.stopPropagation(); 
                 const sortVal = btn.getAttribute('data-sort');
                 changeSort(sortVal);
                 
-                // Automatically collapse after a selection is made
                 bar.classList.add('collapsed');
             });
         });
@@ -270,14 +265,14 @@ function toggleAuthMode(mode) {
         if(tabRegister) tabRegister.classList.remove('active');
         
         if(confirmGroup) confirmGroup.style.display = 'none';
-        if(subtitle) subtitle.innerText = "Hesabına giriş yap ve paylaşmaya başla.";
+        if(subtitle) subtitle.innerText = "Sözcüklerine adını eklemek ve oy vermek için giriş yap.";
         if(btn) btn.innerText = "Giriş Yap";
     } else {
         if(tabRegister) tabRegister.classList.add('active');
         if(tabLogin) tabLogin.classList.remove('active');
         
         if(confirmGroup) confirmGroup.style.display = 'block';
-        if(subtitle) subtitle.innerText = "Yeni bir hesap oluştur ve aramıza katıl!\n Önceden paylaştığın sözcükleri hesabına tanımlayabilirsin! ";
+        if(subtitle) subtitle.innerText = "Yeni bir hesap oluştur ve aramıza katıl!";
         if(btn) btn.innerText = "Kayıt Ol";
     }
 }
@@ -428,19 +423,16 @@ function renderCategorySelection() {
         pill.className = 'category-pill';
         pill.textContent = cat.name;
         
-        // Ensure description is treated as an empty string if null
         const desc = cat.description || ""; 
         
         if (desc) pill.setAttribute('data-desc', desc);
         
-        // Pass the description directly to the toggle function
         pill.onclick = () => toggleCategorySelection(cat.id, pill, desc);
         container.appendChild(pill);
     });
 }
 
 function toggleCategorySelection(id, el, description) {
-    // 1. Handle Selection Visuals
     if (selectedFormCategories.has(id)) {
         selectedFormCategories.delete(id);
         el.classList.remove('selected');
@@ -449,14 +441,12 @@ function toggleCategorySelection(id, el, description) {
         el.classList.add('selected');
     }
 
-    // 2. Handle Helper Text (The "Tap Display" for Form)
     const helpText = document.getElementById('categoryHelpText');
     if (helpText) {
         if (description) {
              helpText.innerHTML = `<strong>${el.textContent}:</strong> ${description}`;
              helpText.classList.add('active');
         } else {
-             // Optional: Clear text if category has no description
              helpText.innerHTML = '';
              helpText.classList.remove('active');
         }
@@ -473,12 +463,9 @@ async function fetchWords(page) {
     
     const mode = localStorage.getItem(COLOR_THEME_KEY) === 'red' ? 'profane' : 'all';
 
-    // Build URL with tag filter and sort if active
     let url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}&sort=${encodeURIComponent(currentSort)}`;
     if (activeCategorySlug) {
         url += `&tag=${activeCategorySlug}`;
-        // Note: Banner update happens in handleTagClick usually, 
-        // but if we load page with defaults, we might call this.
     }
 
     if (page === 1) { 
@@ -515,7 +502,6 @@ function handleTagClick(slug, name, description) {
     
     window.scrollTo({ top: 0, behavior: 'smooth' });
     
-    // Pass description to the banner updater
     updateFilterBanner(true, name, description);
     
     fetchWords(currentPage);
@@ -568,7 +554,7 @@ function appendCards(words, container, isModalMode) {
     });
 }
 
-/* === CARD GENERATION (Updated with Tags) === */
+/* === CARD GENERATION === */
 function createCardElement(item, isModalMode) {
     const card = document.createElement('div');
     card.className = 'word-card fade-in';
@@ -578,7 +564,6 @@ function createCardElement(item, isModalMode) {
     const decode = (s) => s ? parser.parseFromString(s, "text/html").documentElement.textContent : '';
 
     card.onclick = (e) => {
-        // Exclude the vote container background as well so clicking it does nothing
         if (e.target.closest('.vote-btn') || 
             e.target.closest('.vote-container-floating') || 
             e.target.closest('.user-badge') || 
@@ -586,7 +571,7 @@ function createCardElement(item, isModalMode) {
             e.target.closest('.tag-badge') || 
             card.classList.contains('is-profane-content')) return;
             
-        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), decode(item.example), isModalMode);
+        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), decode(item.example), decode(item.etymology), isModalMode);
     };
 
     const votePill = createVoteControls('word', item);
@@ -595,7 +580,8 @@ function createCardElement(item, isModalMode) {
 
     const contentDiv = document.createElement('div');
     const exampleHTML = item.example ? `<div class="word-example">"${decode(item.example)}"</div>` : '';
-    contentDiv.innerHTML = `<h3>${decode(item.word)}</h3><p>${decode(item.def)}</p>${exampleHTML}`;
+    const etymologyHTML = item.etymology ? `<div class="word-etymology" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;"><em>Köken:</em> ${decode(item.etymology)}</div>` : '';
+    contentDiv.innerHTML = `<h3>${decode(item.word)}</h3>${etymologyHTML}<p>${decode(item.def)}</p>${exampleHTML}`;
     
     if (isUserLoggedIn && 
         currentUserUsername === item.author && 
@@ -615,7 +601,6 @@ function createCardElement(item, isModalMode) {
 
     card.appendChild(contentDiv);
 
-    // --- TAGS RENDERING ---
     if (item.categories && item.categories.length > 0) {
         const tagsDiv = document.createElement('div');
         tagsDiv.className = 'tag-list';
@@ -625,12 +610,10 @@ function createCardElement(item, isModalMode) {
             tag.className = 'tag-badge';
             tag.innerText = cat.name;
             
-            // Tooltip attribute (still useful for desktop)
             if(cat.description) {
                 tag.setAttribute('data-desc', cat.description);
             }
             
-            // Pass description to the handler
             tag.onclick = (e) => {
                 e.stopPropagation();
                 handleTagClick(cat.slug, cat.name, cat.description);
@@ -640,7 +623,6 @@ function createCardElement(item, isModalMode) {
         
         card.appendChild(tagsDiv);
     }
-    // ----------------------
 
     const foot = document.createElement('div'); 
     foot.className = 'word-footer';
@@ -695,16 +677,17 @@ async function submitWord() {
     const w = document.getElementById('inputWord').value.trim();
     const d = document.getElementById('inputDef').value.trim();
     const ex = document.getElementById('inputExample').value.trim();
+    const et = document.getElementById('inputEtymology').value.trim();
     const n = isUserLoggedIn ? currentUserUsername : 'Anonim';
 
     const btn = document.querySelector(".form-card button");
     const prof = localStorage.getItem(COLOR_THEME_KEY) === 'red';
 
-    if (!w || !d) return showCustomAlert("Lütfen tüm alanları doldurun.", "error");
-    if (!ex) return showCustomAlert("Lütfen bir örnek cümle yazın.", "error");
+    if (!w || !d || !ex || !et) return showCustomAlert("Lütfen tüm alanları doldurun.", "error");
     
     if (d.length > 300) return showCustomAlert("Tanım çok uzun.", "error");
     if (ex.length > 200) return showCustomAlert("Örnek cümle çok uzun.", "error");
+    if (et.length > 200) return showCustomAlert("Köken bilgisi çok uzun.", "error");
 
     btn.disabled = true; btn.innerText = "Kaydediliyor...";
     try {
@@ -712,18 +695,18 @@ async function submitWord() {
             word: w, 
             definition: d, 
             example: ex, 
+            etymology: et,
             nickname: n, 
             is_profane: prof,
-            category_ids: Array.from(selectedFormCategories) // Send IDs
+            category_ids: Array.from(selectedFormCategories)
         });
         
-        // Reset inputs
         document.getElementById('inputWord').value=''; 
         document.getElementById('inputDef').value='';
         document.getElementById('inputExample').value='';
+        document.getElementById('inputEtymology').value='';
         updateCount({value:''});
         
-        // Reset category pills
         selectedFormCategories.clear();
         document.querySelectorAll('.category-pill.selected').forEach(el => el.classList.remove('selected'));
 
@@ -737,7 +720,6 @@ async function submitWord() {
 function openAddExampleModal(wordId, wordText) {
     wordIdForExample = wordId;
     
-    // Set the word in the header
     const wordDisplay = document.getElementById('exampleModalWord');
     if (wordDisplay) {
         wordDisplay.innerText = wordText ? `"${wordText}"` : '';
@@ -746,7 +728,6 @@ function openAddExampleModal(wordId, wordText) {
     const input = document.getElementById('newExampleInput');
     const count = document.getElementById('exampleCharCount');
     
-    // Reset state
     if(input) input.value = '';
     if(count) count.innerText = '0 / 200';
     
@@ -780,7 +761,6 @@ async function submitExample() {
         showCustomAlert("Örnek cümle başarıyla eklendi!");
         closeModal('addExampleModal');
         
-        // Update the UI immediately without reloading
         updateCardWithExample(wordIdForExample, exampleText);
         
     } catch (e) {
@@ -817,7 +797,14 @@ function createVoteControls(type, data) {
         const b = document.createElement('button'); 
         b.className=`vote-btn ${act} ${data.user_vote === act ? 'active' : ''}`;
         b.innerHTML=`<svg viewBox="0 0 24 24"><path d="${icon}"></path></svg>`;
-        b.onclick = (e) => { e.stopPropagation(); sendVote(type, data.id, act, div); };
+        b.onclick = (e) => { 
+            e.stopPropagation(); 
+            if (!isUserLoggedIn) {
+                openAuthModal();
+                return;
+            }
+            sendVote(type, data.id, act, div); 
+        };
         return b;
     };
     div.append(
@@ -852,7 +839,6 @@ function sendVote(type, id, act, con) {
     const voteData = pendingVotes[uniqueId];
     clearTimeout(voteData.timer);
     
-    // Calculate new optimistic state and score based on the click
     if (voteData.currentState === act) {
         voteData.currentState = 'none';
         voteData.currentScore -= (act === 'like' ? 1 : -1);
@@ -867,25 +853,21 @@ function sendVote(type, id, act, con) {
         voteData.currentScore += diff;
     }
     
-    // Optimistic UI Update immediately
     likeBtn.classList.remove('active');
     dislikeBtn.classList.remove('active');
     if (voteData.currentState === 'like') likeBtn.classList.add('active');
     if (voteData.currentState === 'dislike') dislikeBtn.classList.add('active');
     scoreSpan.innerText = voteData.currentScore;
     
-    // Debounce the API call
     voteData.timer = setTimeout(async () => {
         const finalState = voteData.currentState;
         const initialState = voteData.originalState;
         
-        // If the final state is identical to the beginning, do not hit the server
         if (finalState === initialState) {
             delete pendingVotes[uniqueId];
             return;
         }
         
-        // Determine correct action string: To revert to 'none', send the initial state to trigger the toggle
         const actionToSend = (finalState === 'none') ? initialState : finalState;
         
         const btns = con.querySelectorAll('.vote-btn');
@@ -894,7 +876,6 @@ function sendVote(type, id, act, con) {
         try {
             const data = await apiRequest(`/api/vote/${type}/${id}`, 'POST', { action: actionToSend });
             
-            // Sync with backend truth
             scoreSpan.innerText = data.new_score;
             likeBtn.classList.remove('active');
             dislikeBtn.classList.remove('active');
@@ -903,7 +884,6 @@ function sendVote(type, id, act, con) {
         } catch (e) {
             showCustomAlert("Hata oluştu, oy kaydedilemedi.", "error");
             
-            // Revert UI on failure
             likeBtn.classList.remove('active');
             dislikeBtn.classList.remove('active');
             if (initialState === 'like') likeBtn.classList.add('active');
@@ -917,7 +897,7 @@ function sendVote(type, id, act, con) {
 }
 
 /* === DETAIL VIEW & COMMENTS === */
-function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, wordExample, isModalMode = false) { 
+function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, wordExample, wordEtymology, isModalMode = false) { 
     if (activeCardClone) return; 
     if (originalCard.classList.contains('is-profane-content')) return;
 
@@ -935,12 +915,14 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
     const readOnlyAttr = isUserLoggedIn ? 'readonly' : '';
     
     const exampleHTML = wordExample ? `<div class="word-example" style="margin-top:8px;">"${wordExample}"</div>` : '';
+    const etymologyHTML = wordEtymology ? `<div class="word-etymology" style="font-size:0.9rem; color:var(--text-muted); margin-top:5px; margin-bottom:5px;"><em>Köken:</em> ${wordEtymology}</div>` : '';
 
     const contentHTML = `
         <div class="view-header">
             <div style="display:flex; justify-content:space-between; align-items:start;">
                 <div>
                     <h2 id="commentTitle" style="margin:0; font-size:1.4rem; color:var(--accent);">${wordText}</h2>
+                    ${etymologyHTML}
                     <div style="font-size:1rem; color:var(--text-muted); margin-top:5px; font-style:italic;">${wordDef}</div>
                     ${exampleHTML}
                 </div>
@@ -972,12 +954,6 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
 
     activeCardClone = clone;
     loadComments(wordId, 1, false);
-
-    const authorIn = clone.querySelector('#commentAuthor');
-    if(authorIn && !isUserLoggedIn) {
-        authorIn.addEventListener('click', (e) => { e.preventDefault(); e.target.blur(); openAuthModal(); });
-        authorIn.addEventListener('focus', (e) => { e.preventDefault(); e.target.blur(); openAuthModal(); });
-    }
 }
 
 function closeCommentView() {
@@ -1068,9 +1044,13 @@ function createCommentItem(c) {
 function submitComment() {
     if(!activeCardClone) return;
     const txt = activeCardClone.querySelector('#commentInput').value.trim();
-    const aut = activeCardClone.querySelector('#commentAuthor').value.trim();
+    let aut = activeCardClone.querySelector('#commentAuthor').value.trim();
     if(!txt) return showCustomAlert("Yorum yazın.","error");
     if(txt.length > 200) return showCustomAlert("Çok uzun.","error");
+
+    if (!isUserLoggedIn && !aut) {
+        aut = 'Anonim';
+    }
 
     const btn = activeCardClone.querySelector('.send-btn-minimal');
     btn.disabled = true; 
@@ -1114,7 +1094,7 @@ async function fetchProfileData(username) {
         document.getElementById('statScore').innerText = d.total_score;
     } catch (e) { 
         console.error(e); 
-        showCustomAlert("Kullanıcı Zimmetlenmemiş", "error");
+        showCustomAlert("Kullanıcı bulunamadı", "error");
     }
 }
 
