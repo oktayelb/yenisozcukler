@@ -568,7 +568,7 @@ function appendCards(words, container, isModalMode) {
     });
 }
 
-/* === CARD GENERATION (Updated with Tags) === */
+/* === CARD GENERATION === */
 function createCardElement(item, isModalMode) {
     const card = document.createElement('div');
     card.className = 'word-card fade-in';
@@ -586,7 +586,7 @@ function createCardElement(item, isModalMode) {
             e.target.closest('.tag-badge') || 
             card.classList.contains('is-profane-content')) return;
             
-        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), decode(item.example), isModalMode);
+        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), decode(item.example), decode(item.etymology), isModalMode);
     };
 
     const votePill = createVoteControls('word', item);
@@ -595,7 +595,8 @@ function createCardElement(item, isModalMode) {
 
     const contentDiv = document.createElement('div');
     const exampleHTML = item.example ? `<div class="word-example">"${decode(item.example)}"</div>` : '';
-    contentDiv.innerHTML = `<h3>${decode(item.word)}</h3><p>${decode(item.def)}</p>${exampleHTML}`;
+    const etymologyHTML = item.etymology ? `<div class="word-etymology" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;"><em>Köken:</em> ${decode(item.etymology)}</div>` : '';
+    contentDiv.innerHTML = `<h3>${decode(item.word)}</h3>${etymologyHTML}<p>${decode(item.def)}</p>${exampleHTML}`;
     
     if (isUserLoggedIn && 
         currentUserUsername === item.author && 
@@ -695,16 +696,17 @@ async function submitWord() {
     const w = document.getElementById('inputWord').value.trim();
     const d = document.getElementById('inputDef').value.trim();
     const ex = document.getElementById('inputExample').value.trim();
+    const et = document.getElementById('inputEtymology').value.trim();
     const n = isUserLoggedIn ? currentUserUsername : 'Anonim';
 
     const btn = document.querySelector(".form-card button");
     const prof = localStorage.getItem(COLOR_THEME_KEY) === 'red';
 
-    if (!w || !d) return showCustomAlert("Lütfen tüm alanları doldurun.", "error");
-    if (!ex) return showCustomAlert("Lütfen bir örnek cümle yazın.", "error");
+    if (!w || !d || !ex || !et) return showCustomAlert("Lütfen tüm alanları doldurun.", "error");
     
     if (d.length > 300) return showCustomAlert("Tanım çok uzun.", "error");
     if (ex.length > 200) return showCustomAlert("Örnek cümle çok uzun.", "error");
+    if (et.length > 200) return showCustomAlert("Köken bilgisi çok uzun.", "error");
 
     btn.disabled = true; btn.innerText = "Kaydediliyor...";
     try {
@@ -712,6 +714,7 @@ async function submitWord() {
             word: w, 
             definition: d, 
             example: ex, 
+            etymology: et,
             nickname: n, 
             is_profane: prof,
             category_ids: Array.from(selectedFormCategories) // Send IDs
@@ -721,6 +724,7 @@ async function submitWord() {
         document.getElementById('inputWord').value=''; 
         document.getElementById('inputDef').value='';
         document.getElementById('inputExample').value='';
+        document.getElementById('inputEtymology').value='';
         updateCount({value:''});
         
         // Reset category pills
@@ -917,7 +921,7 @@ function sendVote(type, id, act, con) {
 }
 
 /* === DETAIL VIEW & COMMENTS === */
-function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, wordExample, isModalMode = false) { 
+function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, wordExample, wordEtymology, isModalMode = false) { 
     if (activeCardClone) return; 
     if (originalCard.classList.contains('is-profane-content')) return;
 
@@ -935,12 +939,14 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
     const readOnlyAttr = isUserLoggedIn ? 'readonly' : '';
     
     const exampleHTML = wordExample ? `<div class="word-example" style="margin-top:8px;">"${wordExample}"</div>` : '';
+    const etymologyHTML = wordEtymology ? `<div class="word-etymology" style="font-size:0.9rem; color:var(--text-muted); margin-top:5px; margin-bottom:5px;"><em>Köken:</em> ${wordEtymology}</div>` : '';
 
     const contentHTML = `
         <div class="view-header">
             <div style="display:flex; justify-content:space-between; align-items:start;">
                 <div>
                     <h2 id="commentTitle" style="margin:0; font-size:1.4rem; color:var(--accent);">${wordText}</h2>
+                    ${etymologyHTML}
                     <div style="font-size:1rem; color:var(--text-muted); margin-top:5px; font-style:italic;">${wordDef}</div>
                     ${exampleHTML}
                 </div>

@@ -94,7 +94,7 @@ def get_words(request):
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
         .prefetch_related('categories')\
-        .only('id', 'word', 'definition', 'example', 'author', 'timestamp', 'is_profane', 'score')
+        .only('id', 'word', 'definition', 'example', 'etymology', 'author', 'timestamp', 'is_profane', 'score')
 
     if sort == 'date_asc':
         words_queryset = words_queryset.order_by('timestamp')

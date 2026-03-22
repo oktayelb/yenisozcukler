@@ -42,6 +42,7 @@ class Word(models.Model):
     word = models.CharField(max_length=50)
     definition = models.CharField(max_length=300)
     example = models.CharField(max_length=200, default="")
+    etymology = models.CharField(max_length=200, default="") # blank=True kaldirildi
     
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     author = models.CharField(max_length=50, default='Anonim')    
