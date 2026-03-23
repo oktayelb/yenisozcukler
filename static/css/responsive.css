@@ -21,9 +21,20 @@
     .logo-card.pos-behind { transform: rotate(-6deg) translate(-5px, -5px) scale(0.95); }
     
     .about-box { max-height: 80vh; padding: 20px; }
-    .close-btn svg { width: 32px; height: 32px; }
     
-    .category-pills-container { justify-content: center; }
+    /* Profile Modal Mobile Adjustments to match desktop feel */
+    .profile-modal-box {
+        padding: 25px 15px;
+    }
+    .profile-stats-container {
+        padding: 12px 5px; 
+    }
+    .stat-value {
+        font-size: 1.15rem; 
+    }
+    .stat-label {
+        font-size: 0.7rem;
+    }
 
     /* Fix for My Words Modal on Mobile */
     #myWordsModal .auth-box {
@@ -40,4 +51,4 @@
         min-height: 0;
         max-height: none;
     }
-} 
+}

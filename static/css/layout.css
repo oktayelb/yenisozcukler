@@ -48,6 +48,10 @@ header { text-align: center; margin: 50px 0 40px; }
 .header-controls { left: 20px; } 
 .header-controls-right { right: 20px; align-items: center; }
 
+.header-user-info { display: flex; align-items: center; gap: 10px; }
+.header-profile-btn { border: 2px solid var(--accent); color: var(--accent); }
+.header-profile-icon { margin-right: 5px; margin-bottom: -2px; }
+
 .top-app-bar {
     position: fixed;
     top: 0;

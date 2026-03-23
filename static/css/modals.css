@@ -26,11 +26,58 @@
 }
 .about-text .about-section-title:first-child { margin-top: 0; }
 
-/* PROFILE SPECIFIC */
+/* --------------------------------------
+   PROFILE MODAL SPECIFIC STYLES
+   -------------------------------------- */
 #profileModal { z-index: var(--z-modal-base); }
-.edit-profile-btn { display: flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--border-light); color: var(--text-muted); padding: 6px 14px; border-radius: 20px; cursor: pointer; }
-.clickable-stat { cursor: pointer; transition: all 0.2s; }
-.clickable-stat:hover { background: var(--input-bg); transform: translateY(-2px); border-color: var(--accent) !important; }
+.profile-modal-box { max-width: 400px; padding: 25px; display: flex; flex-direction: column; align-items: center; }
+
+/* Header Section */
+.profile-header-simple { text-align: center; margin-bottom: 20px; width: 100%; }
+.profile-username { font-size: 1.6rem; margin: 0 0 4px 0; color: var(--text-main); font-family: var(--font-heading); line-height: 1.1; }
+.profile-date-text { font-size: 0.85rem; color: var(--text-muted); margin: 0; }
+.profile-date-text strong { color: var(--text-main); font-weight: 600; }
+
+/* Unified Stats Pill */
+.profile-stats-container { 
+    display: flex; align-items: center; justify-content: space-around; 
+    width: 100%; background: var(--input-bg); border: 1px solid var(--border-light); 
+    border-radius: 10px; padding: 12px 0; margin-bottom: 20px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+.profile-stat-item { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.stat-divider { width: 1px; height: 35px; background: var(--border-light); }
+.stat-value { font-size: 1.3rem; font-weight: 800; font-family: var(--font-body); margin-bottom: 2px; }
+.stat-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.text-accent { color: var(--accent); }
+.text-success { color: var(--success-color); }
+
+/* Clickable Stat (Words) */
+.clickable-stat { cursor: pointer; transition: transform 0.2s ease; position: relative; }
+.clickable-stat:hover { transform: translateY(-2px); }
+.clickable-stat:hover .stat-value { text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.clickable-stat::after { 
+    content: '→'; position: absolute; top: -2px; right: 15px; 
+    font-size: 1rem; font-weight: bold; color: var(--accent); 
+    opacity: 0; transform: translateX(-5px); transition: all 0.3s; 
+}
+.clickable-stat:hover::after { opacity: 1; transform: translateX(0); }
+
+/* Action Buttons */
+.profile-actions-wrapper { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.profile-action-btn { 
+    display: flex; align-items: center; justify-content: center; gap: 8px; 
+    width: 100%; padding: 10px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; 
+    cursor: pointer; transition: all 0.2s ease; font-family: var(--font-body);
+}
+.profile-action-btn svg { width: 18px; height: 18px; }
+
+.btn-edit { background: transparent; border: 2px solid var(--border-light); color: var(--text-main); }
+.btn-edit:hover { border-color: var(--accent); color: var(--accent); background: var(--input-bg); transform: translateY(-1px); }
+
+.btn-logout { background: rgba(244, 67, 54, 0.05); border: 2px solid transparent; color: var(--error-color); }
+.btn-logout:hover { background: rgba(244, 67, 54, 0.1); border-color: rgba(244, 67, 54, 0.2); transform: translateY(-1px); }
+
+/* My Words Feed Specifics */
 #userWordsList { padding-right: 10px; margin-top: 15px; }
 #userWordsList .word-card { border: 1px solid var(--border-light); background-color: var(--card-bg); transition: all 0.2s; padding: 15px; }
 #userWordsList .word-card:hover { transform: translateY(-3px); border-color: var(--accent); }
