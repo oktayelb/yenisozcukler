@@ -910,12 +910,13 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
     const clone = document.createElement('div');
     clone.className = 'full-comment-view'; 
     if(isModalMode) clone.classList.add('mode-modal');
-
-    const userValue = isUserLoggedIn ? currentUserUsername : '';
-    const readOnlyAttr = isUserLoggedIn ? 'readonly' : '';
     
     const exampleHTML = wordExample ? `<div class="word-example" style="margin-top:8px;">"${wordExample}"</div>` : '';
     const etymologyHTML = wordEtymology ? `<div class="word-etymology" style="font-size:0.9rem; color:var(--text-muted); margin-top:5px; margin-bottom:5px;"><em>Köken:</em> ${wordEtymology}</div>` : '';
+
+    const commentPlaceholder = isUserLoggedIn ? "Yorum yaz..." : "Yorum yapmak için giriş yapın...";
+    const commentInteraction = isUserLoggedIn ? "" : 'onclick="openAuthModal()" readonly';
+    const buttonAction = isUserLoggedIn ? "submitComment()" : "openAuthModal()";
 
     const contentHTML = `
         <div class="view-header">
@@ -934,15 +935,9 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
         </div>
         <div class="view-footer">
             <div class="custom-comment-wrapper">
-                <div class="custom-comment-header">
-                    <input type="text" id="commentAuthor" class="custom-input-minimal" 
-                           placeholder="Takma Adın (İsteğe bağlı)" 
-                           value="${userValue}" 
-                           ${readOnlyAttr}>
-                </div>
-                <textarea id="commentInput" class="custom-textarea-minimal" rows="2" placeholder="Yorum yaz..." maxlength="200"></textarea>
+                <textarea id="commentInput" class="custom-textarea-minimal" rows="2" placeholder="${commentPlaceholder}" maxlength="200" ${commentInteraction}></textarea>
                 <div class="custom-comment-footer">
-                    <button class="send-btn-minimal" onclick="submitComment()">Gönder</button>
+                    <button class="send-btn-minimal" onclick="${buttonAction}">Gönder</button>
                 </div>
             </div>
         </div>
@@ -1043,19 +1038,20 @@ function createCommentItem(c) {
 
 function submitComment() {
     if(!activeCardClone) return;
+
+    if (!isUserLoggedIn) {
+        openAuthModal();
+        return;
+    }
+
     const txt = activeCardClone.querySelector('#commentInput').value.trim();
-    let aut = activeCardClone.querySelector('#commentAuthor').value.trim();
     if(!txt) return showCustomAlert("Yorum yazın.","error");
     if(txt.length > 200) return showCustomAlert("Çok uzun.","error");
-
-    if (!isUserLoggedIn && !aut) {
-        aut = 'Anonim';
-    }
 
     const btn = activeCardClone.querySelector('.send-btn-minimal');
     btn.disabled = true; 
 
-    apiRequest('/api/comment', 'POST', { word_id: currentWordId, author: aut, comment: txt })
+    apiRequest('/api/comment', 'POST', { word_id: currentWordId, comment: txt })
     .then(data => {
         showCustomAlert("Yorum eklendi!");
         activeCardClone.querySelector('#commentInput').value='';

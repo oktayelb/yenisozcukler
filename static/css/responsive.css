@@ -20,17 +20,34 @@
     .logo-card .subtitle { font-size: 1.1rem; }
     .logo-card.pos-behind { transform: rotate(-6deg) translate(-5px, -5px) scale(0.95); }
     
-    .about-box { max-height: 80vh; padding: 20px; }
+    /* MODAL MOBILE OVERRIDES - Adjusted for new structure */
+    .auth-box { 
+        width: 92%; 
+        padding: 30px 20px; /* Reduced side padding for small screens */
+        border-radius: 20px; 
+    } 
+    .about-box { 
+        max-height: 85vh; 
+        padding: 30px 20px; 
+    }
+    .auth-tabs {
+        margin-bottom: 25px;
+        border-radius: 10px;
+    }
+    .auth-tab {
+        font-size: 1rem;
+        padding: 10px 5px;
+    }
     
-    /* Profile Modal Mobile Adjustments to match desktop feel */
+    /* Profile Modal Mobile Adjustments */
     .profile-modal-box {
-        padding: 25px 15px;
+        padding: 30px 20px;
     }
     .profile-stats-container {
         padding: 12px 5px; 
     }
     .stat-value {
-        font-size: 1.15rem; 
+        font-size: 1.2rem; 
     }
     .stat-label {
         font-size: 0.7rem;
@@ -38,11 +55,12 @@
 
     /* Fix for My Words Modal on Mobile */
     #myWordsModal .auth-box {
-        max-height: 80vh;
-        width: 90% !important;
+        max-height: 85vh;
+        width: 95% !important;
         display: flex;
         flex-direction: column;
         margin: auto;
+        padding: 25px 15px;
     }
 
     #myWordsFeed {

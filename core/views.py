@@ -309,7 +309,7 @@ def add_example(request):
 @ratelimit(key=universal_rate_key, rate='10/m', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
-@permission_classes([]) # OPENED TO ANONYMOUS USERS
+@permission_classes([IsAuthenticated]) # LOCKED TO REGISTERED USERS
 def add_comment(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
@@ -318,15 +318,12 @@ def add_comment(request):
     
     if serializer.is_valid():
         word = get_object_or_404(Word, id=serializer.validated_data['word_id'])
-        
-        user_obj = request.user if request.user.is_authenticated else None
-        author_name = request.user.username if user_obj else 'Anonim'
             
         new_comment = Comment.objects.create(
             word=word,
-            author=author_name,
+            author=request.user.username,
             comment=serializer.validated_data['comment'],
-            user=user_obj, 
+            user=request.user, 
             score=0
         )
         return Response({'success': True, 'comment': CommentSerializer(new_comment).data}, status=201)
