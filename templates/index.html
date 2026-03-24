@@ -9,7 +9,7 @@
       data-username="{{ request.user.username|default:'' }}">
 
     <div class="notification-container" id="notificationContainer"></div>
-    <div id="modalBackdrop" class="modal-backdrop" onclick="closeCommentView()"></div> 
+    <div id="modalBackdrop" class="modal-backdrop"></div> 
 
     <div class="app-layout">
         
@@ -20,25 +20,25 @@
         <div class="header-controls-right">
             {% if request.user.is_authenticated %}
                 <div class="header-user-info">
-                    <button class="header-btn header-profile-btn" onclick="openProfileModal('{{ request.user.username }}')">
+                    <button class="header-btn header-profile-btn auth-profile-trigger">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="header-profile-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                         {{ request.user.username }}
                     </button>
                 </div>
             {% else %}
-                <button class="header-btn" onclick="openModal('authModal')">Giriş Yap</button>
+                <button class="header-btn auth-login-trigger">Giriş Yap</button>
             {% endif %}
-            <button class="header-btn" onclick="showAboutInfo()">Bu site nedir?</button>
+            <button class="header-btn" id="headerAboutBtn">Bu site nedir?</button>
         </div>
         
         <header>
             <div class="logo-wrapper">
-                <div class="logo-card theme-red pos-behind" id="cardRed" onclick="animateLogo(this)">
+                <div class="logo-card theme-red pos-behind" id="cardRed">
                     <h1 id="mainTitle">Yeni Sözcükler</h1>
                     <span class="subtitle" id="subtitleText">"Yeni küfürlerini de paylaş"</span>
                 </div>
 
-                <div class="logo-card theme-default pos-center" id="cardDefault" onclick="animateLogo(this)">
+                <div class="logo-card theme-default pos-center" id="cardDefault">
                     <h1 id="mainTitle">Yeni Sözcükler</h1>
                     <span class="subtitle" id="subtitleText">"Yeni sözcüklerini paylaş"</span>
                 </div>
@@ -48,7 +48,7 @@
         <div class="top-app-bar" id="topAppBar">
             <div class="top-app-inner">
                 <div class="top-app-left">
-                    <button class="header-btn" onclick="focusContributionForm()">+ Sözcük Ekle</button>
+                    <button class="header-btn" id="topAddWordBtn">+ Sözcük Ekle</button>
                 </div>
 
                 <div class="top-app-center">
@@ -69,11 +69,11 @@
 
                 <div class="top-app-right">
                     {% if request.user.is_authenticated %}
-                        <button class="header-btn" onclick="openProfileModal('{{ request.user.username }}')">
+                        <button class="header-btn auth-profile-trigger">
                             {{ request.user.username }}
                         </button>
                     {% else %}
-                        <button class="header-btn" onclick="openModal('authModal')">Giriş Yap</button>
+                        <button class="header-btn auth-login-trigger">Giriş Yap</button>
                     {% endif %}
                 </div>
             </div>
@@ -84,29 +84,26 @@
             <div class="form-card collapsed" id="contributionCard">
                 <button type="button"
                         class="form-collapse-btn"
-                        onclick="toggleContributionForm()"
+                        id="formCollapseBtn"
                         aria-label="Formu daralt">
                     ✕
                 </button>
-                <div class="form-header-toggle" onclick="toggleContributionForm()">
+                <div class="form-header-toggle" id="formHeaderToggle">
                     <div class="form-title" id="contributionTitle" style="margin:0; font-size: 1.8rem;">
                         Katkıda Bulun <span class="toggle-icon">+</span>
                     </div>
                 </div>
                 <div class="form-collapsible-wrapper">
-                    <form class="form-fields" onsubmit="handleWordSubmit(event)" style="padding-top: 25px;">
+                    <form class="form-fields" id="contributionForm" style="padding-top: 25px;">
                         
                         <div class="form-group">
                             <label>Sözcük</label>
-                            <input type="text" id="inputWord" maxlength="50"
-                                placeholder=""
-                                onkeypress="return allowOnlyLetters(event, true)" 
-                                oninput="this.value = this.value.replace(/^\s+/g, '')">
+                            <input type="text" id="inputWord" maxlength="50" placeholder="">
                         </div>
 
                         <div class="form-group def-wrapper">
                             <label>Tanım</label>
-                            <textarea id="inputDef" rows="2" maxlength="300" oninput="updateCount(this)" placeholder="Sözcüğün anlamını açıklayın..." onkeypress="return allowOnlyLetters(event, true)"></textarea>
+                            <textarea id="inputDef" rows="2" maxlength="300" placeholder="Sözcüğün anlamını açıklayın..."></textarea>
                             <div class="char-limit" id="charCount">0 / 300</div>
                         </div>
 
@@ -119,8 +116,7 @@
                         <div class="form-group span-full">
                             <label>Örnek Cümle</label>
                             <textarea id="inputExample" rows="2" maxlength="200" 
-                                    placeholder="Sözcüğü bir cümle içinde kullanın..." 
-                                    onkeypress="return allowOnlyLetters(event, true)"></textarea>
+                                    placeholder="Sözcüğü bir cümle içinde kullanın..."></textarea>
                         </div>
 
                         <div class="form-group span-full" id="categorySelectionContainer" style="display:none;">
@@ -145,7 +141,7 @@
             <div id="activeFilterBanner" class="filter-banner" style="display:none; flex-direction:column; gap:8px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                     <span><span style="opacity:0.8">Kategori:</span> <strong id="filterNameDisplay"></strong></span>
-                    <button onclick="clearCategoryFilter()" style="margin-left:auto;">Filtreyi Temizle ✕</button>
+                    <button id="clearFilterBtn" style="margin-left:auto;">Filtreyi Temizle ✕</button>
                 </div>
                 <div id="filterDescDisplay" style="font-size:0.9rem; font-style:italic; border-top:1px solid rgba(255,255,255,0.2); padding-top:4px; display:none;"></div>
             </div>
@@ -169,14 +165,14 @@
             </div>
 
             <div class="load-more-container" id="loadMoreContainer" style="display:none;">
-                <button class="load-more-btn" onclick="loadMoreWords()">Daha Fazla Göster</button>
+                <button class="load-more-btn" id="loadMoreBtn">Daha Fazla Göster</button>
             </div>
         </div>
     </div> 
     
-    <div id="addExampleModal" class="auth-overlay" onclick="closeModal('addExampleModal', false, event)">
+    <div id="addExampleModal" class="auth-overlay">
         <div class="auth-box" style="max-width: 500px;">
-            <button class="close-btn auth-close" onclick="closeModal('addExampleModal', true)">
+            <button class="close-btn auth-close" id="addExampleCloseBtn">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
             
@@ -195,16 +191,16 @@
                             style="width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid var(--border-light); background:var(--input-bg); color:var(--text-main);"></textarea>
                     <div class="char-count" id="exampleCharCount" style="text-align:right; font-size:0.8rem; color:var(--text-muted); margin-top:5px;">0 / 200</div>
                 </div>
-                <button id="submitExampleBtn" class="auth-submit-btn" onclick="submitExample()">Kaydet</button>
+                <button id="submitExampleBtn" class="auth-submit-btn">Kaydet</button>
             </div>
         </div>
     </div>
 
     {% include 'constant_modals.html' %}
 
-    <div id="profileModal" class="auth-overlay" onclick="closeProfileModal(event)">
+    <div id="profileModal" class="auth-overlay">
         <div class="auth-box profile-modal-box">
-            <button class="close-btn auth-close" onclick="closeProfileModal(event, true)">
+            <button class="close-btn auth-close" id="profileCloseBtn">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
 
@@ -214,7 +210,7 @@
             </div>
 
             <div class="profile-stats-container">
-                <div class="profile-stat-item clickable-stat" onclick="openMyWordsModal()" title="Yayınlanan sözcüklerini gör">
+                <div class="profile-stat-item clickable-stat" id="myWordsStatBtn" title="Yayınlanan sözcüklerini gör">
                     <span class="stat-value text-accent" id="statWords">0</span>
                     <span class="stat-label">Sözcük</span>
                 </div>
@@ -231,11 +227,11 @@
             </div>
 
             <div class="profile-actions-wrapper edit-profile-btn" style="display:none; width: 100%;">
-                <button class="profile-action-btn btn-edit" onclick="openEditProfileModal()">
+                <button class="profile-action-btn btn-edit" id="editProfileBtn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                     Profili Düzenle
                 </button>
-                <button class="profile-action-btn btn-logout" onclick="handleLogout()" title="Çıkış Yap">
+                <button class="profile-action-btn btn-logout" id="logoutBtn" title="Çıkış Yap">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                     Çıkış Yap
                 </button>
@@ -243,9 +239,9 @@
         </div>
     </div>
 
-    <div id="myWordsModal" class="auth-overlay" onclick="closeMyWordsModal(event)">
+    <div id="myWordsModal" class="auth-overlay">
         <div class="auth-box" style="max-width: 600px; width: 95%; max-height: 85vh; display: flex; flex-direction: column;">
-            <button class="close-btn auth-close" onclick="closeMyWordsModal(event, true)">
+            <button class="close-btn auth-close" id="myWordsCloseBtn">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
 
@@ -256,16 +252,15 @@
 
             <div id="myWordsFeed" class="custom-scrollbar" style="flex-grow: 1; overflow-y: auto;"></div>
             
-            <button onclick="openProfileModal(); document.getElementById('myWordsModal').classList.remove('show');" 
-                    style="width:100%; padding:10px; background:none; border:none; color:var(--text-muted); cursor:pointer; margin-top:10px; flex-shrink: 0;">
+            <button id="myWordsProfileBtn" style="width:100%; padding:10px; background:none; border:none; color:var(--text-muted); cursor:pointer; margin-top:10px; flex-shrink: 0;">
                 &larr; Profile Dön
             </button>
         </div>
     </div>
 
-    <div id="editProfileModal" class="auth-overlay" onclick="closeEditProfileModal(event)">
+    <div id="editProfileModal" class="auth-overlay">
         <div class="auth-box" style="max-width: 400px;">
-            <button class="close-btn auth-close" onclick="closeEditProfileModal(event, true)">
+            <button class="close-btn auth-close" id="editProfileCloseBtn">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
             <div class="auth-header">
@@ -277,7 +272,7 @@
             <div class="auth-form" style="margin-bottom: 25px;">
                 <div class="form-group" style="display:flex; gap:10px;">
                     <input type="text" id="newUsernameInput" placeholder="Kullanıcı Adı" maxlength="20">
-                    <button class="auth-submit-btn" onclick="handleChangeUsername()" style="width:auto; margin-top:0; padding:0 20px; white-space:nowrap;">Kaydet</button>
+                    <button class="auth-submit-btn" id="saveUsernameBtn" style="width:auto; margin-top:0; padding:0 20px; white-space:nowrap;">Kaydet</button>
                 </div>
             </div>
             <hr style="border:0; border-top:1px dashed var(--input-border); margin-bottom:20px;">
@@ -290,10 +285,10 @@
                 <div class="form-group">
                     <input type="password" id="newPasswordConfirm" placeholder="Yeni Şifre (Tekrar)">
                 </div>
-                <button class="auth-submit-btn" onclick="handleChangePassword()">Şifreyi Güncelle</button>
+                <button class="auth-submit-btn" id="savePasswordBtn">Şifreyi Güncelle</button>
             </div>
 
-            <button onclick="backToProfile()" style="background:none; border:none; color:var(--text-muted); width:100%; margin-top:15px; cursor:pointer; font-size:0.9rem;">
+            <button id="backToProfileBtn" style="background:none; border:none; color:var(--text-muted); width:100%; margin-top:15px; cursor:pointer; font-size:0.9rem;">
                 &larr; Profile Geri Dön
             </button>
         </div>

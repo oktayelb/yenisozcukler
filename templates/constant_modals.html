@@ -1,8 +1,8 @@
-<div id="aboutModal" class="about-overlay" onclick="closeAboutInfo(event)">
+<div id="aboutModal" class="about-overlay">
     <div class="about-box">
         <div class="drawer-header" style="border:none; padding:0; margin-bottom:10px;">
             <div style="flex-grow:1;"></div>
-            <button class="close-btn" onclick="closeAboutInfo(event, true)">
+            <button class="close-btn" id="aboutCloseBtn">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
         </div>
@@ -41,15 +41,15 @@
     </div>
 </div>
 
-<div id="authModal" class="auth-overlay" onclick="closeAuthModal(event)">
+<div id="authModal" class="auth-overlay">
     <div class="auth-box">
-        <button class="close-btn auth-close" onclick="closeAuthModal(event, true)">
+        <button class="close-btn auth-close" id="authCloseBtn">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
 
         <div class="auth-tabs">
-            <button class="auth-tab active" id="tabLogin" onclick="toggleAuthMode('login')">Giriş Yap</button>
-            <button class="auth-tab" id="tabRegister" onclick="toggleAuthMode('register')">Kayıt Ol</button>
+            <button class="auth-tab active" id="tabLogin">Giriş Yap</button>
+            <button class="auth-tab" id="tabRegister">Kayıt Ol</button>
         </div>
 
         <div class="auth-header">
@@ -75,7 +75,7 @@
             
             <p id="authErrorMsg" style="color: var(--error-color); font-size: 0.9rem; margin-bottom: 10px; display: none;"></p>
             
-            <button class="auth-submit-btn" id="authSubmitBtn" type="button" onclick="handleAuthSubmit()">Giriş Yap</button>
+            <button class="auth-submit-btn" id="authSubmitBtn" type="button">Giriş Yap</button>
         </div>
     </div>
 </div>

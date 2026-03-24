@@ -37,6 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if(el) el.classList.add('loaded');
     });
 
+    setupAllEventListeners(); // Bootstraps extracted inline HTML events
+
     setupAuthTriggers();
     setupSortBar();
     setupTheme();
@@ -45,6 +47,97 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchCategories(); 
     fetchWords(currentPage);
 });
+
+/* --- ALL EXTRACTED EVENT BINDINGS --- */
+function setupAllEventListeners() {
+    // Backdrop / Overlays
+    document.getElementById('modalBackdrop')?.addEventListener('click', closeCommentView);
+    
+    // About Modal
+    document.getElementById('aboutModal')?.addEventListener('click', closeAboutInfo);
+    document.getElementById('aboutCloseBtn')?.addEventListener('click', (e) => closeAboutInfo(e, true));
+    document.getElementById('headerAboutBtn')?.addEventListener('click', showAboutInfo);
+    
+    // Auth Modal
+    document.getElementById('authModal')?.addEventListener('click', closeAuthModal);
+    document.getElementById('authCloseBtn')?.addEventListener('click', (e) => closeAuthModal(e, true));
+    document.getElementById('tabLogin')?.addEventListener('click', () => toggleAuthMode('login'));
+    document.getElementById('tabRegister')?.addEventListener('click', () => toggleAuthMode('register'));
+    document.getElementById('authSubmitBtn')?.addEventListener('click', handleAuthSubmit);
+    
+    // Shared Triggers
+    document.querySelectorAll('.auth-login-trigger').forEach(btn => {
+        btn.addEventListener('click', () => openModal('authModal'));
+    });
+    document.querySelectorAll('.auth-profile-trigger').forEach(btn => {
+        btn.addEventListener('click', () => openProfileModal(currentUserUsername));
+    });
+
+    // Logo animations
+    document.getElementById('cardRed')?.addEventListener('click', function() { animateLogo(this); });
+    document.getElementById('cardDefault')?.addEventListener('click', function() { animateLogo(this); });
+
+    // Header / Form actions
+    document.getElementById('topAddWordBtn')?.addEventListener('click', focusContributionForm);
+    document.getElementById('formCollapseBtn')?.addEventListener('click', toggleContributionForm);
+    document.getElementById('formHeaderToggle')?.addEventListener('click', toggleContributionForm);
+    document.getElementById('contributionForm')?.addEventListener('submit', handleWordSubmit);
+
+    // Form Interactions / Validations
+    const inputWord = document.getElementById('inputWord');
+    if (inputWord) {
+        inputWord.addEventListener('input', function() { this.value = this.value.replace(/^\s+/g, ''); });
+        inputWord.addEventListener('keypress', (e) => {
+            if (typeof allowOnlyLetters === 'function' && !allowOnlyLetters(e, true)) e.preventDefault();
+        });
+    }
+
+    const inputDef = document.getElementById('inputDef');
+    if (inputDef) {
+        inputDef.addEventListener('input', function() { updateCount(this); });
+        inputDef.addEventListener('keypress', (e) => {
+            if (typeof allowOnlyLetters === 'function' && !allowOnlyLetters(e, true)) e.preventDefault();
+        });
+    }
+
+    const inputExample = document.getElementById('inputExample');
+    if (inputExample) {
+        inputExample.addEventListener('keypress', (e) => {
+            if (typeof allowOnlyLetters === 'function' && !allowOnlyLetters(e, true)) e.preventDefault();
+        });
+    }
+
+    // Filter and Feed logic
+    document.getElementById('clearFilterBtn')?.addEventListener('click', clearCategoryFilter);
+    document.getElementById('loadMoreBtn')?.addEventListener('click', loadMoreWords);
+
+    // Add Example Modal
+    document.getElementById('addExampleModal')?.addEventListener('click', (e) => closeModal('addExampleModal', false, e));
+    document.getElementById('addExampleCloseBtn')?.addEventListener('click', () => closeModal('addExampleModal', true));
+    document.getElementById('submitExampleBtn')?.addEventListener('click', submitExample);
+
+    // Profile Modal
+    document.getElementById('profileModal')?.addEventListener('click', closeProfileModal);
+    document.getElementById('profileCloseBtn')?.addEventListener('click', (e) => closeProfileModal(e, true));
+    document.getElementById('myWordsStatBtn')?.addEventListener('click', openMyWordsModal);
+    document.getElementById('editProfileBtn')?.addEventListener('click', openEditProfileModal);
+    document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
+
+    // My Words Modal
+    document.getElementById('myWordsModal')?.addEventListener('click', closeMyWordsModal);
+    document.getElementById('myWordsCloseBtn')?.addEventListener('click', (e) => closeMyWordsModal(e, true));
+    document.getElementById('myWordsProfileBtn')?.addEventListener('click', () => {
+        openProfileModal();
+        document.getElementById('myWordsModal').classList.remove('show');
+    });
+
+    // Edit Profile Modal
+    document.getElementById('editProfileModal')?.addEventListener('click', closeEditProfileModal);
+    document.getElementById('editProfileCloseBtn')?.addEventListener('click', (e) => closeEditProfileModal(e, true));
+    document.getElementById('saveUsernameBtn')?.addEventListener('click', handleChangeUsername);
+    document.getElementById('savePasswordBtn')?.addEventListener('click', handleChangePassword);
+    document.getElementById('backToProfileBtn')?.addEventListener('click', backToProfile);
+}
 
 function focusContributionForm() {
     const card = document.getElementById('contributionCard');
@@ -68,7 +161,7 @@ function showCustomAlert(message, type = 'success') {
     const alertDiv = document.createElement('div');
     alertDiv.className = `custom-alert custom-alert-${type}`;
     alertDiv.textContent = message;
-    alertDiv.onclick = () => alertDiv.remove();
+    alertDiv.addEventListener('click', () => alertDiv.remove());
     container.prepend(alertDiv);
     
     setTimeout(() => alertDiv.classList.add('show'), 10);
@@ -244,7 +337,6 @@ function initTopAppBar() {
     window.addEventListener('scroll', onScroll);
     onScroll();
 }
-
 
 /* --- AUTHENTICATION --- */
 
@@ -427,7 +519,7 @@ function renderCategorySelection() {
         
         if (desc) pill.setAttribute('data-desc', desc);
         
-        pill.onclick = () => toggleCategorySelection(cat.id, pill, desc);
+        pill.addEventListener('click', () => toggleCategorySelection(cat.id, pill, desc));
         container.appendChild(pill);
     });
 }
@@ -563,7 +655,7 @@ function createCardElement(item, isModalMode) {
     const parser = new DOMParser();
     const decode = (s) => s ? parser.parseFromString(s, "text/html").documentElement.textContent : '';
 
-    card.onclick = (e) => {
+    card.addEventListener('click', (e) => {
         if (e.target.closest('.vote-btn') || 
             e.target.closest('.vote-container-floating') || 
             e.target.closest('.user-badge') || 
@@ -572,7 +664,7 @@ function createCardElement(item, isModalMode) {
             card.classList.contains('is-profane-content')) return;
             
         animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), decode(item.example), decode(item.etymology), isModalMode);
-    };
+    });
 
     const votePill = createVoteControls('word', item);
     votePill.className = 'vote-container-floating'; 
@@ -590,10 +682,10 @@ function createCardElement(item, isModalMode) {
         const addExBtn = document.createElement('button');
         addExBtn.className = 'add-example-btn';
         addExBtn.innerText = '+ Örnek Ekle';
-        addExBtn.onclick = (e) => {
+        addExBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             openAddExampleModal(item.id, decode(item.word));
-        };
+        });
         addExBtn.style.cssText = "background:none; border:1px dashed var(--accent); color:var(--accent); cursor:pointer; font-size:0.75rem; padding:4px 8px; border-radius:4px; margin-top:8px; opacity:0.8;";
         
         contentDiv.appendChild(addExBtn);
@@ -614,10 +706,10 @@ function createCardElement(item, isModalMode) {
                 tag.setAttribute('data-desc', cat.description);
             }
             
-            tag.onclick = (e) => {
+            tag.addEventListener('click', (e) => {
                 e.stopPropagation();
                 handleTagClick(cat.slug, cat.name, cat.description);
-            };
+            });
             tagsDiv.appendChild(tag);
         });
         
@@ -642,10 +734,10 @@ function createCardElement(item, isModalMode) {
         const badge = document.createElement('span');
         badge.className = 'user-badge';
         badge.innerText = authorName;
-        badge.onclick = (e) => {
+        badge.addEventListener('click', (e) => {
             e.stopPropagation(); 
             openProfileModal(authorName);
-        };
+        });
         authorSpan.appendChild(badge);
     } else {
         authorSpan.innerHTML += ' anonim';
@@ -659,12 +751,12 @@ function createCardElement(item, isModalMode) {
         const ov = document.createElement('div'); 
         ov.className = 'profane-wrapper';
         ov.innerHTML = `<div class="profane-badge">+18</div><div class="profane-warning">Görmek için tıkla</div>`;
-        ov.onclick = (e) => { 
+        ov.addEventListener('click', (e) => { 
             e.stopPropagation(); e.preventDefault();
             ov.classList.add('hiding'); 
             card.classList.remove('is-profane-content'); 
             setTimeout(() => { if(ov.parentNode) ov.remove(); }, 600);
-        };
+        });
         card.appendChild(ov);
     }
 
@@ -680,7 +772,7 @@ async function submitWord() {
     const et = document.getElementById('inputEtymology').value.trim();
     const n = isUserLoggedIn ? currentUserUsername : 'Anonim';
 
-    const btn = document.querySelector(".form-card button");
+    const btn = document.querySelector(".form-card button[type='submit']");
     const prof = localStorage.getItem(COLOR_THEME_KEY) === 'red';
 
     if (!w || !d || !ex || !et) return showCustomAlert("Lütfen tüm alanları doldurun.", "error");
@@ -797,14 +889,14 @@ function createVoteControls(type, data) {
         const b = document.createElement('button'); 
         b.className=`vote-btn ${act} ${data.user_vote === act ? 'active' : ''}`;
         b.innerHTML=`<svg viewBox="0 0 24 24"><path d="${icon}"></path></svg>`;
-        b.onclick = (e) => { 
+        b.addEventListener('click', (e) => { 
             e.stopPropagation(); 
             if (!isUserLoggedIn) {
                 openAuthModal();
                 return;
             }
             sendVote(type, data.id, act, div); 
-        };
+        });
         return b;
     };
     div.append(
@@ -915,8 +1007,6 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
     const etymologyHTML = wordEtymology ? `<div class="word-etymology" style="font-size:0.9rem; color:var(--text-muted); margin-top:5px; margin-bottom:5px;"><em>Köken:</em> ${wordEtymology}</div>` : '';
 
     const commentPlaceholder = isUserLoggedIn ? "Yorum yaz..." : "Yorum yapmak için giriş yapın...";
-    const commentInteraction = isUserLoggedIn ? "" : 'onclick="openAuthModal()" readonly';
-    const buttonAction = isUserLoggedIn ? "submitComment()" : "openAuthModal()";
 
     const contentHTML = `
         <div class="view-header">
@@ -927,7 +1017,7 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
                     <div style="font-size:1rem; color:var(--text-muted); margin-top:5px; font-style:italic;">${wordDef}</div>
                     ${exampleHTML}
                 </div>
-                <button class="close-icon-btn" onclick="closeCommentView()">✕</button>
+                <button class="close-icon-btn" id="closeCommentViewBtn">✕</button>
             </div>
         </div>
         <div id="commentsList" class="view-body">
@@ -935,9 +1025,9 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
         </div>
         <div class="view-footer">
             <div class="custom-comment-wrapper">
-                <textarea id="commentInput" class="custom-textarea-minimal" rows="2" placeholder="${commentPlaceholder}" maxlength="200" ${commentInteraction}></textarea>
+                <textarea id="commentInput" class="custom-textarea-minimal" rows="2" placeholder="${commentPlaceholder}" maxlength="200" ${isUserLoggedIn ? "" : 'readonly'}></textarea>
                 <div class="custom-comment-footer">
-                    <button class="send-btn-minimal" onclick="${buttonAction}">Gönder</button>
+                    <button class="send-btn-minimal" id="submitCommentActionBtn">Gönder</button>
                 </div>
             </div>
         </div>
@@ -946,6 +1036,15 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
     clone.innerHTML = contentHTML;
     document.body.appendChild(clone);
     requestAnimationFrame(() => requestAnimationFrame(() => clone.classList.add('expanded')));
+
+    // Reattach inline logic created via string building
+    document.getElementById('closeCommentViewBtn')?.addEventListener('click', closeCommentView);
+    if (!isUserLoggedIn) {
+        document.getElementById('commentInput')?.addEventListener('click', openAuthModal);
+        document.getElementById('submitCommentActionBtn')?.addEventListener('click', openAuthModal);
+    } else {
+        document.getElementById('submitCommentActionBtn')?.addEventListener('click', submitComment);
+    }
 
     activeCardClone = clone;
     loadComments(wordId, 1, false);
@@ -983,7 +1082,7 @@ async function loadComments(wordId, page = 1) {
                 const btn = document.createElement('button');
                 btn.className = 'load-more-comments-btn';
                 btn.innerText = 'Daha eski yorumlar';
-                btn.onclick = () => loadComments(wordId, ++currentCommentPage);
+                btn.addEventListener('click', () => loadComments(wordId, ++currentCommentPage));
                 list.appendChild(btn);
             }
         } else if(page === 1) {
@@ -1007,7 +1106,7 @@ function createCommentItem(c) {
         const badge = document.createElement('span');
         badge.className = 'user-badge';
         badge.innerText = authorName;
-        badge.onclick = (e) => { e.stopPropagation(); openProfileModal(authorName); };
+        badge.addEventListener('click', (e) => { e.stopPropagation(); openProfileModal(authorName); });
         left.appendChild(badge);
     } else {
         const b = document.createElement('strong');
