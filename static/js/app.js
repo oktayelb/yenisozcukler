@@ -28,7 +28,7 @@ let currentSort = 'date_desc'; // 'date_desc', 'date_asc', 'score_desc', 'score_
 // Auth State
 let currentAuthMode = 'login'; // 'login' or 'register'
 const isUserLoggedIn = document.body.getAttribute('data-user-auth') === 'true';
-const currentUserUsername = document.body.getAttribute('data-username');
+let currentUserUsername = document.body.getAttribute('data-username');
 
 /* --- INIT --- */
 document.addEventListener('DOMContentLoaded', () => {
@@ -1246,10 +1246,32 @@ function handleChangePassword(){
     .catch(e => showCustomAlert(e.message, "error"));
 }
 
-function handleChangeUsername(){
-    const u = document.getElementById('newUsernameInput').value.trim();
-    if(u) apiRequest('/api/username','PATCH',{new_username: u}).then(() => {
-        showCustomAlert("Kullanıcı adı değişti."); 
-        setTimeout(() => window.location.reload(), 1000);
-    }).catch(e => showCustomAlert(e.message, "error"));
+function handleChangeUsername() {
+    const newUsername = document.getElementById('newUsernameInput').value.trim();
+    const oldUsername = currentUserUsername;
+    if (newUsername) {
+        apiRequest('/api/username', 'PATCH', { new_username: newUsername })
+            .then(() => {
+                showCustomAlert("Kullanıcı adı başarıyla değiştirildi.");
+                currentUserUsername = newUsername;
+                document.body.setAttribute('data-username', newUsername);
+                document.querySelectorAll('.user-badge').forEach(badge => {
+                    if (badge.innerText === oldUsername) {
+                        badge.innerText = newUsername;
+                    }
+                });
+                if (currentProfileUser === oldUsername) {
+                    currentProfileUser = newUsername;
+                    document.getElementById('profileUsername').innerText = newUsername;
+                }
+                const myWordsTitle = document.querySelector('#myWordsModal h2');
+                if (myWordsTitle && myWordsTitle.innerText.includes(oldUsername)) {
+                    myWordsTitle.innerText = `${newUsername} adlı kullanıcının sözcükleri`;
+                }
+                closeModal('editProfileModal', true);
+                openModal('profileModal');
+
+            })
+            .catch(e => showCustomAlert(e.message, "error"));
+    }
 }
