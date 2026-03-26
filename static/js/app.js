@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(el) el.classList.add('loaded');
     });
 
-    setupAllEventListeners(); // Bootstraps extracted inline HTML events
+    setupAllEventListeners();
 
     setupAuthTriggers();
     setupSortBar();
@@ -190,6 +190,18 @@ function focusContributionForm() {
 }
 
 /* --- UTILS --- */
+
+// HTML Escaping Utility to prevent DOM-based XSS
+function escapeHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function getCSRFToken() {
     const match = document.cookie.match(/csrftoken=([^;]+)/);
     return match ? match[1] : null;
@@ -199,7 +211,7 @@ function showCustomAlert(message, type = 'success') {
     const container = document.getElementById('notificationContainer');
     const alertDiv = document.createElement('div');
     alertDiv.className = `custom-alert custom-alert-${type}`;
-    alertDiv.textContent = message;
+    alertDiv.textContent = message; // Safely assign text content
     alertDiv.addEventListener('click', () => alertDiv.remove());
     container.prepend(alertDiv);
     
@@ -211,10 +223,15 @@ function showCustomAlert(message, type = 'success') {
 }
 
 async function apiRequest(url, method = 'GET', body = null) {
-    const options = {
-        method,
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }
-    };
+    const headers = { 'Content-Type': 'application/json' };
+    const csrfToken = getCSRFToken();
+    
+    // Only attach token if it exists to prevent malformed headers
+    if (csrfToken) {
+        headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const options = { method, headers };
     if (body) options.body = JSON.stringify(body);
 
     const response = await fetch(url, options);
@@ -317,7 +334,7 @@ function toggleContributionForm() {
         if (isExpanded) {
             card.classList.remove('expanded');
             card.classList.add('collapsed');
-            if(title) title.innerHTML = 'Katkıda Bulun <span class="toggle-icon">+</span>';
+            if(title) title.innerHTML = 'Katkıda Bulun <span class="toggle-icon">+</span>'; // Static HTML, safe
         } else {
             card.classList.remove('collapsed');
             card.classList.add('expanded');
@@ -540,10 +557,14 @@ function toggleCategorySelection(id, el, description) {
     const helpText = document.getElementById('categoryHelpText');
     if (helpText) {
         if (description) {
-             helpText.innerHTML = `<strong>${el.textContent}:</strong> ${description}`;
+             helpText.innerHTML = ''; // Clear contents safely
+             const strongNode = document.createElement('strong');
+             strongNode.textContent = `${el.textContent}: `;
+             helpText.appendChild(strongNode);
+             helpText.appendChild(document.createTextNode(description));
              helpText.classList.add('active');
         } else {
-             helpText.innerHTML = '';
+             helpText.textContent = '';
              helpText.classList.remove('active');
         }
     }
@@ -583,7 +604,12 @@ async function fetchWords(page) {
             document.getElementById('loadMoreContainer').style.display = hasMore ? 'block' : 'none';
         } else if(page === 1) {
             if(currentSearchQuery) {
-                list.innerHTML = `<div style="text-align:center;color:#ccc;margin-top:20px;">"${currentSearchQuery}" için sonuç bulunamadı.</div>`;
+                // Safely render the search query without innerHTML
+                list.innerHTML = '';
+                const noResultMsg = document.createElement('div');
+                noResultMsg.style.cssText = 'text-align:center;color:#ccc;margin-top:20px;';
+                noResultMsg.textContent = `"${currentSearchQuery}" için sonuç bulunamadı.`;
+                list.appendChild(noResultMsg);
             } else {
                 list.innerHTML = '<div style="text-align:center;color:#ccc;margin-top:20px;">Henüz içerik yok.</div>';
             }
@@ -660,9 +686,6 @@ function createCardElement(item, isModalMode) {
     const card = document.createElement('div');
     card.className = 'word-card fade-in';
     card.setAttribute('data-id', item.id);
-    
-    const parser = new DOMParser();
-    const decode = (s) => s ? parser.parseFromString(s, "text/html").documentElement.textContent : '';
 
     card.addEventListener('click', (e) => {
         if (e.target.closest('.vote-btn') || 
@@ -671,17 +694,39 @@ function createCardElement(item, isModalMode) {
             e.target.closest('.add-example-btn') || 
             e.target.closest('.tag-badge')) return;
             
-        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), decode(item.example), decode(item.etymology), isModalMode);
+        animateAndOpenCommentView(card, item.id, item.word, item.def || item.definition, item.example, item.etymology, isModalMode);
     });
 
     const votePill = createVoteControls('word', item);
     votePill.className = 'vote-container-floating'; 
     card.appendChild(votePill);
 
+    // Build the DOM safely using Node creation instead of innerHTML
     const contentDiv = document.createElement('div');
-    const exampleHTML = item.example ? `<div class="word-example">"${decode(item.example)}"</div>` : '';
-    const etymologyHTML = item.etymology ? `<div class="word-etymology" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;"><em>Köken:</em> ${decode(item.etymology)}</div>` : '';
-    contentDiv.innerHTML = `<h3>${decode(item.word)}</h3>${etymologyHTML}<p>${decode(item.def)}</p>${exampleHTML}`;
+    
+    const wordTitle = document.createElement('h3');
+    wordTitle.textContent = item.word;
+    contentDiv.appendChild(wordTitle);
+
+    if (item.etymology) {
+        const etyDiv = document.createElement('div');
+        etyDiv.className = 'word-etymology';
+        etyDiv.style.cssText = 'font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;';
+        etyDiv.innerHTML = '<em>Köken:</em> '; // Safe static HTML
+        etyDiv.appendChild(document.createTextNode(item.etymology)); // Safe dynamic content
+        contentDiv.appendChild(etyDiv);
+    }
+
+    const defP = document.createElement('p');
+    defP.textContent = item.def || item.definition;
+    contentDiv.appendChild(defP);
+
+    if (item.example) {
+        const exampleDiv = document.createElement('div');
+        exampleDiv.className = 'word-example';
+        exampleDiv.textContent = `"${item.example}"`;
+        contentDiv.appendChild(exampleDiv);
+    }
     
     if (isUserLoggedIn && 
         currentUserUsername === item.author && 
@@ -692,7 +737,7 @@ function createCardElement(item, isModalMode) {
         addExBtn.innerText = '+ Örnek Ekle';
         addExBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            openAddExampleModal(item.id, decode(item.word));
+            openAddExampleModal(item.id, item.word);
         });
         addExBtn.style.cssText = "background:none; border:1px dashed var(--accent); color:var(--accent); cursor:pointer; font-size:0.75rem; padding:4px 8px; border-radius:4px; margin-top:8px; opacity:0.8;";
         
@@ -729,14 +774,13 @@ function createCardElement(item, isModalMode) {
     
     const hint = document.createElement('div'); 
     hint.className = 'click-hint'; 
-    const cCount = item.comment_count || 0; 
+    const cCount = Number(item.comment_count) || 0; 
     hint.innerHTML = `Yorumlar (${cCount}) <span>&rarr;</span>`;
     foot.appendChild(hint);
 
-    const authorName = item.author ? decode(item.author) : 'Anonim';
+    const authorName = item.author ? item.author : 'Anonim';
     const authorSpan = document.createElement('div');
     authorSpan.className = 'card-author';
-    authorSpan.innerHTML = '';
 
     if (authorName !== 'Anonim') {
         const badge = document.createElement('span');
@@ -748,7 +792,7 @@ function createCardElement(item, isModalMode) {
         });
         authorSpan.appendChild(badge);
     } else {
-        authorSpan.innerHTML += ' anonim';
+        authorSpan.textContent = ' anonim';
     }
 
     foot.appendChild(authorSpan);
@@ -994,8 +1038,14 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
     clone.className = 'full-comment-view'; 
     if(isModalMode) clone.classList.add('mode-modal');
     
-    const exampleHTML = wordExample ? `<div class="word-example" style="margin-top:8px;">"${wordExample}"</div>` : '';
-    const etymologyHTML = wordEtymology ? `<div class="word-etymology" style="font-size:0.9rem; color:var(--text-muted); margin-top:5px; margin-bottom:5px;"><em>Köken:</em> ${wordEtymology}</div>` : '';
+    // Safely escape parameters before inserting into innerHTML
+    const safeWordText = escapeHTML(wordText);
+    const safeWordDef = escapeHTML(wordDef);
+    const safeExample = escapeHTML(wordExample);
+    const safeEtymology = escapeHTML(wordEtymology);
+
+    const exampleHTML = safeExample ? `<div class="word-example" style="margin-top:8px;">"${safeExample}"</div>` : '';
+    const etymologyHTML = safeEtymology ? `<div class="word-etymology" style="font-size:0.9rem; color:var(--text-muted); margin-top:5px; margin-bottom:5px;"><em>Köken:</em> ${safeEtymology}</div>` : '';
 
     const commentPlaceholder = isUserLoggedIn ? "Yorum yaz..." : "Yorum yapmak için giriş yapın...";
 
@@ -1003,9 +1053,9 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
         <div class="view-header">
             <div style="display:flex; justify-content:space-between; align-items:start;">
                 <div>
-                    <h2 id="commentTitle" style="margin:0; font-size:1.4rem; color:var(--accent);">${wordText}</h2>
+                    <h2 id="commentTitle" style="margin:0; font-size:1.4rem; color:var(--accent);">${safeWordText}</h2>
                     ${etymologyHTML}
-                    <div style="font-size:1rem; color:var(--text-muted); margin-top:5px; font-style:italic;">${wordDef}</div>
+                    <div style="font-size:1rem; color:var(--text-muted); margin-top:5px; font-style:italic;">${safeWordDef}</div>
                     ${exampleHTML}
                 </div>
                 <button class="close-icon-btn" id="closeCommentViewBtn">✕</button>
@@ -1028,7 +1078,6 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
     document.body.appendChild(clone);
     requestAnimationFrame(() => requestAnimationFrame(() => clone.classList.add('expanded')));
 
-    // Reattach inline logic created via string building
     document.getElementById('closeCommentViewBtn')?.addEventListener('click', closeCommentView);
     if (!isUserLoggedIn) {
         document.getElementById('commentInput')?.addEventListener('click', openAuthModal);

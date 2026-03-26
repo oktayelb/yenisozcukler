@@ -281,6 +281,7 @@ def add_word(request):
 @ratelimit(key='ip', rate='20/m', method='PATCH', block=False)
 @ratelimit(key=universal_rate_key, rate='5/m', method='PATCH', block=False)
 @api_view(['PATCH'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def add_example(request):
     if getattr(request, 'limited', False):
@@ -386,6 +387,7 @@ def register_view(request):
     return Response({'success': False, 'error': first_error}, status=400)
 
 @api_view(['POST'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([])
 def logout_view(request):
     logout(request)
@@ -424,6 +426,7 @@ def get_user_profile(request):
 
 @ratelimit(key=universal_rate_key, rate='3/h', method='PATCH', block=False)
 @api_view(['PATCH'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def change_password(request):
     if getattr(request, 'limited', False):
@@ -443,6 +446,7 @@ def change_password(request):
 
 @ratelimit(key=universal_rate_key, rate='2/d', method='PATCH', block=False)
 @api_view(['PATCH'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def change_username(request):
     if getattr(request, 'limited', False):
