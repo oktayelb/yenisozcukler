@@ -36,7 +36,6 @@ class Word(models.Model):
         blank=True
     )
 
-    is_profane = models.BooleanField(default=False)
     word = models.CharField(max_length=50)
     definition = models.CharField(max_length=300)
     example = models.CharField(max_length=200, default="")

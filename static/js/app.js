@@ -5,7 +5,6 @@
 
 /* --- GLOBAL VARIABLES & SETTINGS --- */
 const THEME_KEY = 'userTheme'; 
-const COLOR_THEME_KEY = 'userColorTheme'; 
 const ITEMS_PER_PAGE = 20; 
 const COMMENTS_PER_PAGE = 10;
 
@@ -43,7 +42,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAuthTriggers();
     setupSortBar();
     setupTheme();
-    initLogoSystem();
     initTopAppBar();
     fetchCategories(); 
     fetchWords(currentPage);
@@ -73,10 +71,6 @@ function setupAllEventListeners() {
     document.querySelectorAll('.auth-profile-trigger').forEach(btn => {
         btn.addEventListener('click', () => openProfileModal(currentUserUsername));
     });
-
-    // Logo animations
-    document.getElementById('cardRed')?.addEventListener('click', function() { animateLogo(this); });
-    document.getElementById('cardDefault')?.addEventListener('click', function() { animateLogo(this); });
 
     // Header / Form actions
     document.getElementById('topAddWordBtn')?.addEventListener('click', focusContributionForm);
@@ -241,7 +235,7 @@ function updateCount(field) {
     document.getElementById('charCount').innerText = `${count} / 300`; 
 }
 
-/* --- THEME & LOGO --- */
+/* --- THEME --- */
 function setupTheme() {
     const saved = localStorage.getItem(THEME_KEY);
     const btn = document.getElementById('darkModeToggle');
@@ -259,41 +253,6 @@ function setupTheme() {
         localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
         btn.textContent = isDark ? 'Aydınlık Mod' : 'Karanlık Mod';
     });
-}
-
-function initLogoSystem() {
-    const theme = localStorage.getItem(COLOR_THEME_KEY) || 'default';
-    document.body.setAttribute('data-theme', theme);
-    updateLogoVisuals(theme);
-}
-
-function animateLogo(el) {
-    const curr = localStorage.getItem(COLOR_THEME_KEY) || 'default';
-    
-    if (activeCategorySlug) {
-        clearCategoryFilter();
-        return; 
-    }
-
-    const next = curr === 'default' ? 'red' : 'default';
-    localStorage.setItem(COLOR_THEME_KEY, next);
-    document.body.setAttribute('data-theme', next);
-    updateLogoVisuals(next);
-    currentPage = 1; fetchWords(currentPage);
-}
-
-function updateLogoVisuals(theme) {
-    const def = document.getElementById('cardDefault');
-    const red = document.getElementById('cardRed');
-    if (!def || !red) return;
-    
-    if (theme === 'red') {
-        red.className = 'logo-card theme-red pos-center';
-        def.className = 'logo-card theme-default pos-behind';
-    } else {
-        def.className = 'logo-card theme-default pos-center';
-        red.className = 'logo-card theme-red pos-behind';
-    }
 }
 
 /* --- SORTING --- */
@@ -598,9 +557,7 @@ async function fetchWords(page) {
     const list = document.getElementById('feedList');
     const loadBtn = document.querySelector('#loadMoreContainer button');
     
-    const mode = localStorage.getItem(COLOR_THEME_KEY) === 'red' ? 'profane' : 'all';
-
-    let url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}&sort=${encodeURIComponent(currentSort)}`;
+    let url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&sort=${encodeURIComponent(currentSort)}`;
     if (activeCategorySlug) {
         url += `&tag=${activeCategorySlug}`;
     }
@@ -712,8 +669,7 @@ function createCardElement(item, isModalMode) {
             e.target.closest('.vote-container-floating') || 
             e.target.closest('.user-badge') || 
             e.target.closest('.add-example-btn') || 
-            e.target.closest('.tag-badge') || 
-            card.classList.contains('is-profane-content')) return;
+            e.target.closest('.tag-badge')) return;
             
         animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), decode(item.example), decode(item.etymology), isModalMode);
     });
@@ -798,20 +754,6 @@ function createCardElement(item, isModalMode) {
     foot.appendChild(authorSpan);
     card.appendChild(foot);
 
-    if (item.is_profane) {
-        card.classList.add('is-profane-content');
-        const ov = document.createElement('div'); 
-        ov.className = 'profane-wrapper';
-        ov.innerHTML = `<div class="profane-badge">+18</div><div class="profane-warning">Görmek için tıkla</div>`;
-        ov.addEventListener('click', (e) => { 
-            e.stopPropagation(); e.preventDefault();
-            ov.classList.add('hiding'); 
-            card.classList.remove('is-profane-content'); 
-            setTimeout(() => { if(ov.parentNode) ov.remove(); }, 600);
-        });
-        card.appendChild(ov);
-    }
-
     return card;
 }
 
@@ -825,7 +767,6 @@ async function submitWord() {
     const n = isUserLoggedIn ? currentUserUsername : 'Anonim';
 
     const btn = document.querySelector(".form-card button[type='submit']");
-    const prof = localStorage.getItem(COLOR_THEME_KEY) === 'red';
 
     if (!w || !d || !ex || !et) return showCustomAlert("Lütfen tüm alanları doldurun.", "error");
     
@@ -841,7 +782,6 @@ async function submitWord() {
             example: ex, 
             etymology: et,
             nickname: n, 
-            is_profane: prof,
             category_ids: Array.from(selectedFormCategories)
         });
         
@@ -1043,7 +983,6 @@ function sendVote(type, id, act, con) {
 /* === DETAIL VIEW & COMMENTS === */
 function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, wordExample, wordEtymology, isModalMode = false) { 
     if (activeCardClone) return; 
-    if (originalCard.classList.contains('is-profane-content')) return;
 
     currentWordId = wordId;
 

@@ -78,21 +78,6 @@
 }
 .word-card:hover .click-hint { color: var(--accent); opacity: 1; }
 
-/* PROFANITY FILTER */
-.profane-wrapper { 
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-    background: var(--card-bg); 
-    z-index: var(--z-card-profane); 
-    display: flex; flex-direction: column; 
-    justify-content: center; align-items: center; 
-    border-radius: 15px; cursor: pointer; border: none; opacity: 1;
-    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-}
-.profane-wrapper.hiding { opacity: 0; pointer-events: none; transform: scale(1.05); }
-.word-card > *:not(.profane-wrapper) { transition: filter 0.6s ease-out, opacity 0.6s ease-out; }
-.word-card.is-profane-content > *:not(.profane-wrapper) { filter: blur(12px); opacity: 0.15; }
-.profane-badge { background: var(--error-color); color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 1.4rem; margin-bottom: 15px; }
-
 /* TAGS & CATEGORIES */
 .tag-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; padding-bottom: 15px; }
 .tag-badge {

@@ -70,7 +70,6 @@ def get_words(request):
     page_number = request.GET.get('page', 1)
     limit = int(request.GET.get('limit', 20))
     limit = min(limit, 50)
-    mode = request.GET.get('mode', 'all') 
     tag_slug = request.GET.get('tag') 
     sort = request.GET.get('sort', 'date_desc')
     search_query = request.GET.get('search', '').strip()
@@ -78,7 +77,7 @@ def get_words(request):
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
         .prefetch_related('categories')\
-        .only('id', 'word', 'definition', 'example', 'etymology', 'author', 'timestamp', 'is_profane', 'score')
+        .only('id', 'word', 'definition', 'example', 'etymology', 'author', 'timestamp', 'score')
 
     if sort == 'date_asc':
         words_queryset = words_queryset.order_by('timestamp')
@@ -88,11 +87,6 @@ def get_words(request):
         words_queryset = words_queryset.order_by('score', '-timestamp')
     else:
         words_queryset = words_queryset.order_by('-timestamp')
-    
-    if mode == 'profane':
-        words_queryset = words_queryset.filter(is_profane=True)
-    else:  
-        words_queryset = words_queryset.filter(is_profane=False)
     
     if tag_slug:
         words_queryset = words_queryset.filter(categories__slug=tag_slug)
@@ -104,7 +98,7 @@ def get_words(request):
         )
 
     if not tag_slug and not search_query:
-        cache_key = f'total_approved_words_count_{mode}'
+        cache_key = 'total_approved_words_count_all'
         total_count = cache.get(cache_key)
         if total_count is None:
             total_count = words_queryset.count()
@@ -277,7 +271,7 @@ def add_word(request):
             save_kwargs['author'] = 'Anonim'
         
         serializer.save(**save_kwargs)
-        cache.delete_many(['total_approved_words_count_all', 'total_approved_words_count_profane'])
+        cache.delete('total_approved_words_count_all')
         
         return Response({'success': True})
     else:
