@@ -76,8 +76,9 @@ def get_words(request):
 
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
+        .select_related('user')\
         .prefetch_related('categories')\
-        .only('id', 'word', 'definition', 'example', 'etymology', 'author', 'timestamp', 'score')
+        .only('id', 'word', 'definition', 'example', 'etymology', 'author', 'timestamp', 'score', 'user__username')
 
     if sort == 'date_asc':
         words_queryset = words_queryset.order_by('timestamp')
@@ -148,7 +149,7 @@ def get_comments(request, word_id):
     limit = int(request.GET.get('limit', 10))
     limit = min(limit, 20)
 
-    comments_qs = Comment.objects.filter(word_id=word_id).order_by('timestamp')
+    comments_qs = Comment.objects.filter(word_id=word_id).select_related('user').order_by('timestamp')
     paginator = Paginator(comments_qs, limit)
 
     try:
@@ -266,9 +267,9 @@ def add_word(request):
         
         if request.user.is_authenticated:
             save_kwargs['user'] = request.user
-            save_kwargs['author'] = request.user.username
+            # Author field stays empty for authenticated users, handled dynamically by display_author
         else:
-            save_kwargs['author'] = 'Anonim'
+            save_kwargs['author'] = serializer.validated_data.get('nickname', 'Anonim')
         
         serializer.save(**save_kwargs)
         cache.delete('total_approved_words_count_all')
@@ -323,9 +324,8 @@ def add_comment(request):
             
         new_comment = Comment.objects.create(
             word=word,
-            author=request.user.username,
-            comment=serializer.validated_data['comment'],
             user=request.user, 
+            comment=serializer.validated_data['comment'],
             score=0
         )
         return Response({'success': True, 'comment': CommentSerializer(new_comment).data}, status=201)
@@ -463,8 +463,7 @@ def change_username(request):
                 user.username = new_username
                 user.save()
 
-                Word.objects.filter(user=user).update(author=new_username)
-                Comment.objects.filter(user=user).update(author=new_username)
+                # Removed Word and Comment bulk update - database is no longer denormalized!
                 
                 return Response({'success': True, 'message': 'Kullanıcı adı başarıyla değiştirildi.'})
                 
@@ -493,7 +492,7 @@ def get_my_words(request):
     else:
         return Response({'success': False, 'error': 'Yetkisiz erişim.'}, status=401)
 
-    words_qs = Word.objects.filter(user=user, status='approved').order_by('-timestamp')
+    words_qs = Word.objects.filter(user=user, status='approved').select_related('user').order_by('-timestamp')
     
     paginator = Paginator(words_qs, limit)
     try:

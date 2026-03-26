@@ -49,6 +49,12 @@ class Word(models.Model):
     
     score = models.IntegerField(default=0, db_index=True)
 
+    @property
+    def display_author(self):
+        if self.user:
+            return self.user.username
+        return self.author
+
     def __str__(self):
         return self.word
 
@@ -69,8 +75,14 @@ class Comment(models.Model):
     
     score = models.IntegerField(default=0)
 
+    @property
+    def display_author(self):
+        if self.user:
+            return self.user.username
+        return self.author
+
     def __str__(self):
-        return f"{self.author}: {self.comment[:20]}"
+        return f"{self.display_author}: {self.comment[:20]}"
 
 
 # --- VOTE MODELS ---

@@ -34,6 +34,7 @@ class CategorySerializer(serializers.ModelSerializer):
 class CommentSerializer(serializers.ModelSerializer):
     score = serializers.IntegerField(read_only=True)
     user_vote = serializers.SerializerMethodField()
+    author = serializers.CharField(source='display_author', read_only=True)
 
     class Meta:
         model = Comment
@@ -52,6 +53,7 @@ class WordSerializer(serializers.ModelSerializer):
     user_vote = serializers.SerializerMethodField()
     comment_count = serializers.IntegerField(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
+    author = serializers.CharField(source='display_author', read_only=True)
 
     class Meta:
         model = Word
