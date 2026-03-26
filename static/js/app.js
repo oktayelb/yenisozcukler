@@ -16,6 +16,7 @@ let currentCommentPage = 1;
 let isLoading = false;
 let currentProfileUser = null; 
 let wordIdForExample = null; 
+let currentSearchQuery = '';
 
 // --- CATEGORY VARIABLES ---
 let activeCategorySlug = null; // Current filter
@@ -107,9 +108,45 @@ function setupAllEventListeners() {
         });
     }
 
-    // Filter and Feed logic
+    // Filter, Feed and Search logic
     document.getElementById('clearFilterBtn')?.addEventListener('click', clearCategoryFilter);
     document.getElementById('loadMoreBtn')?.addEventListener('click', loadMoreWords);
+
+    const searchInput = document.getElementById('mainSearchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+    if (searchInput) {
+        let searchTimeout = null;
+        searchInput.addEventListener('input', (e) => {
+            const val = e.target.value;
+            if (val.length > 0) {
+                if (clearSearchBtn) clearSearchBtn.style.display = 'block';
+            } else {
+                if (clearSearchBtn) clearSearchBtn.style.display = 'none';
+            }
+            
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                executeSearch(val);
+            }, 500); 
+        });
+        
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(searchTimeout);
+                executeSearch(searchInput.value);
+            }
+        });
+    }
+
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', () => {
+            if(searchInput) searchInput.value = '';
+            clearSearchBtn.style.display = 'none';
+            executeSearch('');
+        });
+    }
 
     // Add Example Modal
     document.getElementById('addExampleModal')?.addEventListener('click', (e) => closeModal('addExampleModal', false, e));
@@ -137,6 +174,14 @@ function setupAllEventListeners() {
     document.getElementById('saveUsernameBtn')?.addEventListener('click', handleChangeUsername);
     document.getElementById('savePasswordBtn')?.addEventListener('click', handleChangePassword);
     document.getElementById('backToProfileBtn')?.addEventListener('click', backToProfile);
+}
+
+function executeSearch(query) {
+    const trimmed = query.trim();
+    if (currentSearchQuery === trimmed) return;
+    currentSearchQuery = trimmed;
+    currentPage = 1;
+    fetchWords(currentPage);
 }
 
 function focusContributionForm() {
@@ -559,6 +604,9 @@ async function fetchWords(page) {
     if (activeCategorySlug) {
         url += `&tag=${activeCategorySlug}`;
     }
+    if (currentSearchQuery) {
+        url += `&search=${encodeURIComponent(currentSearchQuery)}`;
+    }
 
     if (page === 1) { 
         list.innerHTML = '<div class="spinner"></div>'; 
@@ -577,7 +625,11 @@ async function fetchWords(page) {
             const hasMore = data.words.length >= ITEMS_PER_PAGE && (!data.total_count || (page * ITEMS_PER_PAGE < data.total_count));
             document.getElementById('loadMoreContainer').style.display = hasMore ? 'block' : 'none';
         } else if(page === 1) {
-            list.innerHTML = '<div style="text-align:center;color:#ccc;margin-top:20px;">Henüz içerik yok.</div>';
+            if(currentSearchQuery) {
+                list.innerHTML = `<div style="text-align:center;color:#ccc;margin-top:20px;">"${currentSearchQuery}" için sonuç bulunamadı.</div>`;
+            } else {
+                list.innerHTML = '<div style="text-align:center;color:#ccc;margin-top:20px;">Henüz içerik yok.</div>';
+            }
         }
     } catch (e) {
         if(page === 1) list.innerHTML = '<div style="text-align:center;color:var(--error-color);">Yüklenemedi.</div>';

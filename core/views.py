@@ -10,7 +10,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
-from django.db.models import Count, F, Sum
+from django.db.models import Count, F, Sum, Q
 from django.db import transaction
 
 from .models import Word, Comment, WordVote, CommentVote, Category
@@ -73,6 +73,7 @@ def get_words(request):
     mode = request.GET.get('mode', 'all') 
     tag_slug = request.GET.get('tag') 
     sort = request.GET.get('sort', 'date_desc')
+    search_query = request.GET.get('search', '').strip()
 
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
@@ -96,7 +97,13 @@ def get_words(request):
     if tag_slug:
         words_queryset = words_queryset.filter(categories__slug=tag_slug)
 
-    if not tag_slug:
+    if search_query:
+        words_queryset = words_queryset.filter(
+            Q(word__icontains=search_query) | 
+            Q(definition__icontains=search_query)
+        )
+
+    if not tag_slug and not search_query:
         cache_key = f'total_approved_words_count_{mode}'
         total_count = cache.get(cache_key)
         if total_count is None:
@@ -184,7 +191,7 @@ def get_comments(request, word_id):
 @ratelimit(key=universal_rate_key, rate='15/m', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
-@permission_classes([IsAuthenticated])  # VOTE REMAINS STRICTLY LOCKED TO USERS
+@permission_classes([IsAuthenticated])
 @transaction.atomic 
 def vote(request, entity_type, entity_id):
     if getattr(request, 'limited', False):
@@ -252,7 +259,7 @@ def vote(request, entity_type, entity_id):
 @ratelimit(key=universal_rate_key, rate='5/m', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
-@permission_classes([])  # OPENED TO ANONYMOUS USERS
+@permission_classes([]) 
 def add_word(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
@@ -309,7 +316,7 @@ def add_example(request):
 @ratelimit(key=universal_rate_key, rate='10/m', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
-@permission_classes([IsAuthenticated]) # LOCKED TO REGISTERED USERS
+@permission_classes([IsAuthenticated])
 def add_comment(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
