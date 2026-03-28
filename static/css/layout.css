@@ -7,14 +7,14 @@
     -webkit-tap-highlight-color: transparent;
 }
 
-body { 
-    font-family: var(--font-body); 
-    background-color: var(--bg-color); 
-    color: var(--text-main); 
-    margin: 0; 
-    padding: 0; 
-    font-size: 18px; 
-    transition: background-color 0.5s, color 0.5s; 
+body {
+    font-family: var(--font-body);
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    margin: 0;
+    padding: 0;
+    font-size: 18px;
+    transition: background-color 0.3s, color 0.3s;
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -81,8 +81,7 @@ header { text-align: center; margin: 50px 0 40px; }
     display: flex;
     align-items: center;
     gap: 16px;
-    background-color: color-mix(in srgb, var(--bg-color) 92%, transparent);
-    backdrop-filter: blur(10px);
+    background-color: color-mix(in srgb, var(--bg-color) 97%, transparent);
     box-shadow: var(--shadow-sm);
     border-radius: 0 0 16px 16px;
     box-sizing: border-box;

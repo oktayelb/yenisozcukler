@@ -433,11 +433,18 @@ def change_password(request):
         return Response({'success': False, 'error': 'İşlem limiti aşıldı.'}, status=429)
 
     user = request.user
+    current_password = request.data.get('current_password')
     new_password = request.data.get('new_password')
-    
+
+    if not current_password:
+        return Response({'success': False, 'error': 'Mevcut şifrenizi girmeniz gerekiyor.'}, status=400)
+
+    if not authenticate(request, username=user.username, password=current_password):
+        return Response({'success': False, 'error': 'Mevcut şifre hatalı.'}, status=400)
+
     if not new_password or len(new_password) < 6:
-        return Response({'success': False, 'error': 'Şifre en az 6 karakter olmalı.'}, status=400)
-    
+        return Response({'success': False, 'error': 'Yeni şifre en az 6 karakter olmalı.'}, status=400)
+
     user.set_password(new_password)
     user.save()
     update_session_auth_hash(request, user)

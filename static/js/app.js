@@ -74,9 +74,15 @@ function setupAllEventListeners() {
 
     // Header / Form actions
     document.getElementById('topAddWordBtn')?.addEventListener('click', focusContributionForm);
-    document.getElementById('formCollapseBtn')?.addEventListener('click', toggleContributionForm);
+    document.getElementById('formCollapseBtn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleContributionForm();
+    });
     document.getElementById('formHeaderToggle')?.addEventListener('click', toggleContributionForm);
     document.getElementById('contributionForm')?.addEventListener('submit', handleWordSubmit);
+    document.getElementById('contributionCard')?.addEventListener('click', function() {
+        if (this.classList.contains('collapsed')) toggleContributionForm();
+    });
 
     // Form Interactions / Validations
     const inputWord = document.getElementById('inputWord');
@@ -355,7 +361,7 @@ function initTopAppBar() {
         }
     };
 
-    window.addEventListener('scroll', onScroll);
+    window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
 }
 
@@ -674,10 +680,10 @@ function appendCards(words, container, isModalMode) {
     words.forEach(w => frag.appendChild(createCardElement(w, isModalMode)));
     container.appendChild(frag);
     Array.from(container.children).slice(-words.length).forEach((c, i) => {
-        requestAnimationFrame(() => setTimeout(() => { 
-            c.classList.remove('fade-in'); 
-            c.classList.add('show'); 
-        }, i * 50));
+        setTimeout(() => {
+            c.classList.remove('fade-in');
+            c.classList.add('show');
+        }, i * 40);
     });
 }
 
@@ -1273,13 +1279,16 @@ function backToProfile(){
 }
 
 function handleChangePassword(){
+    const current = document.getElementById('currentPassword').value;
     const p1 = document.getElementById('newPassword').value;
     const p2 = document.getElementById('newPasswordConfirm').value;
+    if(!current) return showCustomAlert("Mevcut şifrenizi girin.", "error");
     if(p1.length < 6 || p1 !== p2) return showCustomAlert("Hatalı veya eşleşmeyen şifre.", "error");
-    
-    apiRequest('/api/password','PATCH',{new_password: p1})
+
+    apiRequest('/api/password','PATCH',{current_password: current, new_password: p1})
     .then(() => {
         showCustomAlert("Şifre değişti.");
+        document.getElementById('currentPassword').value = '';
         document.getElementById('newPassword').value = '';
         document.getElementById('newPasswordConfirm').value = '';
     })
