@@ -243,6 +243,16 @@ class RegisterViewTests(TestCase):
         )
         self.assertEqual(resp.status_code, 400)
 
+    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
+    def test_register_duplicate_username_case_insensitive(self, _mock):
+        User.objects.create_user(username='Alice', password='pass123')
+        resp = self.client.post(
+            reverse('register'),
+            data=json.dumps({'username': 'alice', 'password': 'pass123', 'token': 'tok'}),
+            content_type='application/json',
+        )
+        self.assertEqual(resp.status_code, 400)
+
     @patch('core.serializers.requests.post', side_effect=_turnstile_fail)
     def test_register_captcha_failure(self, _mock):
         resp = self.client.post(

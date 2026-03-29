@@ -279,7 +279,7 @@ def add_word(request):
             save_kwargs['user'] = request.user
             # Author field stays empty for authenticated users, handled dynamically by display_author
         else:
-            save_kwargs['author'] = serializer.validated_data.get('nickname', 'Anonim')
+            save_kwargs['author'] = 'Anonim'
         
         serializer.save(**save_kwargs)
         cache.delete('total_approved_words_count_all')
@@ -382,7 +382,7 @@ def register_view(request):
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
     
-        if User.objects.filter(username=username).exists():
+        if User.objects.filter(username__iexact=username).exists():
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
         
         try:
