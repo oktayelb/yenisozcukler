@@ -1,4 +1,6 @@
 # core/views.py
+import logging
+
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -20,6 +22,8 @@ from .serializers import (
     AuthSerializer, ChangeUsernameSerializer,
     WordAddExampleSerializer, CategorySerializer
 )
+
+logger = logging.getLogger(__name__)
 
 # --- YARDIMCI FONKSİYONLAR ---
 
@@ -387,6 +391,7 @@ def register_view(request):
                 login(request, user)
                 return Response({'success': True, 'username': user.username, 'message': 'Kayıt başarılı.'}, status=201)
         except Exception as e:
+            logger.error('register_view failed for username=%s: %s', username, e, exc_info=True)
             return Response({'success': False, 'error': 'Kayıt oluşturulamadı.'}, status=500)
 
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
@@ -495,7 +500,8 @@ def change_username(request):
     
 @ratelimit(key='ip', rate='60/m', method='GET', block=False)
 @api_view(['GET'])
-@permission_classes([]) 
+@authentication_classes([SessionAuthentication])
+@permission_classes([])
 def get_my_words(request):
     if getattr(request, 'limited', False):
         return Response({'error': 'Too many requests'}, status=429)

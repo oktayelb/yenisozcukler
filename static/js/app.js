@@ -1236,7 +1236,7 @@ function openProfileModal(targetUsername = null) {
 
 async function fetchProfileData(username) {
     try {
-        const d = await apiRequest(`/api/profile?username=${username}`);
+        const d = await apiRequest(`/api/profile?username=${encodeURIComponent(username)}`);
         document.getElementById('profileUsername').innerText = d.username;
         document.getElementById('profileDate').innerText = d.date_joined;
         document.getElementById('statWords').innerText = d.word_count;
@@ -1259,7 +1259,7 @@ async function fetchMyWordsFeed() {
     c.innerHTML = '<div class="spinner"></div>';
     
     let url = '/api/my-words';
-    if (currentProfileUser) url += `?username=${currentProfileUser}`;
+    if (currentProfileUser) url += `?username=${encodeURIComponent(currentProfileUser)}`;
 
     const title = document.querySelector('#myWordsModal h2');
     if (title) {
