@@ -1,4 +1,6 @@
 # core/views.py
+import logging
+
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -10,7 +12,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
-from django.db.models import Count, F, Sum
+from django.db.models import Count, F, Sum, Q
 from django.db import transaction
 
 from .models import Word, Comment, WordVote, CommentVote, Category
@@ -20,6 +22,8 @@ from .serializers import (
     AuthSerializer, ChangeUsernameSerializer,
     WordAddExampleSerializer, CategorySerializer
 )
+
+logger = logging.getLogger(__name__)
 
 # --- YARDIMCI FONKSİYONLAR ---
 
@@ -68,16 +72,20 @@ def get_words(request):
         return Response({'error': 'Too many requests'}, status=429)
 
     page_number = request.GET.get('page', 1)
-    limit = int(request.GET.get('limit', 20))
+    try:
+        limit = int(request.GET.get('limit', 20))
+    except (ValueError, TypeError):
+        limit = 20
     limit = min(limit, 50)
-    mode = request.GET.get('mode', 'all') 
-    tag_slug = request.GET.get('tag') 
+    tag_slug = request.GET.get('tag')
     sort = request.GET.get('sort', 'date_desc')
+    search_query = request.GET.get('search', '').strip()[:40]
 
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
+        .select_related('user')\
         .prefetch_related('categories')\
-        .only('id', 'word', 'definition', 'example', 'etymology', 'author', 'timestamp', 'is_profane', 'score')
+        .only('id', 'word', 'definition', 'example', 'etymology', 'author', 'timestamp', 'score', 'user__username')
 
     if sort == 'date_asc':
         words_queryset = words_queryset.order_by('timestamp')
@@ -88,16 +96,17 @@ def get_words(request):
     else:
         words_queryset = words_queryset.order_by('-timestamp')
     
-    if mode == 'profane':
-        words_queryset = words_queryset.filter(is_profane=True)
-    else:  
-        words_queryset = words_queryset.filter(is_profane=False)
-    
     if tag_slug:
         words_queryset = words_queryset.filter(categories__slug=tag_slug)
 
-    if not tag_slug:
-        cache_key = f'total_approved_words_count_{mode}'
+    if search_query:
+        words_queryset = words_queryset.filter(
+            Q(word__icontains=search_query) | 
+            Q(definition__icontains=search_query)
+        )
+
+    if not tag_slug and not search_query:
+        cache_key = 'total_approved_words_count_all'
         total_count = cache.get(cache_key)
         if total_count is None:
             total_count = words_queryset.count()
@@ -144,10 +153,13 @@ def get_comments(request, word_id):
         return Response({'error': 'Too many requests'}, status=429)
 
     page = request.GET.get('page', 1)
-    limit = int(request.GET.get('limit', 10))
+    try:
+        limit = int(request.GET.get('limit', 10))
+    except (ValueError, TypeError):
+        limit = 10
     limit = min(limit, 20)
 
-    comments_qs = Comment.objects.filter(word_id=word_id).order_by('timestamp')
+    comments_qs = Comment.objects.filter(word_id=word_id).select_related('user').order_by('timestamp')
     paginator = Paginator(comments_qs, limit)
 
     try:
@@ -184,7 +196,7 @@ def get_comments(request, word_id):
 @ratelimit(key=universal_rate_key, rate='15/m', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
-@permission_classes([IsAuthenticated])  # VOTE REMAINS STRICTLY LOCKED TO USERS
+@permission_classes([IsAuthenticated])
 @transaction.atomic 
 def vote(request, entity_type, entity_id):
     if getattr(request, 'limited', False):
@@ -252,7 +264,7 @@ def vote(request, entity_type, entity_id):
 @ratelimit(key=universal_rate_key, rate='5/m', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
-@permission_classes([])  # OPENED TO ANONYMOUS USERS
+@permission_classes([]) 
 def add_word(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
@@ -265,12 +277,12 @@ def add_word(request):
         
         if request.user.is_authenticated:
             save_kwargs['user'] = request.user
-            save_kwargs['author'] = request.user.username
+            # Author field stays empty for authenticated users, handled dynamically by display_author
         else:
             save_kwargs['author'] = 'Anonim'
         
         serializer.save(**save_kwargs)
-        cache.delete_many(['total_approved_words_count_all', 'total_approved_words_count_profane'])
+        cache.delete('total_approved_words_count_all')
         
         return Response({'success': True})
     else:
@@ -280,6 +292,7 @@ def add_word(request):
 @ratelimit(key='ip', rate='20/m', method='PATCH', block=False)
 @ratelimit(key=universal_rate_key, rate='5/m', method='PATCH', block=False)
 @api_view(['PATCH'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def add_example(request):
     if getattr(request, 'limited', False):
@@ -309,7 +322,7 @@ def add_example(request):
 @ratelimit(key=universal_rate_key, rate='10/m', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
-@permission_classes([IsAuthenticated]) # LOCKED TO REGISTERED USERS
+@permission_classes([IsAuthenticated])
 def add_comment(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
@@ -317,13 +330,12 @@ def add_comment(request):
     serializer = CommentCreateSerializer(data=request.data)
     
     if serializer.is_valid():
-        word = get_object_or_404(Word, id=serializer.validated_data['word_id'])
-            
+        word = get_object_or_404(Word, id=serializer.validated_data['word_id'], status='approved')
+
         new_comment = Comment.objects.create(
             word=word,
-            author=request.user.username,
-            comment=serializer.validated_data['comment'],
             user=request.user, 
+            comment=serializer.validated_data['comment'],
             score=0
         )
         return Response({'success': True, 'comment': CommentSerializer(new_comment).data}, status=201)
@@ -369,8 +381,8 @@ def register_view(request):
     if serializer.is_valid():
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
-
-        if User.objects.filter(username=username).exists():
+    
+        if User.objects.filter(username__iexact=username).exists():
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
         
         try:
@@ -379,20 +391,25 @@ def register_view(request):
                 login(request, user)
                 return Response({'success': True, 'username': user.username, 'message': 'Kayıt başarılı.'}, status=201)
         except Exception as e:
+            logger.error('register_view failed for username=%s: %s', username, e, exc_info=True)
             return Response({'success': False, 'error': 'Kayıt oluşturulamadı.'}, status=500)
 
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
     return Response({'success': False, 'error': first_error}, status=400)
 
+@ratelimit(key='ip', rate='10/m', method='POST', block=False)
 @api_view(['POST'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([])
 def logout_view(request):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
     logout(request)
     return Response({'success': True})
 
-@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@ratelimit(key='ip', rate='30/m', method='GET', block=False)
 @api_view(['GET'])
-@permission_classes([]) 
+@permission_classes([])
 def get_user_profile(request):
     if getattr(request, 'limited', False):
         return Response({'error': 'Too many requests'}, status=429)
@@ -423,17 +440,29 @@ def get_user_profile(request):
 
 @ratelimit(key=universal_rate_key, rate='3/h', method='PATCH', block=False)
 @api_view(['PATCH'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def change_password(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'İşlem limiti aşıldı.'}, status=429)
 
     user = request.user
+    current_password = request.data.get('current_password')
     new_password = request.data.get('new_password')
-    
+
+    if not current_password:
+        return Response({'success': False, 'error': 'Mevcut şifrenizi girmeniz gerekiyor.'}, status=400)
+    if len(current_password) > 60:
+        return Response({'success': False, 'error': 'Mevcut şifre hatalı.'}, status=400)
+
+    if not authenticate(request, username=user.username, password=current_password):
+        return Response({'success': False, 'error': 'Mevcut şifre hatalı.'}, status=400)
+
     if not new_password or len(new_password) < 6:
-        return Response({'success': False, 'error': 'Şifre en az 6 karakter olmalı.'}, status=400)
-    
+        return Response({'success': False, 'error': 'Yeni şifre en az 6 karakter olmalı.'}, status=400)
+    if len(new_password) > 60:
+        return Response({'success': False, 'error': 'Yeni şifre en fazla 60  karakter olabilir.'}, status=400)
+
     user.set_password(new_password)
     user.save()
     update_session_auth_hash(request, user)
@@ -442,6 +471,7 @@ def change_password(request):
 
 @ratelimit(key=universal_rate_key, rate='2/d', method='PATCH', block=False)
 @api_view(['PATCH'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def change_username(request):
     if getattr(request, 'limited', False):
@@ -458,8 +488,7 @@ def change_username(request):
                 user.username = new_username
                 user.save()
 
-                Word.objects.filter(user=user).update(author=new_username)
-                Comment.objects.filter(user=user).update(author=new_username)
+                # Removed Word and Comment bulk update - database is no longer denormalized!
                 
                 return Response({'success': True, 'message': 'Kullanıcı adı başarıyla değiştirildi.'})
                 
@@ -471,14 +500,18 @@ def change_username(request):
     
 @ratelimit(key='ip', rate='60/m', method='GET', block=False)
 @api_view(['GET'])
-@permission_classes([]) 
+@authentication_classes([SessionAuthentication])
+@permission_classes([])
 def get_my_words(request):
     if getattr(request, 'limited', False):
         return Response({'error': 'Too many requests'}, status=429)
 
     target_username = request.GET.get('username')
     page_number = request.GET.get('page', 1)
-    limit = int(request.GET.get('limit', 20))
+    try:
+        limit = int(request.GET.get('limit', 20))
+    except (ValueError, TypeError):
+        limit = 20
     limit = min(limit, 50)
     
     if target_username:
@@ -488,7 +521,7 @@ def get_my_words(request):
     else:
         return Response({'success': False, 'error': 'Yetkisiz erişim.'}, status=401)
 
-    words_qs = Word.objects.filter(user=user, status='approved').order_by('-timestamp')
+    words_qs = Word.objects.filter(user=user, status='approved').select_related('user').order_by('-timestamp')
     
     paginator = Paginator(words_qs, limit)
     try:

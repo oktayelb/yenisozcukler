@@ -22,12 +22,18 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
 # Cloudflare üzerinden gelen https isteklerini güvenilir kabul eder.
 CSRF_TRUSTED_ORIGINS = [
     'https://yenisozcukler.com',
+    'https://www.yenisozcukler.com',
 ]
 
 # Cloudflare ile SSL (HTTPS) iletişimini Django'ya bildirir.
 # Bu ayar olmadan Django, isteğin güvenli olduğunu anlamayıp işlemi reddedebilir.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_REFERER_POLICY = 'same-origin'
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Session cookie hardening — applies in all environments
+SESSION_COOKIE_HTTPONLY = True   # JS can never read the session cookie
+SESSION_COOKIE_SAMESITE = 'Strict'  # Blocks cross-site request cookie sending
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -39,8 +45,6 @@ INSTALLED_APPS = [
     'rest_framework', 
     'core',
 ]
-# Geliştirme için yerel bellek cache'i yeterlidir.
-# İleride Redis'e geçilebilir.
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -128,6 +132,30 @@ REST_FRAMEWORK = {
 }
 
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {module}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'core': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
 
 

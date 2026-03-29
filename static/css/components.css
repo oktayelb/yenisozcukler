@@ -7,30 +7,26 @@
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
 /* WORD CARDS */
-.word-card { 
+.word-card {
     background: var(--card-bg);
-    padding: 25px 30px; 
-    border-radius: 16px; 
-    box-shadow: 0 2px 10px rgba(0,0,0,0.03); 
-    border: 1px solid rgba(142, 127, 127, 0.15); 
-    border-left: 5px solid var(--accent); 
-    position: relative; 
+    padding: 25px 30px;
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+    border: 1px solid rgba(142, 127, 127, 0.15);
+    border-left: 5px solid var(--accent);
+    position: relative;
     margin-bottom: 25px;
     display: flex;
     flex-direction: column;
     gap: 10px;
     transform-origin: center center;
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), 
-                box-shadow 0.4s ease,
-                border-color 0.4s ease;
-    will-change: transform, box-shadow;
+    transition: transform 0.2s ease, opacity 0.3s ease;
 }
-.word-card.fade-in { opacity: 0; transform: translateY(30px) scale(0.95); }
-.word-card.show { opacity: 1; transform: translateY(0) scale(1); }
-.word-card:hover { 
-    transform: translateY(-6px) scale(1.01); 
-    box-shadow: 0 15px 30px rgba(90, 80, 70, 0.12);
-    border-color: rgba(142, 127, 127, 0.25);
+.word-card.fade-in { opacity: 0; transform: translateY(20px); }
+.word-card.show { opacity: 1; transform: translateY(0); }
+.word-card:hover {
+    transform: translateY(-4px);
+    will-change: transform;
 }
 .word-card h3 {
     font-family: var(--font-body); 
@@ -78,21 +74,6 @@
 }
 .word-card:hover .click-hint { color: var(--accent); opacity: 1; }
 
-/* PROFANITY FILTER */
-.profane-wrapper { 
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-    background: var(--card-bg); 
-    z-index: var(--z-card-profane); 
-    display: flex; flex-direction: column; 
-    justify-content: center; align-items: center; 
-    border-radius: 15px; cursor: pointer; border: none; opacity: 1;
-    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-}
-.profane-wrapper.hiding { opacity: 0; pointer-events: none; transform: scale(1.05); }
-.word-card > *:not(.profane-wrapper) { transition: filter 0.6s ease-out, opacity 0.6s ease-out; }
-.word-card.is-profane-content > *:not(.profane-wrapper) { filter: blur(12px); opacity: 0.15; }
-.profane-badge { background: var(--error-color); color: white; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 1.4rem; margin-bottom: 15px; }
-
 /* TAGS & CATEGORIES */
 .tag-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; padding-bottom: 15px; }
 .tag-badge {
@@ -138,7 +119,7 @@
     border: 1px solid var(--border-light);
     border-bottom: 4px solid var(--border-light);
     box-shadow: none;
-    transition: all 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+    transition: padding 0.3s ease, border-color 0.3s ease;
     overflow: hidden; 
 }
 
@@ -388,29 +369,34 @@
 }
 
 /* FORMS (CONTRIBUTION CARD) */
-.form-card { 
-    background: var(--card-bg); box-shadow: var(--shadow-sm); padding: 25px 30px; border-radius: 16px; 
-    transition: padding 0.4s ease, max-width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), border-radius 0.4s ease, background-color 0.4s ease, color 0.4s ease;
+.form-card {
+    background: var(--card-bg); box-shadow: var(--shadow-sm); padding: 25px 30px; border-radius: 16px;
+    transition: border-radius 0.2s ease, background-color 0.2s ease, color 0.2s ease;
     overflow: hidden; width: auto; box-sizing: border-box;
     position: relative;
 }
-.form-card.expanded { max-width: 100%; margin: 0; border-top: 4px solid var(--accent); cursor: default; }
+.form-card.expanded { max-width: 100%; margin: 0; border-top: 4px solid var(--accent); cursor: default; animation: cardExpand 0.22s ease-out; transform-origin: top center; }
+@keyframes cardExpand {
+    from { transform: scaleY(0.96); opacity: 0.7; }
+    to   { transform: scaleY(1);    opacity: 1;   }
+}
 .form-card.collapsed {
     max-width: 280px; margin: 0 auto; background: var(--accent); color: var(--card-bg); 
     border-top: none; border-radius: 50px; padding: 15px 30px; cursor: pointer; box-shadow: 0 4px 15px rgba(142, 127, 127, 0.4);
 }
 .form-card.collapsed:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(142, 127, 127, 0.5); }
 
-.form-header-toggle { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; transition: justify-content 0.3s ease; }
+.form-header-toggle { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
 .form-title { font-family: var(--font-heading); font-size: 2.3rem; margin-bottom: 0; color: var(--accent); transition: color 0.3s ease, font-size 0.3s ease; }
 .toggle-icon { display: inline-block; font-weight: bold; font-size: 2rem; line-height: 1rem; color: var(--accent); transition: transform 0.4s ease, color 0.3s ease; margin-left: 10px; }
 
-.form-card.collapsed .form-header-toggle { justify-content: center; }
-.form-card.collapsed .form-title { color: var(--card-bg); font-size: 1.5rem; display: flex; align-items: center; gap: 8px; }
+.form-card.collapsed .form-header-toggle { justify-content: center; width: 100%; }
+.form-card.collapsed .form-title { color: var(--card-bg); font-size: 1.5rem; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
 .form-card.collapsed .toggle-icon { color: var(--card-bg); transform: rotate(0deg); }
 .form-card.expanded .toggle-icon { transform: rotate(45deg); color: var(--error-color); }
-.form-collapsible-wrapper { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease; }
-.form-card.expanded .form-collapsible-wrapper { max-height: 1500px; opacity: 1; }
+.form-collapsible-wrapper { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.3s ease, opacity 0.25s ease; }
+.form-collapsible-wrapper > * { overflow: hidden; }
+.form-card.expanded .form-collapsible-wrapper { grid-template-rows: 1fr; opacity: 1; }
 
 .form-card .form-collapse-btn {
     position: absolute;

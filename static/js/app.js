@@ -5,7 +5,6 @@
 
 /* --- GLOBAL VARIABLES & SETTINGS --- */
 const THEME_KEY = 'userTheme'; 
-const COLOR_THEME_KEY = 'userColorTheme'; 
 const ITEMS_PER_PAGE = 20; 
 const COMMENTS_PER_PAGE = 10;
 
@@ -16,6 +15,7 @@ let currentCommentPage = 1;
 let isLoading = false;
 let currentProfileUser = null; 
 let wordIdForExample = null; 
+let currentSearchQuery = '';
 
 // --- CATEGORY VARIABLES ---
 let activeCategorySlug = null; // Current filter
@@ -37,12 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if(el) el.classList.add('loaded');
     });
 
-    setupAllEventListeners(); // Bootstraps extracted inline HTML events
+    setupAllEventListeners();
 
     setupAuthTriggers();
     setupSortBar();
     setupTheme();
-    initLogoSystem();
     initTopAppBar();
     fetchCategories(); 
     fetchWords(currentPage);
@@ -73,15 +72,17 @@ function setupAllEventListeners() {
         btn.addEventListener('click', () => openProfileModal(currentUserUsername));
     });
 
-    // Logo animations
-    document.getElementById('cardRed')?.addEventListener('click', function() { animateLogo(this); });
-    document.getElementById('cardDefault')?.addEventListener('click', function() { animateLogo(this); });
-
     // Header / Form actions
     document.getElementById('topAddWordBtn')?.addEventListener('click', focusContributionForm);
-    document.getElementById('formCollapseBtn')?.addEventListener('click', toggleContributionForm);
+    document.getElementById('formCollapseBtn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleContributionForm();
+    });
     document.getElementById('formHeaderToggle')?.addEventListener('click', toggleContributionForm);
     document.getElementById('contributionForm')?.addEventListener('submit', handleWordSubmit);
+    document.getElementById('contributionCard')?.addEventListener('click', function() {
+        if (this.classList.contains('collapsed')) toggleContributionForm();
+    });
 
     // Form Interactions / Validations
     const inputWord = document.getElementById('inputWord');
@@ -107,9 +108,45 @@ function setupAllEventListeners() {
         });
     }
 
-    // Filter and Feed logic
+    // Filter, Feed and Search logic
     document.getElementById('clearFilterBtn')?.addEventListener('click', clearCategoryFilter);
     document.getElementById('loadMoreBtn')?.addEventListener('click', loadMoreWords);
+
+    const searchInput = document.getElementById('mainSearchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+    if (searchInput) {
+        let searchTimeout = null;
+        searchInput.addEventListener('input', (e) => {
+            const val = e.target.value;
+            if (val.length > 0) {
+                if (clearSearchBtn) clearSearchBtn.style.display = 'block';
+            } else {
+                if (clearSearchBtn) clearSearchBtn.style.display = 'none';
+            }
+            
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                executeSearch(val);
+            }, 500); 
+        });
+        
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(searchTimeout);
+                executeSearch(searchInput.value);
+            }
+        });
+    }
+
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', () => {
+            if(searchInput) searchInput.value = '';
+            clearSearchBtn.style.display = 'none';
+            executeSearch('');
+        });
+    }
 
     // Add Example Modal
     document.getElementById('addExampleModal')?.addEventListener('click', (e) => closeModal('addExampleModal', false, e));
@@ -139,6 +176,14 @@ function setupAllEventListeners() {
     document.getElementById('backToProfileBtn')?.addEventListener('click', backToProfile);
 }
 
+function executeSearch(query) {
+    const trimmed = query.trim();
+    if (currentSearchQuery === trimmed) return;
+    currentSearchQuery = trimmed;
+    currentPage = 1;
+    fetchWords(currentPage);
+}
+
 function focusContributionForm() {
     const card = document.getElementById('contributionCard');
     if (!card) return;
@@ -151,6 +196,18 @@ function focusContributionForm() {
 }
 
 /* --- UTILS --- */
+
+// HTML Escaping Utility to prevent DOM-based XSS
+function escapeHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function getCSRFToken() {
     const match = document.cookie.match(/csrftoken=([^;]+)/);
     return match ? match[1] : null;
@@ -160,7 +217,7 @@ function showCustomAlert(message, type = 'success') {
     const container = document.getElementById('notificationContainer');
     const alertDiv = document.createElement('div');
     alertDiv.className = `custom-alert custom-alert-${type}`;
-    alertDiv.textContent = message;
+    alertDiv.textContent = message; // Safely assign text content
     alertDiv.addEventListener('click', () => alertDiv.remove());
     container.prepend(alertDiv);
     
@@ -172,10 +229,15 @@ function showCustomAlert(message, type = 'success') {
 }
 
 async function apiRequest(url, method = 'GET', body = null) {
-    const options = {
-        method,
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }
-    };
+    const headers = { 'Content-Type': 'application/json' };
+    const csrfToken = getCSRFToken();
+    
+    // Only attach token if it exists to prevent malformed headers
+    if (csrfToken) {
+        headers['X-CSRFToken'] = csrfToken;
+    }
+
+    const options = { method, headers };
     if (body) options.body = JSON.stringify(body);
 
     const response = await fetch(url, options);
@@ -196,7 +258,7 @@ function updateCount(field) {
     document.getElementById('charCount').innerText = `${count} / 300`; 
 }
 
-/* --- THEME & LOGO --- */
+/* --- THEME --- */
 function setupTheme() {
     const saved = localStorage.getItem(THEME_KEY);
     const btn = document.getElementById('darkModeToggle');
@@ -214,41 +276,6 @@ function setupTheme() {
         localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
         btn.textContent = isDark ? 'Aydınlık Mod' : 'Karanlık Mod';
     });
-}
-
-function initLogoSystem() {
-    const theme = localStorage.getItem(COLOR_THEME_KEY) || 'default';
-    document.body.setAttribute('data-theme', theme);
-    updateLogoVisuals(theme);
-}
-
-function animateLogo(el) {
-    const curr = localStorage.getItem(COLOR_THEME_KEY) || 'default';
-    
-    if (activeCategorySlug) {
-        clearCategoryFilter();
-        return; 
-    }
-
-    const next = curr === 'default' ? 'red' : 'default';
-    localStorage.setItem(COLOR_THEME_KEY, next);
-    document.body.setAttribute('data-theme', next);
-    updateLogoVisuals(next);
-    currentPage = 1; fetchWords(currentPage);
-}
-
-function updateLogoVisuals(theme) {
-    const def = document.getElementById('cardDefault');
-    const red = document.getElementById('cardRed');
-    if (!def || !red) return;
-    
-    if (theme === 'red') {
-        red.className = 'logo-card theme-red pos-center';
-        def.className = 'logo-card theme-default pos-behind';
-    } else {
-        def.className = 'logo-card theme-default pos-center';
-        red.className = 'logo-card theme-red pos-behind';
-    }
 }
 
 /* --- SORTING --- */
@@ -313,7 +340,7 @@ function toggleContributionForm() {
         if (isExpanded) {
             card.classList.remove('expanded');
             card.classList.add('collapsed');
-            if(title) title.innerHTML = 'Katkıda Bulun <span class="toggle-icon">+</span>';
+            if(title) title.innerHTML = 'Katkıda Bulun <span class="toggle-icon">+</span>'; // Static HTML, safe
         } else {
             card.classList.remove('collapsed');
             card.classList.add('expanded');
@@ -334,7 +361,7 @@ function initTopAppBar() {
         }
     };
 
-    window.addEventListener('scroll', onScroll);
+    window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
 }
 
@@ -406,11 +433,20 @@ function handleAuthSubmit() {
     if (!u || !p) {
         if (err) { err.innerText = "Kullanıcı adı ve şifre gerekli."; err.style.display = 'block'; }
         return;
+    }   
+
+    if (u.length > 30) {
+        if (err) { err.innerText = "Kullanıcı adı en fazla 30 karakter olabilir."; err.style.display = 'block'; }
+        return;
     }
 
     if (currentAuthMode === 'register') {
         if (p.length < 6) {
             if (err) { err.innerText = "Şifre en az 6 karakter olmalı."; err.style.display = 'block'; }
+            return;
+        }
+        if (p.length > 60) {
+            if (err) { err.innerText = "Şifre en fazla 60 karakter olabilir."; err.style.display = 'block'; }
             return;
         }
         if (p !== pConfirm) {
@@ -536,10 +572,14 @@ function toggleCategorySelection(id, el, description) {
     const helpText = document.getElementById('categoryHelpText');
     if (helpText) {
         if (description) {
-             helpText.innerHTML = `<strong>${el.textContent}:</strong> ${description}`;
+             helpText.innerHTML = ''; // Clear contents safely
+             const strongNode = document.createElement('strong');
+             strongNode.textContent = `${el.textContent}: `;
+             helpText.appendChild(strongNode);
+             helpText.appendChild(document.createTextNode(description));
              helpText.classList.add('active');
         } else {
-             helpText.innerHTML = '';
+             helpText.textContent = '';
              helpText.classList.remove('active');
         }
     }
@@ -553,11 +593,12 @@ async function fetchWords(page) {
     const list = document.getElementById('feedList');
     const loadBtn = document.querySelector('#loadMoreContainer button');
     
-    const mode = localStorage.getItem(COLOR_THEME_KEY) === 'red' ? 'profane' : 'all';
-
-    let url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&mode=${mode}&sort=${encodeURIComponent(currentSort)}`;
+    let url = `/api/words?page=${page}&limit=${ITEMS_PER_PAGE}&sort=${encodeURIComponent(currentSort)}`;
     if (activeCategorySlug) {
         url += `&tag=${activeCategorySlug}`;
+    }
+    if (currentSearchQuery) {
+        url += `&search=${encodeURIComponent(currentSearchQuery)}`;
     }
 
     if (page === 1) { 
@@ -577,7 +618,16 @@ async function fetchWords(page) {
             const hasMore = data.words.length >= ITEMS_PER_PAGE && (!data.total_count || (page * ITEMS_PER_PAGE < data.total_count));
             document.getElementById('loadMoreContainer').style.display = hasMore ? 'block' : 'none';
         } else if(page === 1) {
-            list.innerHTML = '<div style="text-align:center;color:#ccc;margin-top:20px;">Henüz içerik yok.</div>';
+            if(currentSearchQuery) {
+                // Safely render the search query without innerHTML
+                list.innerHTML = '';
+                const noResultMsg = document.createElement('div');
+                noResultMsg.style.cssText = 'text-align:center;color:#ccc;margin-top:20px;';
+                noResultMsg.textContent = `"${currentSearchQuery}" için sonuç bulunamadı.`;
+                list.appendChild(noResultMsg);
+            } else {
+                list.innerHTML = '<div style="text-align:center;color:#ccc;margin-top:20px;">Henüz içerik yok.</div>';
+            }
         }
     } catch (e) {
         if(page === 1) list.innerHTML = '<div style="text-align:center;color:var(--error-color);">Yüklenemedi.</div>';
@@ -639,10 +689,10 @@ function appendCards(words, container, isModalMode) {
     words.forEach(w => frag.appendChild(createCardElement(w, isModalMode)));
     container.appendChild(frag);
     Array.from(container.children).slice(-words.length).forEach((c, i) => {
-        requestAnimationFrame(() => setTimeout(() => { 
-            c.classList.remove('fade-in'); 
-            c.classList.add('show'); 
-        }, i * 50));
+        setTimeout(() => {
+            c.classList.remove('fade-in');
+            c.classList.add('show');
+        }, i * 40);
     });
 }
 
@@ -651,29 +701,47 @@ function createCardElement(item, isModalMode) {
     const card = document.createElement('div');
     card.className = 'word-card fade-in';
     card.setAttribute('data-id', item.id);
-    
-    const parser = new DOMParser();
-    const decode = (s) => s ? parser.parseFromString(s, "text/html").documentElement.textContent : '';
 
     card.addEventListener('click', (e) => {
         if (e.target.closest('.vote-btn') || 
             e.target.closest('.vote-container-floating') || 
             e.target.closest('.user-badge') || 
             e.target.closest('.add-example-btn') || 
-            e.target.closest('.tag-badge') || 
-            card.classList.contains('is-profane-content')) return;
+            e.target.closest('.tag-badge')) return;
             
-        animateAndOpenCommentView(card, item.id, decode(item.word), decode(item.def), decode(item.example), decode(item.etymology), isModalMode);
+        animateAndOpenCommentView(card, item.id, item.word, item.def || item.definition, item.example, item.etymology, isModalMode);
     });
 
     const votePill = createVoteControls('word', item);
     votePill.className = 'vote-container-floating'; 
     card.appendChild(votePill);
 
+    // Build the DOM safely using Node creation instead of innerHTML
     const contentDiv = document.createElement('div');
-    const exampleHTML = item.example ? `<div class="word-example">"${decode(item.example)}"</div>` : '';
-    const etymologyHTML = item.etymology ? `<div class="word-etymology" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;"><em>Köken:</em> ${decode(item.etymology)}</div>` : '';
-    contentDiv.innerHTML = `<h3>${decode(item.word)}</h3>${etymologyHTML}<p>${decode(item.def)}</p>${exampleHTML}`;
+    
+    const wordTitle = document.createElement('h3');
+    wordTitle.textContent = item.word;
+    contentDiv.appendChild(wordTitle);
+
+    if (item.etymology) {
+        const etyDiv = document.createElement('div');
+        etyDiv.className = 'word-etymology';
+        etyDiv.style.cssText = 'font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;';
+        etyDiv.innerHTML = '<em>Köken:</em> '; // Safe static HTML
+        etyDiv.appendChild(document.createTextNode(item.etymology)); // Safe dynamic content
+        contentDiv.appendChild(etyDiv);
+    }
+
+    const defP = document.createElement('p');
+    defP.textContent = item.def || item.definition;
+    contentDiv.appendChild(defP);
+
+    if (item.example) {
+        const exampleDiv = document.createElement('div');
+        exampleDiv.className = 'word-example';
+        exampleDiv.textContent = `"${item.example}"`;
+        contentDiv.appendChild(exampleDiv);
+    }
     
     if (isUserLoggedIn && 
         currentUserUsername === item.author && 
@@ -684,7 +752,7 @@ function createCardElement(item, isModalMode) {
         addExBtn.innerText = '+ Örnek Ekle';
         addExBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            openAddExampleModal(item.id, decode(item.word));
+            openAddExampleModal(item.id, item.word);
         });
         addExBtn.style.cssText = "background:none; border:1px dashed var(--accent); color:var(--accent); cursor:pointer; font-size:0.75rem; padding:4px 8px; border-radius:4px; margin-top:8px; opacity:0.8;";
         
@@ -721,14 +789,13 @@ function createCardElement(item, isModalMode) {
     
     const hint = document.createElement('div'); 
     hint.className = 'click-hint'; 
-    const cCount = item.comment_count || 0; 
+    const cCount = Number(item.comment_count) || 0; 
     hint.innerHTML = `Yorumlar (${cCount}) <span>&rarr;</span>`;
     foot.appendChild(hint);
 
-    const authorName = item.author ? decode(item.author) : 'Anonim';
+    const authorName = item.author ? item.author : 'Anonim';
     const authorSpan = document.createElement('div');
     authorSpan.className = 'card-author';
-    authorSpan.innerHTML = '';
 
     if (authorName !== 'Anonim') {
         const badge = document.createElement('span');
@@ -740,25 +807,11 @@ function createCardElement(item, isModalMode) {
         });
         authorSpan.appendChild(badge);
     } else {
-        authorSpan.innerHTML += ' anonim';
+        authorSpan.textContent = ' anonim';
     }
 
     foot.appendChild(authorSpan);
     card.appendChild(foot);
-
-    if (item.is_profane) {
-        card.classList.add('is-profane-content');
-        const ov = document.createElement('div'); 
-        ov.className = 'profane-wrapper';
-        ov.innerHTML = `<div class="profane-badge">+18</div><div class="profane-warning">Görmek için tıkla</div>`;
-        ov.addEventListener('click', (e) => { 
-            e.stopPropagation(); e.preventDefault();
-            ov.classList.add('hiding'); 
-            card.classList.remove('is-profane-content'); 
-            setTimeout(() => { if(ov.parentNode) ov.remove(); }, 600);
-        });
-        card.appendChild(ov);
-    }
 
     return card;
 }
@@ -773,7 +826,6 @@ async function submitWord() {
     const n = isUserLoggedIn ? currentUserUsername : 'Anonim';
 
     const btn = document.querySelector(".form-card button[type='submit']");
-    const prof = localStorage.getItem(COLOR_THEME_KEY) === 'red';
 
     if (!w || !d || !ex || !et) return showCustomAlert("Lütfen tüm alanları doldurun.", "error");
     
@@ -789,7 +841,6 @@ async function submitWord() {
             example: ex, 
             etymology: et,
             nickname: n, 
-            is_profane: prof,
             category_ids: Array.from(selectedFormCategories)
         });
         
@@ -991,7 +1042,6 @@ function sendVote(type, id, act, con) {
 /* === DETAIL VIEW & COMMENTS === */
 function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, wordExample, wordEtymology, isModalMode = false) { 
     if (activeCardClone) return; 
-    if (originalCard.classList.contains('is-profane-content')) return;
 
     currentWordId = wordId;
 
@@ -1003,8 +1053,14 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
     clone.className = 'full-comment-view'; 
     if(isModalMode) clone.classList.add('mode-modal');
     
-    const exampleHTML = wordExample ? `<div class="word-example" style="margin-top:8px;">"${wordExample}"</div>` : '';
-    const etymologyHTML = wordEtymology ? `<div class="word-etymology" style="font-size:0.9rem; color:var(--text-muted); margin-top:5px; margin-bottom:5px;"><em>Köken:</em> ${wordEtymology}</div>` : '';
+    // Safely escape parameters before inserting into innerHTML
+    const safeWordText = escapeHTML(wordText);
+    const safeWordDef = escapeHTML(wordDef);
+    const safeExample = escapeHTML(wordExample);
+    const safeEtymology = escapeHTML(wordEtymology);
+
+    const exampleHTML = safeExample ? `<div class="word-example" style="margin-top:8px;">"${safeExample}"</div>` : '';
+    const etymologyHTML = safeEtymology ? `<div class="word-etymology" style="font-size:0.9rem; color:var(--text-muted); margin-top:5px; margin-bottom:5px;"><em>Köken:</em> ${safeEtymology}</div>` : '';
 
     const commentPlaceholder = isUserLoggedIn ? "Yorum yaz..." : "Yorum yapmak için giriş yapın...";
 
@@ -1012,9 +1068,9 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
         <div class="view-header">
             <div style="display:flex; justify-content:space-between; align-items:start;">
                 <div>
-                    <h2 id="commentTitle" style="margin:0; font-size:1.4rem; color:var(--accent);">${wordText}</h2>
+                    <h2 id="commentTitle" style="margin:0; font-size:1.4rem; color:var(--accent);">${safeWordText}</h2>
                     ${etymologyHTML}
-                    <div style="font-size:1rem; color:var(--text-muted); margin-top:5px; font-style:italic;">${wordDef}</div>
+                    <div style="font-size:1rem; color:var(--text-muted); margin-top:5px; font-style:italic;">${safeWordDef}</div>
                     ${exampleHTML}
                 </div>
                 <button class="close-icon-btn" id="closeCommentViewBtn">✕</button>
@@ -1037,7 +1093,6 @@ function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, word
     document.body.appendChild(clone);
     requestAnimationFrame(() => requestAnimationFrame(() => clone.classList.add('expanded')));
 
-    // Reattach inline logic created via string building
     document.getElementById('closeCommentViewBtn')?.addEventListener('click', closeCommentView);
     if (!isUserLoggedIn) {
         document.getElementById('commentInput')?.addEventListener('click', openAuthModal);
@@ -1181,7 +1236,7 @@ function openProfileModal(targetUsername = null) {
 
 async function fetchProfileData(username) {
     try {
-        const d = await apiRequest(`/api/profile?username=${username}`);
+        const d = await apiRequest(`/api/profile?username=${encodeURIComponent(username)}`);
         document.getElementById('profileUsername').innerText = d.username;
         document.getElementById('profileDate').innerText = d.date_joined;
         document.getElementById('statWords').innerText = d.word_count;
@@ -1204,7 +1259,7 @@ async function fetchMyWordsFeed() {
     c.innerHTML = '<div class="spinner"></div>';
     
     let url = '/api/my-words';
-    if (currentProfileUser) url += `?username=${currentProfileUser}`;
+    if (currentProfileUser) url += `?username=${encodeURIComponent(currentProfileUser)}`;
 
     const title = document.querySelector('#myWordsModal h2');
     if (title) {
@@ -1233,13 +1288,18 @@ function backToProfile(){
 }
 
 function handleChangePassword(){
+    const current = document.getElementById('currentPassword').value;
     const p1 = document.getElementById('newPassword').value;
     const p2 = document.getElementById('newPasswordConfirm').value;
+    if(!current) return showCustomAlert("Mevcut şifrenizi girin.", "error");
+    if(current.length > 60) return showCustomAlert("Şifre en fazla 60 karakter olabilir.", "error");
     if(p1.length < 6 || p1 !== p2) return showCustomAlert("Hatalı veya eşleşmeyen şifre.", "error");
-    
-    apiRequest('/api/password','PATCH',{new_password: p1})
+    if(p1.length > 60) return showCustomAlert("Yeni şifre en fazla 60 karakter olabilir.", "error");
+
+    apiRequest('/api/password','PATCH',{current_password: current, new_password: p1})
     .then(() => {
         showCustomAlert("Şifre değişti.");
+        document.getElementById('currentPassword').value = '';
         document.getElementById('newPassword').value = '';
         document.getElementById('newPasswordConfirm').value = '';
     })

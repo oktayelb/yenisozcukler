@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.utils.html import escape
 from .models import Word, Comment, Category
 import re
 import requests
@@ -20,7 +21,7 @@ def validate_example_text(value):
     if invalid_chars:
         raise serializers.ValidationError(f"Örnek cümlede geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
         
-    return value
+    return escape(value)
 
 
 # --- OKUMA (READ) SERIALIZERS ---
@@ -33,6 +34,7 @@ class CategorySerializer(serializers.ModelSerializer):
 class CommentSerializer(serializers.ModelSerializer):
     score = serializers.IntegerField(read_only=True)
     user_vote = serializers.SerializerMethodField()
+    author = serializers.CharField(source='display_author', read_only=True)
 
     class Meta:
         model = Comment
@@ -51,10 +53,11 @@ class WordSerializer(serializers.ModelSerializer):
     user_vote = serializers.SerializerMethodField()
     comment_count = serializers.IntegerField(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
+    author = serializers.CharField(source='display_author', read_only=True)
 
     class Meta:
         model = Word
-        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'is_profane', 'definition', 'example', 'etymology', 'comment_count', 'categories'] 
+        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'definition', 'example', 'etymology', 'comment_count', 'categories'] 
 
     def get_user_vote(self, obj):
         votes = self.context.get('user_votes', {})
@@ -90,7 +93,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Word
-        fields = ['word', 'definition', 'example', 'etymology', 'nickname', 'is_profane', 'category_ids']
+        fields = ['word', 'definition', 'example', 'etymology', 'nickname', 'category_ids']
 
     def create(self, validated_data):
         categories = validated_data.pop('category_ids', [])
@@ -111,7 +114,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Sözcükte geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return self.turkish_lower(value)
+        return escape(self.turkish_lower(value))
 
     def validate_definition(self, value):
         value = value.strip()
@@ -119,7 +122,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Tanımda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return self.turkish_lower(value)
+        return escape(self.turkish_lower(value))
 
     def validate_example(self, value):
         return validate_example_text(value)
@@ -136,18 +139,21 @@ class WordCreateSerializer(serializers.ModelSerializer):
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\'<>]', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Köken bilgisinde geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return value
+        return escape(value)
 
     def validate_nickname(self, value):
         if not value or not value.strip():
             return "Anonim"
-        
+
         value = value.strip()
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Takma adda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-            
-        return value
+
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("Bu takma ad bir kullanıcı adı olarak alınmış, başka bir takma ad seçin.")
+
+        return escape(value)
 
 class CommentCreateSerializer(serializers.ModelSerializer):
     word_id = serializers.IntegerField()
@@ -165,15 +171,16 @@ class CommentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Yorum 200 karakteri geçemez.")
         if not value:
             raise serializers.ValidationError("Yorum boş olamaz.")
-        return value
+        return escape(value)
 
     def validate_author(self, value):
-        return value.strip() if value else "Anonim"
+        value = value.strip() if value else "Anonim"
+        return escape(value)
     
 
 class AuthSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=20)
-    password = serializers.CharField(min_length=6, write_only=True)
+    username = serializers.CharField(max_length=30)
+    password = serializers.CharField(min_length=6, max_length=60, write_only=True)
     token = serializers.CharField(write_only=True, required=True)
     
     def validate_username(self, value):
@@ -186,7 +193,7 @@ class AuthSerializer(serializers.Serializer):
         if invalid_chars:
             raise serializers.ValidationError(f"Kullanıcı adında geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
             
-        return value
+        return escape(value)
     
     def validate(self, attrs):
         token = attrs.get('token')
@@ -212,7 +219,7 @@ class AuthSerializer(serializers.Serializer):
         return attrs
 
 class ChangeUsernameSerializer(serializers.Serializer):
-    new_username = serializers.CharField(max_length=20, required=True)
+    new_username = serializers.CharField(max_length=30, required=True)
 
     def validate_new_username(self, value):
         value = value.strip()
@@ -231,4 +238,4 @@ class ChangeUsernameSerializer(serializers.Serializer):
         if User.objects.filter(username__iexact=value).exclude(id=user.id).exists():
             raise serializers.ValidationError("Bu kullanıcı adı zaten kullanımda.")
 
-        return value
+        return escape(value)

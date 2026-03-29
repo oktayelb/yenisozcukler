@@ -114,9 +114,9 @@ class CategoryAdmin(admin.ModelAdmin):
 class WordAdmin(admin.ModelAdmin):
     actions = [make_approved, make_pending, change_author]
     
-    list_display = ('word', 'status', 'score', 'author', 'user', 'timestamp', 'is_profane')
+    list_display = ('word', 'status', 'score', 'author', 'user', 'timestamp')
     # Added 'categories' to list_filter so you can filter words by category
-    list_filter = ('status', 'is_profane', 'categories', 'timestamp')
+    list_filter = ('status', 'categories', 'timestamp')
     search_fields = ('word', 'definition', 'author')
     # Use a better widget for selecting multiple categories
     filter_horizontal = ('categories',)

@@ -36,7 +36,6 @@ class Word(models.Model):
         blank=True
     )
 
-    is_profane = models.BooleanField(default=False)
     word = models.CharField(max_length=50)
     definition = models.CharField(max_length=300)
     example = models.CharField(max_length=200, default="")
@@ -49,6 +48,12 @@ class Word(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
     
     score = models.IntegerField(default=0, db_index=True)
+
+    @property
+    def display_author(self):
+        if self.user:
+            return self.user.username
+        return self.author
 
     def __str__(self):
         return self.word
@@ -70,8 +75,14 @@ class Comment(models.Model):
     
     score = models.IntegerField(default=0)
 
+    @property
+    def display_author(self):
+        if self.user:
+            return self.user.username
+        return self.author
+
     def __str__(self):
-        return f"{self.author}: {self.comment[:20]}"
+        return f"{self.display_author}: {self.comment[:20]}"
 
 
 # --- VOTE MODELS ---
