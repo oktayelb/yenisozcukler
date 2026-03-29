@@ -179,8 +179,8 @@ class CommentCreateSerializer(serializers.ModelSerializer):
     
 
 class AuthSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=20)
-    password = serializers.CharField(min_length=6, write_only=True)
+    username = serializers.CharField(max_length=30)
+    password = serializers.CharField(min_length=6, max_length=60, write_only=True)
     token = serializers.CharField(write_only=True, required=True)
     
     def validate_username(self, value):
@@ -219,7 +219,7 @@ class AuthSerializer(serializers.Serializer):
         return attrs
 
 class ChangeUsernameSerializer(serializers.Serializer):
-    new_username = serializers.CharField(max_length=20, required=True)
+    new_username = serializers.CharField(max_length=30, required=True)
 
     def validate_new_username(self, value):
         value = value.strip()

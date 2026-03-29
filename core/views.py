@@ -75,7 +75,7 @@ def get_words(request):
     limit = min(limit, 50)
     tag_slug = request.GET.get('tag')
     sort = request.GET.get('sort', 'date_desc')
-    search_query = request.GET.get('search', '').strip()[:100]
+    search_query = request.GET.get('search', '').strip()[:40]
 
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
@@ -377,7 +377,7 @@ def register_view(request):
     if serializer.is_valid():
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
-
+    
         if User.objects.filter(username=username).exists():
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
         
@@ -447,14 +447,16 @@ def change_password(request):
 
     if not current_password:
         return Response({'success': False, 'error': 'Mevcut şifrenizi girmeniz gerekiyor.'}, status=400)
+    if len(current_password) > 60:
+        return Response({'success': False, 'error': 'Mevcut şifre hatalı.'}, status=400)
 
     if not authenticate(request, username=user.username, password=current_password):
         return Response({'success': False, 'error': 'Mevcut şifre hatalı.'}, status=400)
 
     if not new_password or len(new_password) < 6:
         return Response({'success': False, 'error': 'Yeni şifre en az 6 karakter olmalı.'}, status=400)
-    if len(new_password) > 30:
-        return Response({'success': False, 'error': 'Yeni şifre en fazla 30  karakter olabilir.'}, status=400)
+    if len(new_password) > 60:
+        return Response({'success': False, 'error': 'Yeni şifre en fazla 60  karakter olabilir.'}, status=400)
 
     user.set_password(new_password)
     user.save()
@@ -500,7 +502,10 @@ def get_my_words(request):
 
     target_username = request.GET.get('username')
     page_number = request.GET.get('page', 1)
-    limit = int(request.GET.get('limit', 20))
+    try:
+        limit = int(request.GET.get('limit', 20))
+    except (ValueError, TypeError):
+        limit = 20
     limit = min(limit, 50)
     
     if target_username:

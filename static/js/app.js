@@ -433,11 +433,20 @@ function handleAuthSubmit() {
     if (!u || !p) {
         if (err) { err.innerText = "Kullanıcı adı ve şifre gerekli."; err.style.display = 'block'; }
         return;
+    }   
+
+    if (u.length > 30) {
+        if (err) { err.innerText = "Kullanıcı adı en fazla 30 karakter olabilir."; err.style.display = 'block'; }
+        return;
     }
 
     if (currentAuthMode === 'register') {
         if (p.length < 6) {
             if (err) { err.innerText = "Şifre en az 6 karakter olmalı."; err.style.display = 'block'; }
+            return;
+        }
+        if (p.length > 60) {
+            if (err) { err.innerText = "Şifre en fazla 60 karakter olabilir."; err.style.display = 'block'; }
             return;
         }
         if (p !== pConfirm) {
@@ -1283,7 +1292,9 @@ function handleChangePassword(){
     const p1 = document.getElementById('newPassword').value;
     const p2 = document.getElementById('newPasswordConfirm').value;
     if(!current) return showCustomAlert("Mevcut şifrenizi girin.", "error");
+    if(current.length > 60) return showCustomAlert("Şifre en fazla 60 karakter olabilir.", "error");
     if(p1.length < 6 || p1 !== p2) return showCustomAlert("Hatalı veya eşleşmeyen şifre.", "error");
+    if(p1.length > 60) return showCustomAlert("Yeni şifre en fazla 60 karakter olabilir.", "error");
 
     apiRequest('/api/password','PATCH',{current_password: current, new_password: p1})
     .then(() => {

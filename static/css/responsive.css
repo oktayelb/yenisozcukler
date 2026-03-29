@@ -6,7 +6,7 @@
     .form-fields { display: flex; flex-direction: column; gap: var(--spacing-md); align-items: stretch; } 
     .span-half, .span-full { width: 100%; grid-column: auto; }
     .form-group { width: 100%; }
-    .form-card.collapsed { width: 80%; padding: 12px 20px; }
+    .form-card.collapsed { width: 80%; padding: 12px 20px; align-self: center; }
     .form-header-toggle { justify-content: center; }
     .form-group label { display: block; text-align: center; width: 100%; }
     .char-limit { text-align: right; }
