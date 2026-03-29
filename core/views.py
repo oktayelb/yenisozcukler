@@ -68,11 +68,14 @@ def get_words(request):
         return Response({'error': 'Too many requests'}, status=429)
 
     page_number = request.GET.get('page', 1)
-    limit = int(request.GET.get('limit', 20))
+    try:
+        limit = int(request.GET.get('limit', 20))
+    except (ValueError, TypeError):
+        limit = 20
     limit = min(limit, 50)
-    tag_slug = request.GET.get('tag') 
+    tag_slug = request.GET.get('tag')
     sort = request.GET.get('sort', 'date_desc')
-    search_query = request.GET.get('search', '').strip()
+    search_query = request.GET.get('search', '').strip()[:100]
 
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
@@ -146,7 +149,10 @@ def get_comments(request, word_id):
         return Response({'error': 'Too many requests'}, status=429)
 
     page = request.GET.get('page', 1)
-    limit = int(request.GET.get('limit', 10))
+    try:
+        limit = int(request.GET.get('limit', 10))
+    except (ValueError, TypeError):
+        limit = 10
     limit = min(limit, 20)
 
     comments_qs = Comment.objects.filter(word_id=word_id).select_related('user').order_by('timestamp')
@@ -320,8 +326,8 @@ def add_comment(request):
     serializer = CommentCreateSerializer(data=request.data)
     
     if serializer.is_valid():
-        word = get_object_or_404(Word, id=serializer.validated_data['word_id'])
-            
+        word = get_object_or_404(Word, id=serializer.validated_data['word_id'], status='approved')
+
         new_comment = Comment.objects.create(
             word=word,
             user=request.user, 
@@ -386,16 +392,19 @@ def register_view(request):
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
     return Response({'success': False, 'error': first_error}, status=400)
 
+@ratelimit(key='ip', rate='10/m', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([])
 def logout_view(request):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
     logout(request)
     return Response({'success': True})
 
-@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@ratelimit(key='ip', rate='30/m', method='GET', block=False)
 @api_view(['GET'])
-@permission_classes([]) 
+@permission_classes([])
 def get_user_profile(request):
     if getattr(request, 'limited', False):
         return Response({'error': 'Too many requests'}, status=429)
@@ -444,6 +453,8 @@ def change_password(request):
 
     if not new_password or len(new_password) < 6:
         return Response({'success': False, 'error': 'Yeni şifre en az 6 karakter olmalı.'}, status=400)
+    if len(new_password) > 30:
+        return Response({'success': False, 'error': 'Yeni şifre en fazla 30  karakter olabilir.'}, status=400)
 
     user.set_password(new_password)
     user.save()

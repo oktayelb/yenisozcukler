@@ -144,12 +144,15 @@ class WordCreateSerializer(serializers.ModelSerializer):
     def validate_nickname(self, value):
         if not value or not value.strip():
             return "Anonim"
-        
+
         value = value.strip()
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Takma adda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-            
+
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("Bu takma ad bir kullanıcı adı olarak alınmış, başka bir takma ad seçin.")
+
         return escape(value)
 
 class CommentCreateSerializer(serializers.ModelSerializer):
