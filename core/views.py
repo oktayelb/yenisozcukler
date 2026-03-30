@@ -269,7 +269,7 @@ def add_word(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
     
-    serializer = WordCreateSerializer(data=request.data)
+    serializer = WordCreateSerializer(data=request.data, context={'request': request})
     
     if serializer.is_valid():
         client_ip = get_client_ip(request)

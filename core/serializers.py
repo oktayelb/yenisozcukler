@@ -150,7 +150,8 @@ class WordCreateSerializer(serializers.ModelSerializer):
         if invalid_chars:
             raise serializers.ValidationError(f"Takma adda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
 
-        if User.objects.filter(username__iexact=value).exists():
+        request = self.context.get('request')
+        if not (request and request.user.is_authenticated) and User.objects.filter(username__iexact=value).exists():
             raise serializers.ValidationError("Bu takma ad bir kullanıcı adı olarak alınmış, başka bir takma ad seçin.")
 
         return escape(value)
