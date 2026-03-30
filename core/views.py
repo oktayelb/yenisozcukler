@@ -15,12 +15,14 @@ from django.core.cache import cache
 from django.db.models import Count, F, Sum, Q
 from django.db import transaction
 
-from .models import Word, Comment, WordVote, CommentVote, Category
+from .models import Word, Comment, WordVote, CommentVote, Category, TranslationChallenge, ChallengeComment, ChallengeCommentVote
 from .serializers import (
-    WordSerializer, CommentSerializer, 
+    WordSerializer, CommentSerializer,
     WordCreateSerializer, CommentCreateSerializer,
     AuthSerializer, ChangeUsernameSerializer,
-    WordAddExampleSerializer, CategorySerializer
+    WordAddExampleSerializer, CategorySerializer,
+    TranslationChallengeSerializer, TranslationChallengeCreateSerializer,
+    ChallengeCommentSerializer, ChallengeCommentCreateSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -549,9 +551,182 @@ def get_my_words(request):
         pass
 
     serializer = WordSerializer(words_page, many=True, context={'user_votes': user_votes})
-    
+
     return Response({
-        'success': True, 
+        'success': True,
         'words': serializer.data,
         'total_count': paginator.count
+    })
+
+
+# --- TRANSLATION CHALLENGE ENDPOINTLERİ ---
+
+@ratelimit(key='ip', rate='60/m', method='GET', block=False)
+@api_view(['GET'])
+@authentication_classes([SessionAuthentication])
+@permission_classes([])
+def get_challenges(request):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    challenges = TranslationChallenge.objects.filter(status='approved')\
+        .annotate(comment_count=Count('comments'))\
+        .select_related('user')\
+        .order_by('-timestamp')
+
+    serializer = TranslationChallengeSerializer(challenges, many=True)
+    return Response({'success': True, 'challenges': serializer.data})
+
+
+@ratelimit(key='ip', rate='30/m', method='POST', block=False)
+@ratelimit(key=universal_rate_key, rate='5/m', method='POST', block=False)
+@api_view(['POST'])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def add_challenge(request):
+    if getattr(request, 'limited', False):
+        return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
+
+    serializer = TranslationChallengeCreateSerializer(data=request.data)
+    if serializer.is_valid():
+        client_ip = get_client_ip(request)
+        TranslationChallenge.objects.create(
+            foreign_word=serializer.validated_data['foreign_word'],
+            meaning=serializer.validated_data['meaning'],
+            user=request.user,
+            ip_address=client_ip,
+            status='pending'
+        )
+        return Response({'success': True})
+    else:
+        first_error = next(iter(serializer.errors.values()))[0]
+        return Response({'success': False, 'error': first_error}, status=400)
+
+
+@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@api_view(['GET'])
+@authentication_classes([SessionAuthentication])
+@permission_classes([])
+def get_challenge_comments(request, challenge_id):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    challenge = get_object_or_404(TranslationChallenge, id=challenge_id, status='approved')
+
+    page = request.GET.get('page', 1)
+    try:
+        limit = int(request.GET.get('limit', 10))
+    except (ValueError, TypeError):
+        limit = 10
+    limit = min(limit, 20)
+
+    comments_qs = ChallengeComment.objects.filter(challenge=challenge).select_related('user').order_by('timestamp')
+    paginator = Paginator(comments_qs, limit)
+
+    try:
+        comments_page = paginator.page(page)
+    except (EmptyPage, PageNotAnInteger):
+        comments_page = []
+
+    user_votes = {}
+    try:
+        if comments_page and request.user.is_authenticated:
+            page_comment_ids = [c.id for c in comments_page]
+            votes = ChallengeCommentVote.objects.filter(
+                user=request.user,
+                comment_id__in=page_comment_ids
+            ).values('comment', 'value')
+            for v in votes:
+                user_votes[v['comment']] = v['value']
+    except Exception:
+        pass
+
+    serializer = ChallengeCommentSerializer(comments_page, many=True, context={'user_votes': user_votes})
+    return Response({
+        'success': True,
+        'comments': serializer.data,
+        'has_next': comments_page.has_next() if hasattr(comments_page, 'has_next') else False
+    })
+
+
+@ratelimit(key='ip', rate='50/m', method='POST', block=False)
+@ratelimit(key=universal_rate_key, rate='10/m', method='POST', block=False)
+@api_view(['POST'])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def add_challenge_comment(request):
+    if getattr(request, 'limited', False):
+        return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
+
+    serializer = ChallengeCommentCreateSerializer(data=request.data)
+    if serializer.is_valid():
+        challenge = get_object_or_404(
+            TranslationChallenge,
+            id=serializer.validated_data['challenge_id'],
+            status='approved'
+        )
+        new_comment = ChallengeComment.objects.create(
+            challenge=challenge,
+            user=request.user,
+            comment=serializer.validated_data['comment'],
+            score=0
+        )
+        return Response({
+            'success': True,
+            'comment': ChallengeCommentSerializer(new_comment).data
+        }, status=201)
+    else:
+        first_error = next(iter(serializer.errors.values()))[0]
+        return Response({'success': False, 'error': first_error}, status=400)
+
+
+@ratelimit(key='ip', rate='100/m', method='POST', block=False)
+@ratelimit(key=universal_rate_key, rate='15/m', method='POST', block=False)
+@api_view(['POST'])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def vote_challenge_comment(request, comment_id):
+    if getattr(request, 'limited', False):
+        return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
+
+    client_ip = get_client_ip(request)
+    user = request.user
+    action = request.data.get('action')
+    if action not in ['like', 'dislike']:
+        return Response({'error': 'Geçersiz işlem.'}, status=400)
+
+    vote_val = 1 if action == 'like' else -1
+    obj = get_object_or_404(ChallengeComment.objects.select_for_update(), id=comment_id)
+
+    existing_vote = ChallengeCommentVote.objects.filter(user=user, comment=obj).first()
+    response_action = 'none'
+
+    if existing_vote:
+        if existing_vote.value == vote_val:
+            existing_vote.delete()
+            obj.score = F('score') - vote_val
+            response_action = 'none'
+        else:
+            existing_vote.value = vote_val
+            existing_vote.save()
+            obj.score = F('score') + (vote_val * 2)
+            response_action = 'liked' if vote_val == 1 else 'disliked'
+    else:
+        ChallengeCommentVote.objects.create(
+            value=vote_val,
+            ip_address=client_ip,
+            user=user,
+            comment=obj
+        )
+        obj.score = F('score') + vote_val
+        response_action = 'liked' if vote_val == 1 else 'disliked'
+
+    obj.save()
+    obj.refresh_from_db()
+
+    return Response({
+        'success': True,
+        'new_score': obj.score,
+        'user_action': response_action
     })

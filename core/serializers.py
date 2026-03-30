@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.utils.html import escape
-from .models import Word, Comment, Category
+from .models import Word, Comment, Category, TranslationChallenge, ChallengeComment
 import re
 import requests
 from decouple import config
@@ -217,7 +217,7 @@ class ChangeUsernameSerializer(serializers.Serializer):
 
     def validate_new_username(self, value):
         value = value.strip()
-        user = self.context['request'].user 
+        user = self.context['request'].user
 
         if not value:
             raise serializers.ValidationError("Kullanıcı adı boş olamaz.")
@@ -232,4 +232,68 @@ class ChangeUsernameSerializer(serializers.Serializer):
         if User.objects.filter(username__iexact=value).exclude(id=user.id).exists():
             raise serializers.ValidationError("Bu kullanıcı adı zaten kullanımda.")
 
+        return escape(value)
+
+
+# --- TRANSLATION CHALLENGE SERIALIZERS ---
+
+class TranslationChallengeSerializer(serializers.ModelSerializer):
+    author = serializers.CharField(source='display_author', read_only=True)
+    comment_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = TranslationChallenge
+        fields = ['id', 'foreign_word', 'meaning', 'author', 'timestamp', 'comment_count']
+
+
+class TranslationChallengeCreateSerializer(serializers.Serializer):
+    foreign_word = serializers.CharField(max_length=100, required=True)
+    meaning = serializers.CharField(max_length=300, required=True)
+
+    def validate_foreign_word(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Yabancı sözcük boş olamaz.")
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-\']', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Sözcükte geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
+        return escape(value)
+
+    def validate_meaning(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Anlam açıklaması boş olamaz.")
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Anlam açıklamasında geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
+        return escape(value)
+
+
+class ChallengeCommentSerializer(serializers.ModelSerializer):
+    score = serializers.IntegerField(read_only=True)
+    user_vote = serializers.SerializerMethodField()
+    author = serializers.CharField(source='display_author', read_only=True)
+
+    class Meta:
+        model = ChallengeComment
+        fields = ['id', 'challenge', 'author', 'comment', 'timestamp', 'score', 'user_vote']
+
+    def get_user_vote(self, obj):
+        votes = self.context.get('user_votes', {})
+        vote_value = votes.get(obj.id)
+        if vote_value == 1: return 'like'
+        if vote_value == -1: return 'dislike'
+        return None
+
+
+class ChallengeCommentCreateSerializer(serializers.Serializer):
+    challenge_id = serializers.IntegerField(required=True)
+    comment = serializers.CharField(max_length=300, required=True)
+
+    def validate_comment(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Yorum boş olamaz.")
+        if len(value) > 300:
+            raise serializers.ValidationError("Yorum 300 karakteri geçemez.")
         return escape(value)

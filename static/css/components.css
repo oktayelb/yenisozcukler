@@ -497,3 +497,176 @@ input:focus, textarea:focus { border-color: var(--accent); background-color: var
 .user-badge:hover { transform: translateY(-2px); box-shadow: 0 5px 10px rgba(0,0,0,0.1); border-color: var(--accent); color: var(--accent); background: var(--card-bg); }
 .user-badge:active { transform: translateY(0); box-shadow: 0 2px 3px rgba(0,0,0,0.05); }
 .comment-card .user-badge { background: var(--card-bg); font-size: 0.75rem; padding: 2px 10px; }
+
+/* ========================================
+   CHALLENGE BOX
+   ======================================= */
+.challenge-box {
+    background: var(--card-bg);
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+.challenge-header {
+    padding: 16px 20px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+.challenge-header:hover {
+    background: rgba(142, 127, 127, 0.05);
+}
+.challenge-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.challenge-title-row h3 {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-main);
+    flex: 1;
+}
+.challenge-icon {
+    font-size: 1.3rem;
+}
+.challenge-toggle-icon {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    transition: transform 0.3s;
+}
+.challenge-subtitle {
+    margin: 4px 0 0 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-style: italic;
+    padding-left: 30px;
+}
+.challenge-body {
+    border-top: 1px solid var(--border-light);
+    padding: 12px 20px 16px;
+}
+.challenge-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 350px;
+    overflow-y: auto;
+}
+.challenge-item {
+    background: var(--input-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.challenge-item:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+.challenge-word {
+    font-family: var(--font-body);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+}
+.challenge-meaning {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+.challenge-item-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+.challenge-comment-hint {
+    color: var(--accent);
+    font-weight: 600;
+}
+.challenge-author {
+    opacity: 0.7;
+}
+
+/* Challenge Submit Section */
+.challenge-submit-section {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-light);
+}
+.challenge-suggest-btn {
+    background: none;
+    border: 1px dashed var(--accent);
+    color: var(--accent);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 600;
+    width: 100%;
+    transition: all 0.2s;
+}
+.challenge-suggest-btn:hover {
+    background: rgba(142, 127, 127, 0.08);
+}
+.challenge-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.challenge-form input,
+.challenge-form textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--input-border);
+    border-radius: 8px;
+    background: var(--input-bg);
+    color: var(--text-main);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    box-sizing: border-box;
+    transition: border-color 0.3s;
+}
+.challenge-form input:focus,
+.challenge-form textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--input-focus-bg);
+}
+.challenge-cancel-btn {
+    background: none;
+    border: 1px solid var(--border-light);
+    color: var(--text-muted);
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+.challenge-submit-btn {
+    background: var(--accent);
+    border: none;
+    color: var(--card-bg);
+    padding: 6px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: opacity 0.2s;
+}
+.challenge-submit-btn:hover {
+    opacity: 0.85;
+}
+.challenge-submit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
