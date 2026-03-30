@@ -158,13 +158,10 @@ class WordCreateSerializer(serializers.ModelSerializer):
 
 class CommentCreateSerializer(serializers.ModelSerializer):
     word_id = serializers.IntegerField()
-    
+
     class Meta:
         model = Comment
-        fields = ['word_id', 'author', 'comment']
-        extra_kwargs = {
-            'author': {'required': False, 'allow_blank': True}
-        }
+        fields = ['word_id', 'comment']
 
     def validate_comment(self, value):
         value = value.strip()
@@ -172,10 +169,6 @@ class CommentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Yorum 200 karakteri geçemez.")
         if not value:
             raise serializers.ValidationError("Yorum boş olamaz.")
-        return escape(value)
-
-    def validate_author(self, value):
-        value = value.strip() if value else "Anonim"
         return escape(value)
     
 
