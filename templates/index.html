@@ -274,7 +274,7 @@
             <h4 style="margin:0 0 10px 0; color:var(--text-main); font-size:1rem;">Kullanıcı Adı</h4>
             <div class="auth-form" style="margin-bottom: 25px;">
                 <div class="form-group" style="display:flex; gap:10px;">
-                    <input type="text" id="newUsernameInput" placeholder="Kullanıcı Adı" maxlength="30">
+                    <input type="text" id="newUsernameInput" placeholder="Kullanıcı Adı" maxlength="30" style="text-transform:lowercase;" oninput="this.value=this.value.toLowerCase()">
                     <button class="auth-submit-btn" id="saveUsernameBtn" style="width:auto; margin-top:0; padding:0 20px; white-space:nowrap;">Kaydet</button>
                 </div>
             </div>

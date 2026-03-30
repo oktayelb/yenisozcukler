@@ -358,7 +358,15 @@ def login_view(request):
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
 
-        user = authenticate(request, username=username, password=password)  
+        # Case-insensitive username lookup before authenticating
+        try:
+            db_user = User.objects.get(username__iexact=username)
+            user = authenticate(request, username=db_user.username, password=password)
+        except User.DoesNotExist:
+            user = None
+        except User.MultipleObjectsReturned:
+            user = None
+
         if user is None:
             return Response({'success': False, 'error': 'Bu kullanıcı adı veya şifre hatalı.'}, status=400)
         
@@ -379,12 +387,12 @@ def register_view(request):
 
     serializer = AuthSerializer(data=request.data)
     if serializer.is_valid():
-        username = serializer.validated_data['username']
+        username = serializer.validated_data['username'].lower()
         password = serializer.validated_data['password']
-    
-        if User.objects.filter(username__iexact=username).exists():
+
+        if User.objects.filter(username=username).exists():
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
-        
+
         try:
             with transaction.atomic():
                 user = User.objects.create_user(username=username, password=password)
@@ -417,7 +425,7 @@ def get_user_profile(request):
     target_username = request.GET.get('username')
 
     if target_username:
-        user = get_object_or_404(User, username=target_username)
+        user = get_object_or_404(User, username__iexact=target_username)
     else:
         if request.user.is_authenticated:
             user = request.user
@@ -480,7 +488,7 @@ def change_username(request):
     serializer = ChangeUsernameSerializer(data=request.data, context={'request': request})
     
     if serializer.is_valid():
-        new_username = serializer.validated_data['new_username']
+        new_username = serializer.validated_data['new_username'].lower()
         user = request.user
 
         try:
@@ -515,7 +523,7 @@ def get_my_words(request):
     limit = min(limit, 50)
     
     if target_username:
-        user = get_object_or_404(User, username=target_username)
+        user = get_object_or_404(User, username__iexact=target_username)
     elif request.user.is_authenticated:
         user = request.user
     else:

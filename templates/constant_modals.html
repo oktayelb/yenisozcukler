@@ -55,7 +55,7 @@
         <div class="auth-form" id="authForm">
             <div class="form-group">
                 <label>Kullanıcı Adı</label>
-                <input type="text" id="authUsername" maxlength="30" placeholder="Kullanıcı Adı" autocomplete="username">
+                <input type="text" id="authUsername" maxlength="30" placeholder="Kullanıcı Adı" autocomplete="username" style="text-transform:lowercase;" oninput="this.value=this.value.toLowerCase()">
             </div>
             <div class="form-group">
                 <label>Şifre</label>
