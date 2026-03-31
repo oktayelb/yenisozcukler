@@ -469,6 +469,31 @@ input:focus, textarea:focus { border-color: var(--accent); background-color: var
 }
 .form-card button:hover { background-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
 
+/* SUBMIT ENVELOPE ANIMATION */
+.submit-flying-text {
+    position: absolute; pointer-events: none; z-index: 10000;
+    color: var(--text-main); 
+    font-size: 1.05rem; 
+    font-family: var(--font-body);
+    font-weight: 500;
+    white-space: nowrap; 
+    will-change: transform, opacity;
+    transform-origin: center center;
+}
+.submit-envelope {
+    position: absolute; pointer-events: none; z-index: 10001;
+    will-change: transform, opacity;
+    display: flex; justify-content: center; align-items: center;
+}
+.submit-envelope svg { 
+    display: block; width: 60px; height: 48px; 
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.2));
+}
+.env-flap {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: 30px 16px;
+}
+
 /* VOTE BUTTONS */
 .vote-container-floating { position: absolute; top: 25px; right: 25px; background: var(--accent); border-radius: 30px; padding: 8px 16px; display: flex; align-items: center; gap: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.3s ease; z-index: 5; cursor: default; }
 .word-card:hover .vote-container-floating { transform: scale(1.05); }
