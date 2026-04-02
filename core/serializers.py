@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from django.utils.html import escape
 from .models import Word, Comment, Category, TranslationChallenge, ChallengeComment
 import re
 import requests
@@ -21,7 +20,7 @@ def validate_example_text(value):
     if invalid_chars:
         raise serializers.ValidationError(f"Örnek cümlede geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
         
-    return escape(value)
+    return value
 
 
 # --- OKUMA (READ) SERIALIZERS ---
@@ -114,7 +113,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Sözcükte geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return escape(self.turkish_lower(value))
+        return self.turkish_lower(value)
 
     def validate_definition(self, value):
         value = value.strip()
@@ -122,7 +121,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Tanımda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return escape(self.turkish_lower(value))
+        return self.turkish_lower(value)
 
     def validate_example(self, value):
         return validate_example_text(value)
@@ -139,7 +138,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\'<>]', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Köken bilgisinde geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return escape(value)
+        return value
 
     def validate_nickname(self, value):
         if not value or not value.strip():
@@ -154,7 +153,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
         if not (request and request.user.is_authenticated) and User.objects.filter(username__iexact=value).exists():
             raise serializers.ValidationError("Bu takma ad bir kullanıcı adı olarak alınmış, başka bir takma ad seçin.")
 
-        return escape(value)
+        return value
 
 class CommentCreateSerializer(serializers.ModelSerializer):
     word_id = serializers.IntegerField()
@@ -169,7 +168,7 @@ class CommentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Yorum 200 karakteri geçemez.")
         if not value:
             raise serializers.ValidationError("Yorum boş olamaz.")
-        return escape(value)
+        return value
     
 
 class AuthSerializer(serializers.Serializer):
@@ -187,8 +186,8 @@ class AuthSerializer(serializers.Serializer):
         if invalid_chars:
             raise serializers.ValidationError(f"Kullanıcı adında geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
             
-        return escape(value)
-    
+        return value
+
     def validate(self, attrs):
         token = attrs.get('token')
         
@@ -232,7 +231,7 @@ class ChangeUsernameSerializer(serializers.Serializer):
         if User.objects.filter(username__iexact=value).exclude(id=user.id).exists():
             raise serializers.ValidationError("Bu kullanıcı adı zaten kullanımda.")
 
-        return escape(value)
+        return value
 
 
 # --- TRANSLATION CHALLENGE SERIALIZERS ---
@@ -257,7 +256,7 @@ class TranslationChallengeCreateSerializer(serializers.Serializer):
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-\']', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Sözcükte geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return escape(value)
+        return value
 
     def validate_meaning(self, value):
         value = value.strip()
@@ -266,7 +265,7 @@ class TranslationChallengeCreateSerializer(serializers.Serializer):
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Anlam açıklamasında geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return escape(value)
+        return value
 
 
 class ChallengeCommentSerializer(serializers.ModelSerializer):
@@ -296,4 +295,4 @@ class ChallengeCommentCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("Yorum boş olamaz.")
         if len(value) > 300:
             raise serializers.ValidationError("Yorum 300 karakteri geçemez.")
-        return escape(value)
+        return value

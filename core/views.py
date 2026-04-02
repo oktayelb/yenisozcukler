@@ -336,7 +336,8 @@ def add_comment(request):
 
         new_comment = Comment.objects.create(
             word=word,
-            user=request.user, 
+            user=request.user,
+            author=request.user.username,
             comment=serializer.validated_data['comment'],
             score=0
         )
@@ -668,6 +669,7 @@ def add_challenge_comment(request):
         new_comment = ChallengeComment.objects.create(
             challenge=challenge,
             user=request.user,
+            author=request.user.username,
             comment=serializer.validated_data['comment'],
             score=0
         )
