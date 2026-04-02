@@ -1,6 +1,6 @@
 /* === TRANSLATION CHALLENGE === */
 import { state, isUserLoggedIn, CHALLENGE_COMMENTS_PER_PAGE, pendingVotes } from './state.js';
-import { escapeHTML, apiRequest, showCustomAlert } from './utils.js';
+import { escapeHTML, apiRequest, showCustomAlert, getCSRFToken } from './utils.js';
 import { openAuthModal } from './auth.js';
 import { openProfileModal } from './profile.js';
 
@@ -35,7 +35,6 @@ export function setupChallengeBox() {
         submitBtn.addEventListener('click', submitChallenge);
     }
 
-    // Load preview on init
     fetchChallengesAndRender();
 }
 
@@ -77,8 +76,7 @@ function renderPreview() {
 
         const count = document.createElement('span');
         count.className = 'challenge-chip-count';
-        const cCount = Number(ch.comment_count) || 0;
-        count.textContent = cCount;
+        count.textContent = Number(ch.comment_count) || 0;
 
         chip.append(word, count);
         preview.appendChild(chip);
@@ -91,7 +89,7 @@ function toggleChallengeExpand() {
     if (!wrapper) return;
 
     state.challengeExpanded = !state.challengeExpanded;
-    
+
     if (state.challengeExpanded) {
         wrapper.classList.add('expanded');
         if (icon) icon.style.transform = 'rotate(180deg)';
@@ -112,9 +110,7 @@ function renderFullList() {
         return;
     }
 
-    allChallenges.forEach(ch => {
-        list.appendChild(createChallengeItem(ch));
-    });
+    allChallenges.forEach(ch => list.appendChild(createChallengeItem(ch)));
 }
 
 function createChallengeItem(ch) {
@@ -135,11 +131,10 @@ function createChallengeItem(ch) {
     const footer = document.createElement('div');
     footer.className = 'challenge-item-footer';
 
-    const commentHint = document.createElement('span');
-    commentHint.className = 'challenge-comment-hint';
-    const cCount = Number(ch.comment_count) || 0;
-    commentHint.textContent = `Tartışma (${cCount})`;
-    footer.appendChild(commentHint);
+    const hint = document.createElement('span');
+    hint.className = 'challenge-comment-hint';
+    hint.textContent = `Öneriler (${Number(ch.comment_count) || 0})`;
+    footer.appendChild(hint);
 
     const authorEl = document.createElement('span');
     authorEl.className = 'challenge-author';
@@ -147,11 +142,7 @@ function createChallengeItem(ch) {
     footer.appendChild(authorEl);
 
     item.appendChild(footer);
-
-    item.addEventListener('click', () => {
-        openChallengeDiscussion(ch.id, ch.foreign_word, ch.meaning);
-    });
-
+    item.addEventListener('click', () => openChallengeDiscussion(ch.id, ch.foreign_word, ch.meaning));
     return item;
 }
 
@@ -196,14 +187,36 @@ function openChallengeDiscussion(challengeId, foreignWord, meaning) {
 
     const safeWord = escapeHTML(foreignWord);
     const safeMeaning = escapeHTML(meaning);
-    const commentPlaceholder = isUserLoggedIn ? "Bir Türkçe karşılık öner veya tartışmaya katıl..." : "Yorum yapmak için giriş yapın...";
+
+    const footerContent = isUserLoggedIn
+        ? `<div class="custom-comment-wrapper">
+               <div class="custom-comment-header">
+                   <input type="text" id="challengeSuggestedWordInput" class="custom-input-minimal"
+                          placeholder="Önerdiğiniz sözcük..." maxlength="30" autocomplete="off">
+               </div>
+               <textarea id="challengeExplanationInput" class="custom-textarea-minimal" rows="2"
+                         placeholder="Neden bu sözcüğü öneriyorsunuz? (İsteğe bağlı)" maxlength="300"></textarea>
+               <div class="custom-comment-footer">
+                   <button class="send-btn-minimal" id="submitChallengeSuggestionBtn">Karşılık Öner</button>
+               </div>
+           </div>`
+        : `<div class="custom-comment-wrapper" style="cursor:pointer;" id="loginPromptWrapper">
+               <div class="custom-comment-header">
+                   <input class="custom-input-minimal" readonly placeholder="Önerdiğiniz sözcük...">
+               </div>
+               <textarea class="custom-textarea-minimal" rows="2" readonly
+                         placeholder="Karşılık önermek için giriş yapın..."></textarea>
+               <div class="custom-comment-footer">
+                   <button class="send-btn-minimal">Karşılık Öner</button>
+               </div>
+           </div>`;
 
     view.innerHTML = `
         <div class="view-header">
             <div style="display:flex; justify-content:space-between; align-items:start;">
                 <div>
                     <h2 style="margin:0; font-size:1.4rem; color:var(--accent);">${safeWord}</h2>
-                    <div style="font-size:1rem; color:var(--text-muted); margin-top:5px; font-style:italic;">${safeMeaning}</div>
+                    <div style="font-size:0.92rem; color:var(--text-muted); margin-top:4px; font-style:italic;">${safeMeaning}</div>
                 </div>
                 <button class="close-icon-btn" id="closeChallengeViewBtn">&#10005;</button>
             </div>
@@ -211,29 +224,22 @@ function openChallengeDiscussion(challengeId, foreignWord, meaning) {
         <div id="challengeCommentsList" class="view-body">
             <div class="spinner"></div>
         </div>
-        <div class="view-footer">
-            <div class="custom-comment-wrapper">
-                <textarea id="challengeCommentInput" class="custom-textarea-minimal" rows="2" placeholder="${commentPlaceholder}" maxlength="300" ${isUserLoggedIn ? "" : 'readonly'}></textarea>
-                <div class="custom-comment-footer">
-                    <button class="send-btn-minimal" id="submitChallengeCommentBtn">Gönder</button>
-                </div>
-            </div>
-        </div>
+        <div class="view-footer">${footerContent}</div>
     `;
 
     document.body.appendChild(view);
     requestAnimationFrame(() => requestAnimationFrame(() => view.classList.add('expanded')));
 
     document.getElementById('closeChallengeViewBtn')?.addEventListener('click', closeChallengeDiscussion);
+
     if (!isUserLoggedIn) {
-        document.getElementById('challengeCommentInput')?.addEventListener('click', openAuthModal);
-        document.getElementById('submitChallengeCommentBtn')?.addEventListener('click', openAuthModal);
+        document.getElementById('loginPromptWrapper')?.addEventListener('click', openAuthModal);
     } else {
-        document.getElementById('submitChallengeCommentBtn')?.addEventListener('click', submitChallengeComment);
+        document.getElementById('submitChallengeSuggestionBtn')?.addEventListener('click', submitChallengeSuggestion);
     }
 
     state.activeChallengeView = view;
-    loadChallengeComments(challengeId, 1);
+    loadSuggestions(challengeId, 1);
 }
 
 export function closeChallengeDiscussion() {
@@ -251,78 +257,172 @@ export function closeChallengeDiscussion() {
     }, 400);
 }
 
-async function loadChallengeComments(challengeId, page = 1) {
+async function loadSuggestions(challengeId, page = 1) {
     const list = state.activeChallengeView?.querySelector('#challengeCommentsList');
     if (!list) return;
 
-    if (page === 1) { list.innerHTML = '<div class="spinner"></div>'; state.currentChallengeCommentPage = 1; }
-    else { const b = list.querySelector('.load-more-comments-btn'); if (b) b.innerText = 'Yükleniyor...'; }
+    if (page === 1) {
+        list.innerHTML = '<div class="spinner"></div>';
+        state.currentChallengeCommentPage = 1;
+    } else {
+        const btn = list.querySelector('.load-more-comments-btn');
+        if (btn) btn.innerText = 'Yükleniyor...';
+    }
 
     try {
         const data = await apiRequest(`/api/challenge-comments/${challengeId}?page=${page}&limit=${CHALLENGE_COMMENTS_PER_PAGE}`);
-        if (page === 1) list.innerHTML = ''; else list.querySelector('.load-more-comments-btn')?.remove();
+
+        if (page === 1) list.innerHTML = '';
+        else list.querySelector('.load-more-comments-btn')?.remove();
 
         if (data.comments?.length > 0) {
-            data.comments.forEach(c => list.appendChild(createChallengeCommentItem(c)));
+            data.comments.forEach(s => list.appendChild(createSuggestionCard(s)));
             if (data.has_next) {
                 const btn = document.createElement('button');
                 btn.className = 'load-more-comments-btn';
-                btn.innerText = 'Daha eski yorumlar';
-                btn.addEventListener('click', () => loadChallengeComments(challengeId, ++state.currentChallengeCommentPage));
+                btn.innerText = 'Daha fazla öneri';
+                btn.addEventListener('click', () => loadSuggestions(challengeId, ++state.currentChallengeCommentPage));
                 list.appendChild(btn);
             }
         } else if (page === 1) {
-            list.innerHTML = '<div style="text-align:center;color:var(--text-muted);margin-top:20px;">Henüz öneri yok. İlk öneriyi sen yap!</div>';
+            list.innerHTML = '<div style="text-align:center;color:var(--text-muted);margin-top:20px;">Henüz öneri yok. İlk karşılığı sen öner!</div>';
         }
     } catch (e) {
         if (page === 1) list.innerHTML = '<div style="color:var(--error-color);">Hata.</div>';
     }
 }
 
-function createChallengeCommentItem(c) {
-    const d = document.createElement('div');
-    d.className = 'comment-card';
-    const date = new Date(c.timestamp).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+function createSuggestionCard(s) {
+    const card = document.createElement('div');
+    card.className = 'suggestion-card';
+    card.setAttribute('data-suggestion-id', s.id);
 
-    const authorName = c.author || 'Anonim';
-    const head = document.createElement('div');
-    head.style.display = 'flex';
-    head.style.justifyContent = 'space-between';
-    head.style.alignItems = 'center';
+    const displayWord = s.suggested_word || '';
+    const wordEl = document.createElement('div');
+    wordEl.className = 'suggestion-word';
+    wordEl.textContent = displayWord;
+    card.appendChild(wordEl);
 
-    const left = document.createElement('div');
+    // Explanation (optional)
+    const displayExpl = s.explanation || '';
+    if (displayExpl) {
+        const explEl = document.createElement('div');
+        explEl.className = 'suggestion-explanation';
+        explEl.textContent = displayExpl;
+        card.appendChild(explEl);
+    }
+
+    // Footer: meta + votes
+    const footer = document.createElement('div');
+    footer.className = 'suggestion-footer';
+
+    const meta = document.createElement('div');
+    meta.className = 'suggestion-meta';
+
+    const authorName = s.author || 'Anonim';
     if (authorName !== 'Anonim') {
         const badge = document.createElement('span');
         badge.className = 'user-badge';
         badge.innerText = authorName;
         badge.addEventListener('click', (e) => { e.stopPropagation(); openProfileModal(authorName); });
-        left.appendChild(badge);
+        meta.appendChild(badge);
     } else {
-        const b = document.createElement('strong');
-        b.innerText = 'Anonim';
-        left.appendChild(b);
+        const anonEl = document.createElement('span');
+        anonEl.className = 'suggestion-anon';
+        anonEl.textContent = 'Anonim';
+        meta.appendChild(anonEl);
     }
 
-    const right = document.createElement('span');
-    right.style.fontSize = '0.75rem';
-    right.style.color = 'var(--text-muted)';
-    right.innerText = date;
+    const date = new Date(s.timestamp).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+    const dateEl = document.createElement('span');
+    dateEl.className = 'suggestion-date';
+    dateEl.textContent = date;
+    meta.appendChild(dateEl);
 
-    head.append(left, right);
-    d.appendChild(head);
+    footer.appendChild(meta);
+    footer.appendChild(createChallengeVoteControls(s));
+    card.appendChild(footer);
 
-    const body = document.createElement('div');
-    body.style.margin = '5px 0';
-    body.innerText = c.comment;
-    d.appendChild(body);
+    return card;
+}
 
-    const ft = document.createElement('div');
-    ft.style.display = 'flex';
-    ft.style.justifyContent = 'flex-end';
-    ft.appendChild(createChallengeVoteControls(c));
-    d.appendChild(ft);
+async function submitChallengeSuggestion() {
+    if (!state.activeChallengeView) return;
+    if (!isUserLoggedIn) { openAuthModal(); return; }
 
-    return d;
+    const wordInput = state.activeChallengeView.querySelector('#challengeSuggestedWordInput');
+    const explInput = state.activeChallengeView.querySelector('#challengeExplanationInput');
+    const btn = state.activeChallengeView.querySelector('#submitChallengeSuggestionBtn');
+
+    const suggestedWord = wordInput?.value.trim() || '';
+    const explanation = explInput?.value.trim() || '';
+
+    if (!suggestedWord) {
+        return showCustomAlert("Önerilen sözcük boş olamaz.", "error");
+    }
+
+    btn.disabled = true;
+    btn.innerText = "Gönderiliyor...";
+
+    try {
+        const response = await fetch('/api/challenge-suggestion', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({
+                challenge_id: state.currentChallengeId,
+                suggested_word: suggestedWord,
+                explanation: explanation
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.status === 409) {
+            showCustomAlert("Bu sözcük zaten önerilmiş. Sizi mevcut öneriye yönlendiriyoruz, lütfen onu oylayın.");
+            scrollToAndHighlight(data.existing_id);
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(data.error || "İşlem başarısız.");
+        }
+
+        showCustomAlert("Öneriniz eklendi!");
+        if (wordInput) wordInput.value = '';
+        if (explInput) explInput.value = '';
+
+        const list = state.activeChallengeView.querySelector('#challengeCommentsList');
+        if (list) {
+            if (list.querySelector('[style*="Henüz"]') || list.innerText.includes('Henüz')) list.innerHTML = '';
+            const newCard = createSuggestionCard({ ...data.suggestion, user_vote: null });
+            list.insertBefore(newCard, list.firstChild);
+            list.scrollTop = 0;
+        }
+    } catch (e) {
+        showCustomAlert(e.message, "error");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = "Karşılık Öner";
+        }
+    }
+}
+
+function scrollToAndHighlight(suggestionId) {
+    const list = state.activeChallengeView?.querySelector('#challengeCommentsList');
+    if (!list) return;
+    const target = list.querySelector(`[data-suggestion-id="${suggestionId}"]`);
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Remove and re-add class to restart animation if already present
+    target.classList.remove('suggestion-highlight');
+    void target.offsetWidth;
+    target.classList.add('suggestion-highlight');
+    target.addEventListener('animationend', () => target.classList.remove('suggestion-highlight'), { once: true });
 }
 
 function triggerVoteAnim(btn, container) {
@@ -429,28 +529,4 @@ function sendChallengeCommentVote(commentId, act, con) {
             delete pendingVotes[uniqueId];
         }
     }, 500);
-}
-
-function submitChallengeComment() {
-    if (!state.activeChallengeView) return;
-    if (!isUserLoggedIn) { openAuthModal(); return; }
-
-    const txt = state.activeChallengeView.querySelector('#challengeCommentInput').value.trim();
-    if (!txt) return showCustomAlert("Yorum yazın.", "error");
-    if (txt.length > 300) return showCustomAlert("Çok uzun.", "error");
-
-    const btn = state.activeChallengeView.querySelector('#submitChallengeCommentBtn');
-    btn.disabled = true;
-
-    apiRequest('/api/challenge-comment', 'POST', { challenge_id: state.currentChallengeId, comment: txt })
-        .then(data => {
-            showCustomAlert("Yorum eklendi!");
-            state.activeChallengeView.querySelector('#challengeCommentInput').value = '';
-            const list = state.activeChallengeView.querySelector('#challengeCommentsList');
-            if (list.innerText.includes('Henüz')) list.innerHTML = '';
-            list.insertBefore(createChallengeCommentItem({ ...data.comment, user_vote: null }), list.firstChild);
-            list.scrollTop = 0;
-        })
-        .catch(e => showCustomAlert(e.message, "error"))
-        .finally(() => btn.disabled = false);
 }

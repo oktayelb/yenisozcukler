@@ -182,7 +182,8 @@ class ChallengeComment(models.Model):
 
     challenge = models.ForeignKey(TranslationChallenge, on_delete=models.CASCADE, related_name='comments')
     author = models.CharField(max_length=50, default='Anonim')
-    comment = models.CharField(max_length=300, blank=False)
+    suggested_word = models.CharField(max_length=30, blank=False)
+    explanation = models.CharField(max_length=300, blank=True, default='')
     timestamp = models.DateTimeField(auto_now_add=True)
     score = models.IntegerField(default=0)
 

@@ -22,7 +22,7 @@ from .serializers import (
     AuthSerializer, ChangeUsernameSerializer,
     WordAddExampleSerializer, CategorySerializer,
     TranslationChallengeSerializer, TranslationChallengeCreateSerializer,
-    ChallengeCommentSerializer, ChallengeCommentCreateSerializer
+    ChallengeCommentSerializer, ChallengeSuggestionCreateSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -655,27 +655,43 @@ def get_challenge_comments(request, challenge_id):
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
-def add_challenge_comment(request):
+def add_challenge_suggestion(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
 
-    serializer = ChallengeCommentCreateSerializer(data=request.data)
+    serializer = ChallengeSuggestionCreateSerializer(data=request.data)
     if serializer.is_valid():
         challenge = get_object_or_404(
             TranslationChallenge,
             id=serializer.validated_data['challenge_id'],
             status='approved'
         )
-        new_comment = ChallengeComment.objects.create(
+        suggested_word = serializer.validated_data['suggested_word']
+        explanation = serializer.validated_data.get('explanation', '')
+
+        existing = ChallengeComment.objects.filter(
+            challenge=challenge,
+            suggested_word__iexact=suggested_word
+        ).first()
+
+        if existing:
+            return Response({
+                'success': False,
+                'error': 'duplicate',
+                'existing_id': existing.id
+            }, status=409)
+
+        new_suggestion = ChallengeComment.objects.create(
             challenge=challenge,
             user=request.user,
             author=request.user.username,
-            comment=serializer.validated_data['comment'],
+            suggested_word=suggested_word,
+            explanation=explanation,
             score=0
         )
         return Response({
             'success': True,
-            'comment': ChallengeCommentSerializer(new_comment).data
+            'suggestion': ChallengeCommentSerializer(new_suggestion).data
         }, status=201)
     else:
         first_error = next(iter(serializer.errors.values()))[0]

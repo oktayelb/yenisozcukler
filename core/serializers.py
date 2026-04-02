@@ -275,7 +275,7 @@ class ChallengeCommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ChallengeComment
-        fields = ['id', 'challenge', 'author', 'comment', 'timestamp', 'score', 'user_vote']
+        fields = ['id', 'challenge', 'author', 'suggested_word', 'explanation', 'timestamp', 'score', 'user_vote']
 
     def get_user_vote(self, obj):
         votes = self.context.get('user_votes', {})
@@ -285,14 +285,25 @@ class ChallengeCommentSerializer(serializers.ModelSerializer):
         return None
 
 
-class ChallengeCommentCreateSerializer(serializers.Serializer):
+class ChallengeSuggestionCreateSerializer(serializers.Serializer):
     challenge_id = serializers.IntegerField(required=True)
-    comment = serializers.CharField(max_length=300, required=True)
+    suggested_word = serializers.CharField(max_length=30, required=True)
+    explanation = serializers.CharField(max_length=300, required=False, allow_blank=True, default='')
 
-    def validate_comment(self, value):
+    def validate_suggested_word(self, value):
         value = value.strip()
         if not value:
-            raise serializers.ValidationError("Yorum boş olamaz.")
-        if len(value) > 300:
-            raise serializers.ValidationError("Yorum 300 karakteri geçemez.")
+            raise serializers.ValidationError("Önerilen sözcük boş olamaz.")
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s\-]', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Sözcükte geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
+        return value
+
+    def validate_explanation(self, value):
+        if not value:
+            return ''
+        value = value.strip()
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Açıklamada geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
         return value
