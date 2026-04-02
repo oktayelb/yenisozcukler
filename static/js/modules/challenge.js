@@ -4,10 +4,12 @@ import { escapeHTML, apiRequest, showCustomAlert } from './utils.js';
 import { openAuthModal } from './auth.js';
 import { openProfileModal } from './profile.js';
 
+let allChallenges = [];
+
 export function setupChallengeBox() {
-    const header = document.getElementById('challengeHeader');
-    if (header) {
-        header.addEventListener('click', toggleChallengeBox);
+    const toggleArea = document.getElementById('challengeToggleArea');
+    if (toggleArea) {
+        toggleArea.addEventListener('click', toggleChallengeExpand);
     }
 
     const suggestBtn = document.getElementById('challengeSuggestBtn');
@@ -32,40 +34,87 @@ export function setupChallengeBox() {
     if (submitBtn) {
         submitBtn.addEventListener('click', submitChallenge);
     }
+
+    // Load preview on init
+    fetchChallengesAndRender();
 }
 
-function toggleChallengeBox() {
-    const body = document.getElementById('challengeBody');
-    const icon = document.getElementById('challengeToggleIcon');
-    if (!body) return;
-
-    state.challengeExpanded = !state.challengeExpanded;
-    body.style.display = state.challengeExpanded ? 'block' : 'none';
-    if (icon) icon.innerHTML = state.challengeExpanded ? '&#9650;' : '&#9660;';
-
-    if (state.challengeExpanded) {
-        fetchChallenges();
-    }
-}
-
-async function fetchChallenges() {
-    const list = document.getElementById('challengeList');
-    if (!list) return;
-    list.innerHTML = '<div class="spinner"></div>';
+async function fetchChallengesAndRender() {
+    const preview = document.getElementById('challengePreview');
+    if (!preview) return;
 
     try {
         const data = await apiRequest('/api/challenges');
-        list.innerHTML = '';
-        if (data.challenges?.length > 0) {
-            data.challenges.forEach(ch => {
-                list.appendChild(createChallengeItem(ch));
-            });
-        } else {
-            list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:15px;">Henüz meydan okuma yok.</div>';
-        }
+        allChallenges = data.challenges || [];
+        renderPreview();
     } catch (e) {
-        list.innerHTML = '<div style="text-align:center;color:var(--error-color);padding:15px;">Yüklenemedi.</div>';
+        preview.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:10px;font-size:0.85rem;">Yüklenemedi.</div>';
     }
+}
+
+function renderPreview() {
+    const preview = document.getElementById('challengePreview');
+    if (!preview) return;
+    preview.innerHTML = '';
+
+    const top3 = allChallenges.slice(0, 3);
+    if (top3.length === 0) {
+        preview.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:10px;font-size:0.85rem;">Henüz meydan okuma yok.</div>';
+        return;
+    }
+
+    top3.forEach(ch => {
+        const chip = document.createElement('div');
+        chip.className = 'challenge-chip';
+        chip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openChallengeDiscussion(ch.id, ch.foreign_word, ch.meaning);
+        });
+
+        const word = document.createElement('span');
+        word.className = 'challenge-chip-word';
+        word.textContent = ch.foreign_word;
+
+        const count = document.createElement('span');
+        count.className = 'challenge-chip-count';
+        const cCount = Number(ch.comment_count) || 0;
+        count.textContent = cCount;
+
+        chip.append(word, count);
+        preview.appendChild(chip);
+    });
+}
+
+function toggleChallengeExpand() {
+    const wrapper = document.getElementById('challengeBodyWrapper');
+    const icon = document.getElementById('challengeToggleIcon');
+    if (!wrapper) return;
+
+    state.challengeExpanded = !state.challengeExpanded;
+    
+    if (state.challengeExpanded) {
+        wrapper.classList.add('expanded');
+        if (icon) icon.style.transform = 'rotate(180deg)';
+        renderFullList();
+    } else {
+        wrapper.classList.remove('expanded');
+        if (icon) icon.style.transform = 'rotate(0deg)';
+    }
+}
+
+function renderFullList() {
+    const list = document.getElementById('challengeList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    if (allChallenges.length === 0) {
+        list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:15px;">Henüz meydan okuma yok.</div>';
+        return;
+    }
+
+    allChallenges.forEach(ch => {
+        list.appendChild(createChallengeItem(ch));
+    });
 }
 
 function createChallengeItem(ch) {
@@ -276,6 +325,20 @@ function createChallengeCommentItem(c) {
     return d;
 }
 
+function triggerVoteAnim(btn, container) {
+    btn.classList.remove('vote-pop');
+    void btn.offsetWidth;
+    btn.classList.add('vote-pop');
+    btn.addEventListener('animationend', () => btn.classList.remove('vote-pop'), { once: true });
+    const score = container.querySelector('.vote-score');
+    if (score) {
+        score.classList.remove('score-flash');
+        void score.offsetWidth;
+        score.classList.add('score-flash');
+        score.addEventListener('animationend', () => score.classList.remove('score-flash'), { once: true });
+    }
+}
+
 function createChallengeVoteControls(data) {
     const div = document.createElement('div');
     div.className = 'vote-container';
@@ -286,6 +349,7 @@ function createChallengeVoteControls(data) {
         b.addEventListener('click', (e) => {
             e.stopPropagation();
             if (!isUserLoggedIn) { openAuthModal(); return; }
+            triggerVoteAnim(b, div);
             sendChallengeCommentVote(data.id, act, div);
         });
         return b;

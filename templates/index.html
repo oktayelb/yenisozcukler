@@ -142,30 +142,36 @@
             </div>
 
             <div class="challenge-box" id="challengeBox">
-                <div class="challenge-header" id="challengeHeader">
-                    <div class="challenge-title-row">
-                        <h3>Çeviri Meydan Okuması</h3>
-                        <span class="challenge-toggle-icon" id="challengeToggleIcon">&#9660;</span>
-                    </div>
-                    <p class="challenge-subtitle">Türkçe karşılığı olmayan yabancı sözcükler. Tartışmaya katıl!</p>
-                </div>
-                <div class="challenge-body" id="challengeBody" style="display:none;">
-                    <div class="challenge-list" id="challengeList">
-                        <div class="spinner"></div>
-                    </div>
-                    {% if request.user.is_authenticated %}
-                    <div class="challenge-submit-section" id="challengeSubmitSection">
-                        <button class="challenge-suggest-btn" id="challengeSuggestBtn">+ Yabancı Sözcük Öner</button>
-                        <div class="challenge-form" id="challengeForm" style="display:none;">
-                            <input type="text" id="challengeWordInput" maxlength="100" placeholder="Yabancı sözcük (ör: serendipity)">
-                            <textarea id="challengeMeaningInput" rows="2" maxlength="300" placeholder="Anlamını açıklayın..."></textarea>
-                            <div style="display:flex; gap:8px; justify-content:flex-end;">
-                                <button class="challenge-cancel-btn" id="challengeCancelBtn">Vazgeç</button>
-                                <button class="challenge-submit-btn" id="challengeSubmitBtn">Gönder</button>
-                            </div>
+                <div class="challenge-toggle-area" id="challengeToggleArea">
+                    <div class="challenge-header" id="challengeHeader">
+                        <div class="challenge-title-row">
+                            <h3>Karşılıksız Yabancı Sözcükler</h3>
+                            <span class="challenge-toggle-icon" id="challengeToggleIcon">&#9660;</span>
                         </div>
                     </div>
-                    {% endif %}
+                    <div class="challenge-preview" id="challengePreview">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+                <div class="challenge-body-wrapper" id="challengeBodyWrapper">
+                    <div class="challenge-body">
+                        <div class="challenge-body-inner" id="challengeBody">
+                            <div class="challenge-list" id="challengeList"></div>
+                            {% if request.user.is_authenticated %}
+                            <div class="challenge-submit-section" id="challengeSubmitSection">
+                                <button class="challenge-suggest-btn" id="challengeSuggestBtn">+ Karşılığı olmayan sözcük ekle</button>
+                                <div class="challenge-form" id="challengeForm" style="display:none;">
+                                    <input type="text" id="challengeWordInput" maxlength="100" placeholder="Yabancı sözcük (ör: serendipity)">
+                                    <textarea id="challengeMeaningInput" rows="2" maxlength="300" placeholder="Anlamını açıklayın..."></textarea>
+                                    <div style="display:flex; gap:8px; justify-content:flex-end;">
+                                        <button class="challenge-cancel-btn" id="challengeCancelBtn">Vazgeç</button>
+                                        <button class="challenge-submit-btn" id="challengeSubmitBtn">Gönder</button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
 

@@ -573,7 +573,7 @@ def get_challenges(request):
     challenges = TranslationChallenge.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
         .select_related('user')\
-        .order_by('-timestamp')
+        .order_by('-comment_count', '-timestamp')
 
     serializer = TranslationChallengeSerializer(challenges, many=True)
     return Response({'success': True, 'challenges': serializer.data})

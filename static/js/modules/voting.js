@@ -15,6 +15,7 @@ export function createVoteControls(type, data) {
                 openAuthModal();
                 return;
             }
+            triggerVoteAnim(b, div);
             sendVote(type, data.id, act, div);
         });
         return b;
@@ -25,6 +26,21 @@ export function createVoteControls(type, data) {
         mkBtn('dislike', 'M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17')
     );
     return div;
+}
+
+function triggerVoteAnim(btn, container) {
+    btn.classList.remove('vote-pop');
+    void btn.offsetWidth;
+    btn.classList.add('vote-pop');
+    btn.addEventListener('animationend', () => btn.classList.remove('vote-pop'), { once: true });
+
+    const score = container.querySelector('.vote-score');
+    if (score) {
+        score.classList.remove('score-flash');
+        void score.offsetWidth;
+        score.classList.add('score-flash');
+        score.addEventListener('animationend', () => score.classList.remove('score-flash'), { once: true });
+    }
 }
 
 function sendVote(type, id, act, con) {
