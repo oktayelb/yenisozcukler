@@ -194,7 +194,7 @@ class ChallengeComment(models.Model):
         return self.author
 
     def __str__(self):
-        return f"{self.display_author}: {self.comment[:20]}"
+        return f"{self.display_author}: {self.suggested_word}"
 
 
 class ChallengeCommentVote(models.Model):

@@ -3,7 +3,6 @@ from django.contrib import messages
 from django.http import HttpResponseRedirect, HttpResponse
 from django.template import Template, RequestContext
 from django.contrib.admin import helpers
-# Added Category to imports
 from .models import Word, Comment, WordVote, CommentVote, Category, TranslationChallenge, ChallengeComment, ChallengeCommentVote
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin
@@ -107,18 +106,16 @@ def change_author(modeladmin, request, queryset):
 
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'slug', 'is_active', 'order')
-    list_editable = ('is_active', 'order') # Edit these directly in the list
-    prepopulated_fields = {'slug': ('name',)} # Auto-fill slug from name
+    list_editable = ('is_active', 'order')
+    prepopulated_fields = {'slug': ('name',)}
     ordering = ('order', 'name')
 
 class WordAdmin(admin.ModelAdmin):
     actions = [make_approved, make_pending, change_author]
     
     list_display = ('word', 'status', 'score', 'author', 'user', 'timestamp')
-    # Added 'categories' to list_filter so you can filter words by category
     list_filter = ('status', 'categories', 'timestamp')
     search_fields = ('word', 'definition', 'author')
-    # Use a better widget for selecting multiple categories
     filter_horizontal = ('categories',)
 
 class CommentAdmin(admin.ModelAdmin):
@@ -146,7 +143,7 @@ class CustomUserAdmin(UserAdmin):
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
 
-admin.site.register(Category, CategoryAdmin) # Registered Category
+admin.site.register(Category, CategoryAdmin)
 admin.site.register(Word, WordAdmin)
 admin.site.register(Comment, CommentAdmin)
 admin.site.register(WordVote, WordVoteAdmin)
@@ -172,8 +169,8 @@ class TranslationChallengeAdmin(admin.ModelAdmin):
     search_fields = ('foreign_word', 'meaning', 'author')
 
 class ChallengeCommentAdmin(admin.ModelAdmin):
-    list_display = ('author', 'challenge', 'score', 'timestamp')
-    search_fields = ('comment', 'author')
+    list_display = ('author', 'challenge', 'suggested_word', 'score', 'timestamp')
+    search_fields = ('suggested_word', 'explanation', 'author')
     list_filter = ('timestamp',)
 
 class ChallengeCommentVoteAdmin(admin.ModelAdmin):
