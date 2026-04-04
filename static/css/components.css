@@ -781,6 +781,116 @@ input:focus, textarea:focus { border-color: var(--accent); background-color: var
     cursor: not-allowed;
 }
 
+/* Challenge icons */
+.challenge-icon {
+    width: 14px;
+    height: 14px;
+    vertical-align: -2px;
+    display: inline-block;
+}
+
+/* Challenge timer & closed state */
+.challenge-chip-timer {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+}
+.challenge-chip-timer .challenge-icon {
+    width: 12px;
+    height: 12px;
+}
+
+.challenge-timer-badge {
+    font-size: 0.8rem;
+    color: var(--accent);
+    margin-top: 6px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--bg-secondary, rgba(var(--accent-rgb, 100, 100, 255), 0.08));
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.challenge-timer-badge.closed {
+    color: var(--text-muted);
+    background: var(--bg-tertiary, rgba(128, 128, 128, 0.1));
+}
+
+.challenge-timer-inline {
+    font-size: 0.82rem;
+    margin-top: 6px;
+    padding: 2px 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.challenge-timer-inline.active {
+    color: var(--accent);
+}
+.challenge-timer-inline.closed {
+    color: var(--text-muted);
+}
+
+.challenge-closed-notice {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 12px;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.challenge-already-submitted {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 12px;
+    font-size: 0.88rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+/* Winner suggestion highlight */
+.suggestion-winner {
+    border: 1.5px solid var(--accent);
+    background: rgba(var(--accent-rgb, 100, 100, 255), 0.06);
+    position: relative;
+}
+
+.suggestion-winner-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+.suggestion-winner-badge .challenge-icon {
+    width: 13px;
+    height: 13px;
+}
+
+/* Suggestion card details */
+.suggestion-etymology,
+.suggestion-example {
+    font-size: 0.84rem;
+    color: var(--text-secondary, var(--text-muted));
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+.suggestion-label {
+    font-weight: 600;
+    color: var(--text-color, #ccc);
+    font-size: 0.82rem;
+}
+
 /* Challenge mobile responsive */
 @media (max-width: 480px) {
     .challenge-preview {

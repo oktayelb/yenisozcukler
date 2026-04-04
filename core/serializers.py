@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Word, Comment, Category, TranslationChallenge, ChallengeComment
+from .models import Word, Comment, Category
 import re
 import requests
 from decouple import config
@@ -231,79 +231,4 @@ class ChangeUsernameSerializer(serializers.Serializer):
         if User.objects.filter(username__iexact=value).exclude(id=user.id).exists():
             raise serializers.ValidationError("Bu kullanıcı adı zaten kullanımda.")
 
-        return value
-
-
-# --- TRANSLATION CHALLENGE SERIALIZERS ---
-
-class TranslationChallengeSerializer(serializers.ModelSerializer):
-    author = serializers.CharField(source='display_author', read_only=True)
-    comment_count = serializers.IntegerField(read_only=True)
-
-    class Meta:
-        model = TranslationChallenge
-        fields = ['id', 'foreign_word', 'meaning', 'author', 'timestamp', 'comment_count']
-
-
-class TranslationChallengeCreateSerializer(serializers.Serializer):
-    foreign_word = serializers.CharField(max_length=100, required=True)
-    meaning = serializers.CharField(max_length=300, required=True)
-
-    def validate_foreign_word(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("Yabancı sözcük boş olamaz.")
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-\']', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Sözcükte geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return value
-
-    def validate_meaning(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("Anlam açıklaması boş olamaz.")
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Anlam açıklamasında geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return value
-
-
-class ChallengeCommentSerializer(serializers.ModelSerializer):
-    score = serializers.IntegerField(read_only=True)
-    user_vote = serializers.SerializerMethodField()
-    author = serializers.CharField(source='display_author', read_only=True)
-
-    class Meta:
-        model = ChallengeComment
-        fields = ['id', 'challenge', 'author', 'suggested_word', 'explanation', 'timestamp', 'score', 'user_vote']
-
-    def get_user_vote(self, obj):
-        votes = self.context.get('user_votes', {})
-        vote_value = votes.get(obj.id)
-        if vote_value == 1: return 'like'
-        if vote_value == -1: return 'dislike'
-        return None
-
-
-class ChallengeSuggestionCreateSerializer(serializers.Serializer):
-    challenge_id = serializers.IntegerField(required=True)
-    suggested_word = serializers.CharField(max_length=30, required=True)
-    explanation = serializers.CharField(max_length=300, required=False, allow_blank=True, default='')
-
-    def validate_suggested_word(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("Önerilen sözcük boş olamaz.")
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s\-]', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Sözcükte geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return value
-
-    def validate_explanation(self, value):
-        if not value:
-            return ''
-        value = value.strip()
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Açıklamada geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
         return value

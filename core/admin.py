@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.http import HttpResponseRedirect, HttpResponse
 from django.template import Template, RequestContext
 from django.contrib.admin import helpers
-from .models import Word, Comment, WordVote, CommentVote, Category, TranslationChallenge, ChallengeComment, ChallengeCommentVote
+from .models import Word, Comment, WordVote, CommentVote, Category
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin
 
@@ -124,14 +124,14 @@ class CommentAdmin(admin.ModelAdmin):
     list_filter = ('timestamp',)
 
 class WordVoteAdmin(admin.ModelAdmin):
-    list_display = ('word', 'ip_address', 'value', 'timestamp')
+    list_display = ('word', 'user', 'value', 'timestamp')
     list_filter = ('value', 'timestamp')
-    search_fields = ('ip_address', 'word__word')
+    search_fields = ('word__word', 'user__username')
 
 class CommentVoteAdmin(admin.ModelAdmin):
-    list_display = ('comment', 'ip_address', 'value', 'timestamp')
+    list_display = ('comment', 'user', 'value', 'timestamp')
     list_filter = ('value', 'timestamp')
-    search_fields = ('ip_address', 'comment__comment')
+    search_fields = ('comment__comment', 'user__username')
 
 class CustomUserAdmin(UserAdmin):
     list_display = ('id', 'username', 'email', 'first_name', 'last_name', 'is_staff', 'date_joined')
@@ -148,35 +148,3 @@ admin.site.register(Word, WordAdmin)
 admin.site.register(Comment, CommentAdmin)
 admin.site.register(WordVote, WordVoteAdmin)
 admin.site.register(CommentVote, CommentVoteAdmin)
-
-
-# --- Translation Challenge Admin ---
-
-@admin.action(description='Mark selected challenges as Approved')
-def approve_challenges(modeladmin, request, queryset):
-    updated_count = queryset.update(status='approved')
-    modeladmin.message_user(request, f"{updated_count} challenges marked as Approved.")
-
-@admin.action(description='Mark selected challenges as Pending')
-def pending_challenges(modeladmin, request, queryset):
-    updated_count = queryset.update(status='pending')
-    modeladmin.message_user(request, f"{updated_count} challenges marked as Pending.")
-
-class TranslationChallengeAdmin(admin.ModelAdmin):
-    actions = [approve_challenges, pending_challenges]
-    list_display = ('foreign_word', 'meaning', 'status', 'author', 'user', 'timestamp')
-    list_filter = ('status', 'timestamp')
-    search_fields = ('foreign_word', 'meaning', 'author')
-
-class ChallengeCommentAdmin(admin.ModelAdmin):
-    list_display = ('author', 'challenge', 'suggested_word', 'score', 'timestamp')
-    search_fields = ('suggested_word', 'explanation', 'author')
-    list_filter = ('timestamp',)
-
-class ChallengeCommentVoteAdmin(admin.ModelAdmin):
-    list_display = ('comment', 'ip_address', 'value', 'timestamp')
-    list_filter = ('value', 'timestamp')
-
-admin.site.register(TranslationChallenge, TranslationChallengeAdmin)
-admin.site.register(ChallengeComment, ChallengeCommentAdmin)
-admin.site.register(ChallengeCommentVote, ChallengeCommentVoteAdmin)

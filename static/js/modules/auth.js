@@ -40,15 +40,31 @@ export function toggleAuthMode(mode) {
 }
 
 export function setupAuthTriggers() {
-    const def = document.getElementById('inputDef');
-    if (def) {
-        def.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                submitWord();
-            }
-        });
-    }
+    // Word submission form — Enter on any field submits
+    ['inputWord', 'inputDef', 'inputExample', 'inputEtymology'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submitWord();
+                }
+            });
+        }
+    });
+
+    // Auth modal — Enter on any input submits login/register
+    ['authUsername', 'authPassword', 'authPasswordConfirm'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAuthSubmit();
+                }
+            });
+        }
+    });
 
     const authorBtn = document.getElementById('authorTrigger');
     if (authorBtn) {

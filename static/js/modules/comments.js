@@ -63,6 +63,12 @@ export function animateAndOpenCommentView(originalCard, wordId, wordText, wordDe
         document.getElementById('submitCommentActionBtn')?.addEventListener('click', openAuthModal);
     } else {
         document.getElementById('submitCommentActionBtn')?.addEventListener('click', submitComment);
+        document.getElementById('commentInput')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submitComment();
+            }
+        });
     }
 
     state.activeCardClone = clone;

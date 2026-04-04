@@ -6,6 +6,11 @@ import { openProfileModal } from './profile.js';
 
 let allChallenges = [];
 
+const ICON_TIMER = '<svg class="challenge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+const ICON_TROPHY = '<svg class="challenge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>';
+const ICON_LOCK = '<svg class="challenge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+const ICON_CHECK = '<svg class="challenge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
 export function setupChallengeBox() {
     const toggleArea = document.getElementById('challengeToggleArea');
     if (toggleArea) {
@@ -67,7 +72,7 @@ function renderPreview() {
         chip.className = 'challenge-chip';
         chip.addEventListener('click', (e) => {
             e.stopPropagation();
-            openChallengeDiscussion(ch.id, ch.foreign_word, ch.meaning);
+            openChallengeDiscussion(ch);
         });
 
         const word = document.createElement('span');
@@ -79,6 +84,20 @@ function renderPreview() {
         count.textContent = Number(ch.comment_count) || 0;
 
         chip.append(word, count);
+
+        if (ch.timer_on) {
+            const timerIcon = document.createElement('span');
+            timerIcon.className = 'challenge-chip-timer';
+            if (ch.is_closed) {
+                timerIcon.innerHTML = ICON_TROPHY;
+                timerIcon.title = 'Sona erdi';
+            } else {
+                timerIcon.innerHTML = ICON_TIMER;
+                timerIcon.title = formatTimeRemaining(ch.time_remaining_seconds);
+            }
+            chip.appendChild(timerIcon);
+        }
+
         preview.appendChild(chip);
     });
 }
@@ -128,6 +147,21 @@ function createChallengeItem(ch) {
     meaningEl.textContent = ch.meaning;
     item.appendChild(meaningEl);
 
+    if (ch.timer_on) {
+        const timerEl = document.createElement('div');
+        timerEl.className = 'challenge-timer-badge';
+        if (ch.is_closed) {
+            timerEl.innerHTML = ICON_TROPHY + ' Sona erdi';
+            timerEl.classList.add('closed');
+            if (ch.winner) {
+                timerEl.innerHTML += ` &mdash; Kazanan: <strong>${escapeHTML(ch.winner.suggested_word)}</strong>`;
+            }
+        } else {
+            timerEl.innerHTML = `${ICON_TIMER} ${formatTimeRemaining(ch.time_remaining_seconds)}`;
+        }
+        item.appendChild(timerEl);
+    }
+
     const footer = document.createElement('div');
     footer.className = 'challenge-item-footer';
 
@@ -142,7 +176,7 @@ function createChallengeItem(ch) {
     footer.appendChild(authorEl);
 
     item.appendChild(footer);
-    item.addEventListener('click', () => openChallengeDiscussion(ch.id, ch.foreign_word, ch.meaning));
+    item.addEventListener('click', () => openChallengeDiscussion(ch));
     return item;
 }
 
@@ -174,9 +208,9 @@ async function submitChallenge() {
     }
 }
 
-function openChallengeDiscussion(challengeId, foreignWord, meaning) {
+function openChallengeDiscussion(ch) {
     if (state.activeChallengeView) return;
-    state.currentChallengeId = challengeId;
+    state.currentChallengeId = ch.id;
 
     const backdrop = document.getElementById('modalBackdrop');
     backdrop.style.display = 'block';
@@ -185,22 +219,34 @@ function openChallengeDiscussion(challengeId, foreignWord, meaning) {
     const view = document.createElement('div');
     view.className = 'full-comment-view';
 
-    const safeWord = escapeHTML(foreignWord);
-    const safeMeaning = escapeHTML(meaning);
+    const safeWord = escapeHTML(ch.foreign_word);
+    const safeMeaning = escapeHTML(ch.meaning);
 
-    const footerContent = isUserLoggedIn
-        ? `<div class="custom-comment-wrapper">
+    const isClosed = ch.is_closed;
+
+    let footerContent;
+    if (isClosed) {
+        footerContent = `<div class="challenge-closed-notice">
+            ${ICON_LOCK} <span>Bu meydan okuma sona erdi.</span>
+        </div>`;
+    } else if (isUserLoggedIn) {
+        footerContent = `<div class="custom-comment-wrapper" id="challengeFormWrapper">
                <div class="custom-comment-header">
                    <input type="text" id="challengeSuggestedWordInput" class="custom-input-minimal"
                           placeholder="Önerdiğiniz sözcük..." maxlength="30" autocomplete="off">
                </div>
+               <input type="text" id="challengeEtymologyInput" class="custom-input-minimal"
+                      placeholder="Köken bilgisi (ör: Farsça 'del' + Türkçe '-li')" maxlength="200" autocomplete="off">
+               <textarea id="challengeExampleInput" class="custom-textarea-minimal" rows="2"
+                         placeholder="Örnek cümle..." maxlength="200"></textarea>
                <textarea id="challengeExplanationInput" class="custom-textarea-minimal" rows="2"
                          placeholder="Neden bu sözcüğü öneriyorsunuz? (İsteğe bağlı)" maxlength="300"></textarea>
                <div class="custom-comment-footer">
                    <button class="send-btn-minimal" id="submitChallengeSuggestionBtn">Karşılık Öner</button>
                </div>
-           </div>`
-        : `<div class="custom-comment-wrapper" style="cursor:pointer;" id="loginPromptWrapper">
+           </div>`;
+    } else {
+        footerContent = `<div class="custom-comment-wrapper" style="cursor:pointer;" id="loginPromptWrapper">
                <div class="custom-comment-header">
                    <input class="custom-input-minimal" readonly placeholder="Önerdiğiniz sözcük...">
                </div>
@@ -210,6 +256,16 @@ function openChallengeDiscussion(challengeId, foreignWord, meaning) {
                    <button class="send-btn-minimal">Karşılık Öner</button>
                </div>
            </div>`;
+    }
+
+    let timerHtml = '';
+    if (ch.timer_on) {
+        if (isClosed) {
+            timerHtml = `<div class="challenge-timer-inline closed">${ICON_TROPHY} Sona erdi</div>`;
+        } else {
+            timerHtml = `<div class="challenge-timer-inline active">${ICON_TIMER} ${formatTimeRemaining(ch.time_remaining_seconds)}</div>`;
+        }
+    }
 
     view.innerHTML = `
         <div class="view-header">
@@ -217,6 +273,7 @@ function openChallengeDiscussion(challengeId, foreignWord, meaning) {
                 <div>
                     <h2 style="margin:0; font-size:1.4rem; color:var(--accent);">${safeWord}</h2>
                     <div style="font-size:0.92rem; color:var(--text-muted); margin-top:4px; font-style:italic;">${safeMeaning}</div>
+                    ${timerHtml}
                 </div>
                 <button class="close-icon-btn" id="closeChallengeViewBtn">&#10005;</button>
             </div>
@@ -232,14 +289,26 @@ function openChallengeDiscussion(challengeId, foreignWord, meaning) {
 
     document.getElementById('closeChallengeViewBtn')?.addEventListener('click', closeChallengeDiscussion);
 
-    if (!isUserLoggedIn) {
+    if (isClosed) {
+        // No interaction needed
+    } else if (!isUserLoggedIn) {
         document.getElementById('loginPromptWrapper')?.addEventListener('click', openAuthModal);
     } else {
         document.getElementById('submitChallengeSuggestionBtn')?.addEventListener('click', submitChallengeSuggestion);
+        ['challengeSuggestedWordInput', 'challengeEtymologyInput'].forEach(id => {
+            document.getElementById(id)?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); submitChallengeSuggestion(); }
+            });
+        });
+        ['challengeExampleInput', 'challengeExplanationInput'].forEach(id => {
+            document.getElementById(id)?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitChallengeSuggestion(); }
+            });
+        });
     }
 
     state.activeChallengeView = view;
-    loadSuggestions(challengeId, 1);
+    loadSuggestions(ch.id, 1);
 }
 
 export function closeChallengeDiscussion() {
@@ -275,8 +344,19 @@ async function loadSuggestions(challengeId, page = 1) {
         if (page === 1) list.innerHTML = '';
         else list.querySelector('.load-more-comments-btn')?.remove();
 
+        // Hide form if user already submitted
+        if (data.has_submitted) {
+            const formWrapper = state.activeChallengeView?.querySelector('#challengeFormWrapper');
+            if (formWrapper) {
+                formWrapper.innerHTML = `<div class="challenge-already-submitted">${ICON_CHECK} Bu meydan okumaya zaten bir öneri gönderdiniz.</div>`;
+            }
+        }
+
+        const isClosed = data.is_closed;
+        const winnerId = data.winner_id;
+
         if (data.comments?.length > 0) {
-            data.comments.forEach(s => list.appendChild(createSuggestionCard(s)));
+            data.comments.forEach(s => list.appendChild(createSuggestionCard(s, isClosed, winnerId)));
             if (data.has_next) {
                 const btn = document.createElement('button');
                 btn.className = 'load-more-comments-btn';
@@ -292,16 +372,42 @@ async function loadSuggestions(challengeId, page = 1) {
     }
 }
 
-function createSuggestionCard(s) {
+function createSuggestionCard(s, isClosed = false, winnerId = null) {
+    const isWinner = isClosed && winnerId === s.id;
+
     const card = document.createElement('div');
     card.className = 'suggestion-card';
+    if (isWinner) card.classList.add('suggestion-winner');
     card.setAttribute('data-suggestion-id', s.id);
+
+    if (isWinner) {
+        const winnerBadge = document.createElement('div');
+        winnerBadge.className = 'suggestion-winner-badge';
+        winnerBadge.innerHTML = `${ICON_TROPHY} Kazanan`;
+        card.appendChild(winnerBadge);
+    }
 
     const displayWord = s.suggested_word || '';
     const wordEl = document.createElement('div');
     wordEl.className = 'suggestion-word';
     wordEl.textContent = displayWord;
     card.appendChild(wordEl);
+
+    // Etymology
+    if (s.etymology) {
+        const etyEl = document.createElement('div');
+        etyEl.className = 'suggestion-etymology';
+        etyEl.innerHTML = `<span class="suggestion-label">Köken:</span> ${escapeHTML(s.etymology)}`;
+        card.appendChild(etyEl);
+    }
+
+    // Example sentence
+    if (s.example_sentence) {
+        const exEl = document.createElement('div');
+        exEl.className = 'suggestion-example';
+        exEl.innerHTML = `<span class="suggestion-label">Örnek:</span> <em>${escapeHTML(s.example_sentence)}</em>`;
+        card.appendChild(exEl);
+    }
 
     // Explanation (optional)
     const displayExpl = s.explanation || '';
@@ -340,7 +446,7 @@ function createSuggestionCard(s) {
     meta.appendChild(dateEl);
 
     footer.appendChild(meta);
-    footer.appendChild(createChallengeVoteControls(s));
+    footer.appendChild(createChallengeVoteControls(s, isClosed));
     card.appendChild(footer);
 
     return card;
@@ -351,10 +457,14 @@ async function submitChallengeSuggestion() {
     if (!isUserLoggedIn) { openAuthModal(); return; }
 
     const wordInput = state.activeChallengeView.querySelector('#challengeSuggestedWordInput');
+    const etyInput = state.activeChallengeView.querySelector('#challengeEtymologyInput');
+    const exInput = state.activeChallengeView.querySelector('#challengeExampleInput');
     const explInput = state.activeChallengeView.querySelector('#challengeExplanationInput');
     const btn = state.activeChallengeView.querySelector('#submitChallengeSuggestionBtn');
 
     const suggestedWord = wordInput?.value.trim() || '';
+    const etymology = etyInput?.value.trim() || '';
+    const exampleSentence = exInput?.value.trim() || '';
     const explanation = explInput?.value.trim() || '';
 
     if (!suggestedWord) {
@@ -374,6 +484,8 @@ async function submitChallengeSuggestion() {
             body: JSON.stringify({
                 challenge_id: state.currentChallengeId,
                 suggested_word: suggestedWord,
+                etymology: etymology,
+                example_sentence: exampleSentence,
                 explanation: explanation
             })
         });
@@ -381,8 +493,21 @@ async function submitChallengeSuggestion() {
         const data = await response.json();
 
         if (response.status === 409) {
-            showCustomAlert("Bu sözcük zaten önerilmiş. Sizi mevcut öneriye yönlendiriyoruz, lütfen onu oylayın.");
-            scrollToAndHighlight(data.existing_id);
+            if (data.error === 'duplicate') {
+                showCustomAlert("Bu sözcük zaten önerilmiş. Sizi mevcut öneriye yönlendiriyoruz, lütfen onu oylayın.");
+                scrollToAndHighlight(data.existing_id);
+            } else {
+                showCustomAlert(data.error || "Bu meydan okumaya zaten bir öneri gönderdiniz.", "error");
+                const formWrapper = state.activeChallengeView?.querySelector('#challengeFormWrapper');
+                if (formWrapper) {
+                    formWrapper.innerHTML = `<div class="challenge-already-submitted">${ICON_CHECK} Bu meydan okumaya zaten bir öneri gönderdiniz.</div>`;
+                }
+            }
+            return;
+        }
+
+        if (response.status === 403) {
+            showCustomAlert(data.error || "Bu meydan okuma sona erdi.", "error");
             return;
         }
 
@@ -391,8 +516,11 @@ async function submitChallengeSuggestion() {
         }
 
         showCustomAlert("Öneriniz eklendi!");
-        if (wordInput) wordInput.value = '';
-        if (explInput) explInput.value = '';
+
+        const formWrapper = state.activeChallengeView?.querySelector('#challengeFormWrapper');
+        if (formWrapper) {
+            formWrapper.innerHTML = `<div class="challenge-already-submitted">${ICON_CHECK} Öneriniz eklendi!</div>`;
+        }
 
         const list = state.activeChallengeView.querySelector('#challengeCommentsList');
         if (list) {
@@ -418,7 +546,6 @@ function scrollToAndHighlight(suggestionId) {
     if (!target) return;
 
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    // Remove and re-add class to restart animation if already present
     target.classList.remove('suggestion-highlight');
     void target.offsetWidth;
     target.classList.add('suggestion-highlight');
@@ -439,15 +566,17 @@ function triggerVoteAnim(btn, container) {
     }
 }
 
-function createChallengeVoteControls(data) {
+function createChallengeVoteControls(data, isClosed = false) {
     const div = document.createElement('div');
     div.className = 'vote-container';
     const mkBtn = (act, icon) => {
         const b = document.createElement('button');
         b.className = `vote-btn ${act} ${data.user_vote === act ? 'active' : ''}`;
+        if (isClosed) b.disabled = true;
         b.innerHTML = `<svg viewBox="0 0 24 24"><path d="${icon}"></path></svg>`;
         b.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (isClosed) return;
             if (!isUserLoggedIn) { openAuthModal(); return; }
             triggerVoteAnim(b, div);
             sendChallengeCommentVote(data.id, act, div);
@@ -529,4 +658,16 @@ function sendChallengeCommentVote(commentId, act, con) {
             delete pendingVotes[uniqueId];
         }
     }, 500);
+}
+
+function formatTimeRemaining(seconds) {
+    if (!seconds || seconds <= 0) return 'Süre doldu';
+
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+
+    if (days > 0) return `${days} gün ${hours} saat kaldı`;
+    if (hours > 0) return `${hours} saat ${minutes} dk kaldı`;
+    return `${minutes} dk kaldı`;
 }
