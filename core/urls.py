@@ -24,5 +24,5 @@ urlpatterns = [
     # PATCH
     path('api/password', views.change_password, name='change_password'),
     path('api/username', views.change_username, name='change_username'),
-    path('api/example'    , views.add_example,     name='add_example'),
+    path('api/example', views.add_example, name='add_example'),
 ]

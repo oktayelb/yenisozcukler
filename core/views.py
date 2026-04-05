@@ -13,11 +13,11 @@ from django.contrib.auth import authenticate, login, logout, update_session_auth
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
 from django.db.models import Count, F, Sum, Q
-from django.db import transaction
+from django.db import transaction, DatabaseError, OperationalError, IntegrityError
 
 from .models import Word, Comment, WordVote, CommentVote, Category
 from .serializers import (
-    WordSerializer, CommentSerializer, 
+    WordSerializer, CommentSerializer,
     WordCreateSerializer, CommentCreateSerializer,
     AuthSerializer, ChangeUsernameSerializer,
     WordAddExampleSerializer, CategorySerializer
@@ -133,14 +133,14 @@ def get_words(request):
             for v in votes:
                 user_votes[v['word']] = v['value']
                 
-    except Exception:
+    except (DatabaseError, OperationalError):
         pass
 
     serializer = WordSerializer(words_page, many=True, context={'user_votes': user_votes})
-    
+
     return Response({
-        'status': 'full', 
-        'words': serializer.data, 
+        'status': 'full',
+        'words': serializer.data,
         'total_count': total_count
     })
 
@@ -179,7 +179,7 @@ def get_comments(request, word_id):
 
             for v in votes:
                 user_votes[v['comment']] = v['value']
-    except Exception:
+    except (DatabaseError, OperationalError):
         pass
 
     serializer = CommentSerializer(comments_page, many=True, context={'user_votes': user_votes})
@@ -241,13 +241,16 @@ def vote(request, entity_type, entity_id):
             obj.score = F('score') + (vote_val * 2)
             response_action = 'liked' if vote_val == 1 else 'disliked'
     else:
-        new_vote = VoteClass(
-            value=vote_val, 
-            ip_address=client_ip, 
-            user=user,             
-            **{lookup_field: obj}
-        )
-        new_vote.save()
+        try:
+            new_vote = VoteClass(
+                value=vote_val,
+                ip_address=client_ip,
+                user=user,
+                **{lookup_field: obj}
+            )
+            new_vote.save()
+        except IntegrityError:
+            return Response({'error': 'Oy zaten kaydedildi.'}, status=409)
         obj.score = F('score') + vote_val
         response_action = 'liked' if vote_val == 1 else 'disliked'
 
@@ -334,7 +337,8 @@ def add_comment(request):
 
         new_comment = Comment.objects.create(
             word=word,
-            user=request.user, 
+            user=request.user,
+            author=request.user.username,
             comment=serializer.validated_data['comment'],
             score=0
         )
@@ -545,13 +549,13 @@ def get_my_words(request):
             votes = WordVote.objects.filter(user=request.user, word_id__in=page_word_ids).values('word', 'value')
             for v in votes:
                 user_votes[v['word']] = v['value']
-    except Exception:
+    except (DatabaseError, OperationalError):
         pass
 
     serializer = WordSerializer(words_page, many=True, context={'user_votes': user_votes})
-    
+
     return Response({
-        'success': True, 
+        'success': True,
         'words': serializer.data,
         'total_count': paginator.count
     })

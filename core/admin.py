@@ -3,7 +3,6 @@ from django.contrib import messages
 from django.http import HttpResponseRedirect, HttpResponse
 from django.template import Template, RequestContext
 from django.contrib.admin import helpers
-# Added Category to imports
 from .models import Word, Comment, WordVote, CommentVote, Category
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin
@@ -107,18 +106,16 @@ def change_author(modeladmin, request, queryset):
 
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'slug', 'is_active', 'order')
-    list_editable = ('is_active', 'order') # Edit these directly in the list
-    prepopulated_fields = {'slug': ('name',)} # Auto-fill slug from name
+    list_editable = ('is_active', 'order')
+    prepopulated_fields = {'slug': ('name',)}
     ordering = ('order', 'name')
 
 class WordAdmin(admin.ModelAdmin):
     actions = [make_approved, make_pending, change_author]
     
     list_display = ('word', 'status', 'score', 'author', 'user', 'timestamp')
-    # Added 'categories' to list_filter so you can filter words by category
     list_filter = ('status', 'categories', 'timestamp')
     search_fields = ('word', 'definition', 'author')
-    # Use a better widget for selecting multiple categories
     filter_horizontal = ('categories',)
 
 class CommentAdmin(admin.ModelAdmin):
@@ -127,14 +124,14 @@ class CommentAdmin(admin.ModelAdmin):
     list_filter = ('timestamp',)
 
 class WordVoteAdmin(admin.ModelAdmin):
-    list_display = ('word', 'ip_address', 'value', 'timestamp')
+    list_display = ('word', 'user', 'value', 'timestamp')
     list_filter = ('value', 'timestamp')
-    search_fields = ('ip_address', 'word__word')
+    search_fields = ('word__word', 'user__username')
 
 class CommentVoteAdmin(admin.ModelAdmin):
-    list_display = ('comment', 'ip_address', 'value', 'timestamp')
+    list_display = ('comment', 'user', 'value', 'timestamp')
     list_filter = ('value', 'timestamp')
-    search_fields = ('ip_address', 'comment__comment')
+    search_fields = ('comment__comment', 'user__username')
 
 class CustomUserAdmin(UserAdmin):
     list_display = ('id', 'username', 'email', 'first_name', 'last_name', 'is_staff', 'date_joined')
@@ -146,7 +143,7 @@ class CustomUserAdmin(UserAdmin):
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
 
-admin.site.register(Category, CategoryAdmin) # Registered Category
+admin.site.register(Category, CategoryAdmin)
 admin.site.register(Word, WordAdmin)
 admin.site.register(Comment, CommentAdmin)
 admin.site.register(WordVote, WordVoteAdmin)
