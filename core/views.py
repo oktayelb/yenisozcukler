@@ -15,12 +15,13 @@ from django.core.cache import cache
 from django.db.models import Count, F, Sum, Q
 from django.db import transaction, DatabaseError, OperationalError, IntegrityError
 
-from .models import Word, Comment, WordVote, CommentVote, Category
+from .models import Word, Comment, WordVote, CommentVote, Category, Notification
 from .serializers import (
     WordSerializer, CommentSerializer,
     WordCreateSerializer, CommentCreateSerializer,
     AuthSerializer, ChangeUsernameSerializer,
-    WordAddExampleSerializer, CategorySerializer
+    WordAddExampleSerializer, CategorySerializer,
+    NotificationSerializer
 )
 
 logger = logging.getLogger(__name__)
@@ -257,10 +258,27 @@ def vote(request, entity_type, entity_id):
     obj.save()
     obj.refresh_from_db()
 
+    # Create notification on first vote for this entity (skip self-votes)
+    if response_action != 'none':
+        owner = obj.user if hasattr(obj, 'user') else None
+        if owner and owner != user:
+            notif_type = 'word_vote' if entity_type == 'word' else 'comment_vote'
+            if not Notification.objects.filter(
+                recipient=owner, notification_type=notif_type,
+                **({'word': obj} if entity_type == 'word' else {'comment': obj}),
+            ).exists():
+                Notification.objects.create(
+                    recipient=owner,
+                    actor=user,
+                    notification_type=notif_type,
+                    word=obj if entity_type == 'word' else obj.word,
+                    comment=obj if entity_type == 'comment' else None,
+                )
+
     return Response({
-        'success': True, 
-        'new_score': obj.score, 
-        'user_action': response_action 
+        'success': True,
+        'new_score': obj.score,
+        'user_action': response_action
     })
 
 @ratelimit(key='ip', rate='30/m', method='POST', block=False)
@@ -342,6 +360,17 @@ def add_comment(request):
             comment=serializer.validated_data['comment'],
             score=0
         )
+
+        # Notify word owner about new comment (skip self-comments)
+        if word.user and word.user != request.user:
+            Notification.objects.create(
+                recipient=word.user,
+                actor=request.user,
+                notification_type='new_comment',
+                word=word,
+                comment=new_comment,
+            )
+
         return Response({'success': True, 'comment': CommentSerializer(new_comment).data}, status=201)
     else:
         first_error = next(iter(serializer.errors.values()))[0]
@@ -559,3 +588,65 @@ def get_my_words(request):
         'words': serializer.data,
         'total_count': paginator.count
     })
+
+
+# --- BİLDİRİM (NOTIFICATION) ENDPOINTLERİ ---
+
+@ratelimit(key=universal_rate_key, rate='60/m', method='GET', block=False)
+@api_view(['GET'])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def get_notifications(request):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    page_number = request.GET.get('page', 1)
+    try:
+        limit = int(request.GET.get('limit', 20))
+    except (ValueError, TypeError):
+        limit = 20
+    limit = min(limit, 50)
+
+    qs = Notification.objects.filter(recipient=request.user).select_related('actor', 'word', 'comment')
+    paginator = Paginator(qs, limit)
+    try:
+        page = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page = []
+
+    serializer = NotificationSerializer(page, many=True)
+
+    return Response({
+        'success': True,
+        'notifications': serializer.data,
+        'has_next': page.has_next() if hasattr(page, 'has_next') else False,
+    })
+
+
+@ratelimit(key=universal_rate_key, rate='120/m', method='GET', block=False)
+@api_view(['GET'])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def get_unread_count(request):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+    return Response({'success': True, 'unread_count': count})
+
+
+@ratelimit(key=universal_rate_key, rate='30/m', method='POST', block=False)
+@api_view(['POST'])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def mark_notifications_read(request):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    ids = request.data.get('ids')
+    qs = Notification.objects.filter(recipient=request.user, is_read=False)
+    if ids and isinstance(ids, list):
+        qs = qs.filter(id__in=ids)
+    qs.update(is_read=True)
+
+    return Response({'success': True})

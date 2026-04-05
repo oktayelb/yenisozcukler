@@ -26,3 +26,4 @@ export const closeAboutInfo = (e, f) => closeModal('aboutModal', f, e);
 export const closeProfileModal = (e, f) => closeModal('profileModal', f, e);
 export const closeEditProfileModal = (e, f) => closeModal('editProfileModal', f, e);
 export const closeMyWordsModal = (e, f) => closeModal('myWordsModal', f, e);
+export const closeNotificationsModal = (e, f) => closeModal('notificationsModal', f, e);

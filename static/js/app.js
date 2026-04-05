@@ -16,6 +16,7 @@ import { submitExample } from './modules/example.js';
 import { closeCommentView } from './modules/comments.js';
 import { openProfileModal, openMyWordsModal, openEditProfileModal, handleChangeUsername, handleChangePassword, backToProfile } from './modules/profile.js';
 import { setupChallengeBox, closeChallengeDiscussion } from './modules/challenge.js';
+import { initNotifications, openNotificationsModal, closeNotificationsModal, notifBackToProfile, loadMoreNotifications } from './modules/notifications.js';
 
 /* --- INIT --- */
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTheme();
     initTopAppBar();
     setupChallengeBox();
+    initNotifications();
     fetchCategories();
     fetchWords(state.currentPage);
 });
@@ -165,4 +167,11 @@ function setupAllEventListeners() {
     document.getElementById('saveUsernameBtn')?.addEventListener('click', handleChangeUsername);
     document.getElementById('savePasswordBtn')?.addEventListener('click', handleChangePassword);
     document.getElementById('backToProfileBtn')?.addEventListener('click', backToProfile);
+
+    // Notifications Modal
+    document.getElementById('openNotificationsBtn')?.addEventListener('click', openNotificationsModal);
+    document.getElementById('notificationsModal')?.addEventListener('click', (e) => closeNotificationsModal(e));
+    document.getElementById('notifCloseBtn')?.addEventListener('click', (e) => closeNotificationsModal(e, true));
+    document.getElementById('notifLoadMoreBtn')?.addEventListener('click', loadMoreNotifications);
+    document.getElementById('notifBackToProfileBtn')?.addEventListener('click', notifBackToProfile);
 }

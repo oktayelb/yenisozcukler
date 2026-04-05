@@ -287,3 +287,104 @@
 /* Input word field padding inside the header row */
 .custom-input-minimal { padding: 0 18px; font-size: 1.05rem; }
 .custom-comment-header { padding: 14px 0 12px; }
+
+/* ----------------------------------------
+   NOTIFICATION BADGE
+   ---------------------------------------- */
+.notif-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #e74c3c;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    line-height: 1;
+    box-shadow: 0 2px 6px rgba(231, 76, 60, 0.4);
+    animation: badgePop 0.3s ease;
+}
+.notif-badge-inline {
+    background: #e74c3c;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    margin-left: 8px;
+    line-height: 1;
+}
+@keyframes badgePop {
+    0% { transform: scale(0); }
+    60% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+/* ----------------------------------------
+   NOTIFICATION ITEMS
+   ---------------------------------------- */
+#notificationsModal { z-index: var(--z-modal-base); }
+#notifFeed { padding: 5px; overflow-y: auto; max-height: 60vh; display: flex; flex-direction: column; gap: 8px; }
+
+.notif-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--border-light);
+    transition: background 0.2s;
+}
+.notif-item[style*="cursor: pointer"]:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.notif-item.notif-unread {
+    background: var(--card-bg);
+    border-left: 3px solid var(--accent);
+}
+.notif-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.notif-content {
+    flex: 1;
+    min-width: 0;
+}
+.notif-text {
+    font-size: 0.9rem;
+    color: var(--text-main);
+    line-height: 1.4;
+}
+.notif-date {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Notifications button in profile */
+.profile-notif-section { display: flex; width: 100%; }
+.btn-notif {
+    background: transparent;
+    border: 2px solid var(--border-light);
+    color: var(--text-main);
+}
+.btn-notif:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--input-bg);
+    transform: translateY(-1px);
+}

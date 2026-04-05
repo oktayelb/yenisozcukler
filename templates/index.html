@@ -20,9 +20,10 @@
         <div class="header-controls-right">
             {% if request.user.is_authenticated %}
                 <div class="header-user-info">
-                    <button class="header-btn header-profile-btn auth-profile-trigger">
+                    <button class="header-btn header-profile-btn auth-profile-trigger" style="position:relative;">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="header-profile-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                         {{ request.user.username }}
+                        <span class="notif-badge" id="notifBadge" style="display:none;"></span>
                     </button>
                 </div>
             {% else %}
@@ -263,6 +264,14 @@
                 </div>
             </div>
 
+            <div class="profile-notif-section edit-profile-btn" style="display:none; width:100%; margin-bottom:15px;">
+                <button class="profile-action-btn btn-notif" id="openNotificationsBtn" style="position:relative;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                    Bildirimler
+                    <span class="notif-badge-inline" id="profileNotifBadge" style="display:none;"></span>
+                </button>
+            </div>
+
             <div class="profile-actions-wrapper edit-profile-btn" style="display:none; width: 100%;">
                 <button class="profile-action-btn btn-edit" id="editProfileBtn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -290,6 +299,28 @@
             <div id="myWordsFeed" class="custom-scrollbar" style="flex-grow: 1; overflow-y: auto;"></div>
             
             <button id="myWordsProfileBtn" style="width:100%; padding:10px; background:none; border:none; color:var(--text-muted); cursor:pointer; margin-top:10px; flex-shrink: 0;">
+                &larr; Profile Dön
+            </button>
+        </div>
+    </div>
+
+    <div id="notificationsModal" class="auth-overlay">
+        <div class="auth-box" style="max-width: 500px; width: 95%; max-height: 85vh; display: flex; flex-direction: column;">
+            <button class="close-btn auth-close" id="notifCloseBtn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+
+            <div class="auth-header" style="margin-bottom:15px; flex-shrink: 0;">
+                <h2>Bildirimler</h2>
+            </div>
+
+            <div id="notifFeed" class="custom-scrollbar" style="flex-grow: 1; overflow-y: auto;"></div>
+
+            <button id="notifLoadMoreBtn" style="width:100%; padding:10px; background:none; border:1px solid var(--border-light); color:var(--text-muted); cursor:pointer; margin-top:10px; border-radius:8px; display:none;">
+                Daha Fazla
+            </button>
+
+            <button id="notifBackToProfileBtn" style="width:100%; padding:10px; background:none; border:none; color:var(--text-muted); cursor:pointer; margin-top:10px; flex-shrink: 0;">
                 &larr; Profile Dön
             </button>
         </div>

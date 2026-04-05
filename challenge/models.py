@@ -8,6 +8,7 @@ class TranslationChallenge(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
     ]
 
     user = models.ForeignKey(
@@ -25,6 +26,7 @@ class TranslationChallenge(models.Model):
 
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending', db_index=True)
+    rejection_reason = models.CharField(max_length=300, blank=True, default='')
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     timer_on = models.BooleanField(default=False)
@@ -57,7 +59,7 @@ class TranslationChallenge(models.Model):
 
     def create_winner_word(self):
         from django.db import transaction
-        from core.models import Word
+        from core.models import Word, Notification
 
         with transaction.atomic():
             locked = TranslationChallenge.objects.select_for_update().get(pk=self.pk)
@@ -77,6 +79,16 @@ class TranslationChallenge(models.Model):
             )
             locked.winner_word_created = True
             locked.save(update_fields=['winner_word_created'])
+
+            # Notify the winner
+            if top.user:
+                Notification.objects.create(
+                    recipient=top.user,
+                    notification_type='challenge_win',
+                    word=word,
+                    message=f'"{top.suggested_word}" sözcüğünüz "{locked.foreign_word}" yarışmasını kazandı!',
+                )
+
         self.winner_word_created = True
         return word
 
