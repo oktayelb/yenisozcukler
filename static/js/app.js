@@ -17,6 +17,7 @@ import { closeCommentView } from './modules/comments.js';
 import { openProfileModal, openMyWordsModal, openEditProfileModal, handleChangeUsername, handleChangePassword, backToProfile } from './modules/profile.js';
 import { setupChallengeBox, closeChallengeDiscussion } from './modules/challenge.js';
 import { initNotifications, openNotificationsModal, closeNotificationsModal, notifBackToProfile, loadMoreNotifications } from './modules/notifications.js';
+import { initRouter } from './modules/router.js';
 
 /* --- INIT --- */
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,7 +35,14 @@ document.addEventListener('DOMContentLoaded', () => {
     setupChallengeBox();
     initNotifications();
     fetchCategories();
+
+    // Always fetch the home feed — it's the background content
+    // that shows when overlays close or user navigates back to /
     fetchWords(state.currentPage);
+
+    // Init router — handles non-home routes (e.g. /sozcuk/5/)
+    // by opening the correct overlay after the feed loads
+    initRouter();
 });
 
 /* --- ALL EXTRACTED EVENT BINDINGS --- */

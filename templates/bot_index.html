@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yeni Sözcükler - Türkçeye Yeni Sözcükler Türet</title>
+    <meta name="description" content="Yeni Türkçe sözcükler türetin, paylaşın ve oylayın. Türk dilinin gelişmesine katkıda bulunun.">
+    <link rel="canonical" href="https://yenisozcukler.com/">
+</head>
+<body>
+    <header>
+        <h1>Yeni Sözcükler</h1>
+        <p>Türkçeye kazandırılan en yeni sözcükleri keşfedin, paylaşın ve oylayın.</p>
+    </header>
+
+    <main>
+        <h2>Son Eklenen Sözcükler</h2>
+        <ul>
+            {% for word in words %}
+            <li>
+                <article>
+                    <h3><a href="/sozcuk/{{ word.id }}/">{{ word.word }}</a></h3>
+                    <p>{{ word.definition|truncatechars:160 }}</p>
+                </article>
+            </li>
+            {% empty %}
+            <li>Henüz sözcük bulunmuyor.</li>
+            {% endfor %}
+        </ul>
+    </main>
+</body>
+</html>

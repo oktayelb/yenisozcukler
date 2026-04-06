@@ -58,3 +58,37 @@ export function updateCount(field) {
     const count = field.value.length;
     document.getElementById('charCount').innerText = `${count} / 300`;
 }
+
+const DEFAULT_TITLE = 'Yeni Sözcükler - Türkçeye Yeni Sözcükler Türet';
+const DEFAULT_DESCRIPTION = 'Yeni Türkçe sözcükler türetin, paylaşın ve oylayın. Türk dilinin gelişmesine katkıda bulunun.';
+const BASE_URL = 'https://yenisozcukler.com';
+
+export function updatePageMeta(title, description) {
+    const finalTitle = title || DEFAULT_TITLE;
+    const finalDesc = description || DEFAULT_DESCRIPTION;
+    const currentUrl = BASE_URL + window.location.pathname;
+
+    // Update Title
+    document.title = finalTitle;
+    
+    // Update Meta Tags
+    const updateMetaTag = (selector, attr, content) => {
+        let tag = document.querySelector(selector);
+        if (tag) {
+            tag.setAttribute(attr, content);
+        }
+    };
+
+    updateMetaTag('meta[name="description"]', 'content', finalDesc);
+    
+    // Update Open Graph and Twitter tags to prevent duplicate content issues in SPA
+    updateMetaTag('meta[property="og:title"]', 'content', finalTitle);
+    updateMetaTag('meta[property="og:description"]', 'content', finalDesc);
+    updateMetaTag('meta[property="og:url"]', 'content', currentUrl);
+    
+    updateMetaTag('meta[name="twitter:title"]', 'content', finalTitle);
+    updateMetaTag('meta[name="twitter:description"]', 'content', finalDesc);
+
+    // Update Canonical URL
+    updateMetaTag('link[rel="canonical"]', 'href', currentUrl);
+}

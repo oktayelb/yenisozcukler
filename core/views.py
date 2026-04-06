@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication
 
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django_ratelimit.decorators import ratelimit
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
@@ -43,6 +43,60 @@ def universal_rate_key(group, request):
     if hasattr(request, 'user') and request.user.is_authenticated:
         return f"user_{request.user.id}"
     return f"ip_{get_client_ip(request)}"
+
+# --- BOT DETECTION ---
+
+BOT_SPECIFIC = [
+    'googlebot', 'bingbot', 'yandexbot', 'duckduckbot', 'baiduspider',
+    'slurp', 'facebookexternalhit', 'linkedinbot',
+    'whatsapp', 'telegrambot', 'discordbot', 'applebot',
+]
+BOT_GENERIC = ['bot', 'crawler', 'spider', 'fetch', 'scraper', 'preview']
+
+def _is_bot(ua):
+    ua = (ua or '').lower()
+    return any(p in ua for p in BOT_SPECIFIC) or any(p in ua for p in BOT_GENERIC)
+
+# --- DYNAMIC RENDERING VIEWS ---
+
+def index_view(request):
+    """Serve SEO links to bots, SPA shell to browsers on home page."""
+    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+        words = Word.objects.filter(status='approved').order_by('-timestamp')[:50]
+        response = render(request, 'bot_index.html', {'words': words})
+    else:
+        response = render(request, 'index.html')
+    
+    response['Vary'] = 'User-Agent'
+    return response
+
+def category_view(request, slug):
+    """Serve SEO links to bots, SPA shell to browsers on category pages."""
+    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+        category = get_object_or_404(Category, slug=slug)
+        words = Word.objects.filter(status='approved', categories=category).order_by('-timestamp')[:50]
+        response = render(request, 'bot_category.html', {'category': category, 'words': words})
+    else:
+        response = render(request, 'index.html')
+        
+    response['Vary'] = 'User-Agent'
+    return response
+
+def word_detail(request, word_id):
+    """Serve SSR page to bots, SPA shell to browsers."""
+    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+        word = get_object_or_404(
+            Word.objects.select_related('user').prefetch_related('categories'),
+            id=word_id,
+            status='approved'
+        )
+        response = render(request, 'word_detail.html', {'word': word})
+    else:
+        response = render(request, 'index.html')
+
+    response['Vary'] = 'User-Agent'
+    return response
+
 
 # --- OKUMA (READ) ENDPOINTLERİ ---
 
@@ -191,6 +245,33 @@ def get_comments(request, word_id):
         'has_next': comments_page.has_next() if hasattr(comments_page, 'has_next') else False
     })
 
+
+@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@api_view(['GET'])
+@permission_classes([])
+def get_word(request, word_id):
+    """Single word API endpoint for SPA routing."""
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    word = get_object_or_404(
+        Word.objects.filter(status='approved')
+            .annotate(comment_count=Count('comments'))
+            .select_related('user')
+            .prefetch_related('categories'),
+        id=word_id
+    )
+
+    user_votes = {}
+    if request.user.is_authenticated:
+        vote = WordVote.objects.filter(user=request.user, word=word).values('value').first()
+        if vote:
+            user_votes[word.id] = vote['value']
+
+    serializer = WordSerializer(word, context={'user_votes': user_votes})
+    return Response({'success': True, 'word': serializer.data})
+
+
 # --- YAZMA (WRITE) ENDPOINTLERİ ---
 
 @ratelimit(key='ip', rate='100/m', method='POST', block=False)
@@ -258,7 +339,6 @@ def vote(request, entity_type, entity_id):
     obj.save()
     obj.refresh_from_db()
 
-    # Create notification on first vote for this entity (skip self-votes)
     if response_action != 'none':
         owner = obj.user if hasattr(obj, 'user') else None
         if owner and owner != user:
@@ -298,7 +378,6 @@ def add_word(request):
         
         if request.user.is_authenticated:
             save_kwargs['user'] = request.user
-            # Author field stays empty for authenticated users, handled dynamically by display_author
         else:
             save_kwargs['author'] = 'Anonim'
         
@@ -361,7 +440,6 @@ def add_comment(request):
             score=0
         )
 
-        # Notify word owner about new comment (skip self-comments)
         if word.user and word.user != request.user:
             Notification.objects.create(
                 recipient=word.user,
@@ -391,7 +469,6 @@ def login_view(request):
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
 
-        # Case-insensitive username lookup before authenticating
         try:
             db_user = User.objects.get(username__iexact=username)
             user = authenticate(request, username=db_user.username, password=password)
@@ -528,8 +605,6 @@ def change_username(request):
             with transaction.atomic():
                 user.username = new_username
                 user.save()
-
-                # Removed Word and Comment bulk update - database is no longer denormalized!
                 
                 return Response({'success': True, 'message': 'Kullanıcı adı başarıyla değiştirildi.'})
                 
@@ -588,7 +663,6 @@ def get_my_words(request):
         'words': serializer.data,
         'total_count': paginator.count
     })
-
 
 # --- BİLDİRİM (NOTIFICATION) ENDPOINTLERİ ---
 
