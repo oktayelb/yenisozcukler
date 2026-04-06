@@ -11,9 +11,10 @@ export function openProfileModal(targetUsername = null) {
     state.currentProfileUser = targetUsername;
     openModal('profileModal');
 
-    const editBtn = document.querySelector('.edit-profile-btn');
     const isOwnProfile = (targetUsername === state.currentUserUsername);
-    if (editBtn) editBtn.style.display = isOwnProfile ? 'flex' : 'none';
+    document.querySelectorAll('.edit-profile-btn').forEach(el => {
+        el.style.display = isOwnProfile ? 'flex' : 'none';
+    });
 
     document.getElementById('profileUsername').innerText = targetUsername;
     fetchProfileData(targetUsername);
