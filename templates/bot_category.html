@@ -5,7 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ category.name }} Sözcükleri - Yeni Sözcükler</title>
     <meta name="description" content="{% if category.description %}{{ category.description }}{% else %}{{ category.name }} kategorisindeki yeni Türkçe sözcükler.{% endif %}">
+
+    <meta property="og:title" content="{{ category.name }} Sözcükleri - Yeni Sözcükler">
+    <meta property="og:description" content="{% if category.description %}{{ category.description }}{% else %}{{ category.name }} kategorisindeki yeni Türkçe sözcükler.{% endif %}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://yenisozcukler.com/kategori/{{ category.slug }}/">
+    <meta property="og:site_name" content="Yeni Sözcükler">
+
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ category.name }} Sözcükleri - Yeni Sözcükler">
+    <meta name="twitter:description" content="{% if category.description %}{{ category.description }}{% else %}{{ category.name }} kategorisindeki yeni Türkçe sözcükler.{% endif %}">
+
     <link rel="canonical" href="https://yenisozcukler.com/kategori/{{ category.slug }}/">
+    <meta name="robots" content="index, follow">
 </head>
 <body>
     <header>

@@ -1,15 +1,9 @@
-import os
-from django.urls import path
-from django.views.static import serve
-from django.conf import settings
+from django.urls import path, re_path
 from . import views
 
 urlpatterns = [
     # robots.txt
-    path('robots.txt', serve, {
-        'path': 'robots.txt',
-        'document_root': os.path.join(settings.BASE_DIR, 'static'),
-    }, name='robots_txt'),
+    path('robots.txt', views.robots_txt, name='robots_txt'),
 
     # Ana Sayfa (Bot-aware)
     path('', views.index_view, name='index'),
@@ -45,4 +39,7 @@ urlpatterns = [
 
     # SPA catch-all (Bot-aware)
     path('kategori/<slug:slug>/', views.category_view, name='spa_category'),
+
+    # Catch-all: serve SPA shell for any unmatched path (must be last)
+    re_path(r'^(?!api/).*$', views.spa_catchall, name='spa_catchall'),
 ]

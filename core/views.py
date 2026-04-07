@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication
 
 from django.shortcuts import get_object_or_404, render
+from django.http import HttpResponse, HttpResponseNotFound
 from django_ratelimit.decorators import ratelimit
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
@@ -44,6 +45,18 @@ def universal_rate_key(group, request):
         return f"user_{request.user.id}"
     return f"ip_{get_client_ip(request)}"
 
+# --- ROBOTS.TXT ---
+
+_ROBOTS_TXT = (
+    "User-agent: *\n"
+    "Allow: /\n"
+    "Disallow: /api/\n"
+    "Disallow: /admin/\n"
+)
+
+def robots_txt(request):
+    return HttpResponse(_ROBOTS_TXT, content_type='text/plain')
+
 # --- BOT DETECTION ---
 
 BOT_SPECIFIC = [
@@ -51,7 +64,7 @@ BOT_SPECIFIC = [
     'slurp', 'facebookexternalhit', 'linkedinbot',
     'whatsapp', 'telegrambot', 'discordbot', 'applebot',
 ]
-BOT_GENERIC = ['bot', 'crawler', 'spider', 'fetch', 'scraper', 'preview']
+BOT_GENERIC = ['bot', 'crawler', 'spider', 'scraper', 'preview']
 
 def _is_bot(ua):
     ua = (ua or '').lower()
@@ -96,6 +109,12 @@ def word_detail(request, word_id):
 
     response['Vary'] = 'User-Agent'
     return response
+
+def spa_catchall(request, *args, **kwargs):
+    """Serve SPA shell for unmatched routes. Bots get 404."""
+    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+        return HttpResponseNotFound()
+    return render(request, 'index.html')
 
 
 # --- OKUMA (READ) ENDPOINTLERİ ---

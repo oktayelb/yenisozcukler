@@ -68,6 +68,36 @@ function dispatch() {
     }
 }
 
+// ── Helpers ─────────────────────────────────────────────────────
+
+/** Apply category filter banner and page meta without re-fetching. */
+function applyCategoryUI(slug) {
+    const cat = state.allCategories.find(c => c.slug === slug);
+    const name = cat ? cat.name : slug;
+    const description = cat ? cat.description : '';
+
+    const banner = document.getElementById('activeFilterBanner');
+    const nameDisplay = document.getElementById('filterNameDisplay');
+    const descDisplay = document.getElementById('filterDescDisplay');
+    if (banner) {
+        banner.style.display = 'flex';
+        if (nameDisplay) nameDisplay.innerText = name;
+        if (descDisplay) {
+            if (description) {
+                descDisplay.innerText = description;
+                descDisplay.style.display = 'block';
+            } else {
+                descDisplay.style.display = 'none';
+            }
+        }
+    }
+
+    updatePageMeta(
+        `${name} - Yeni Sözcükler`,
+        description || `${name} kategorisindeki yeni Türkçe sözcükler.`
+    );
+}
+
 // ── Route handlers ──────────────────────────────────────────────
 
 function handleHomeRoute() {
@@ -179,14 +209,16 @@ export function initRouter() {
 
     const route = matchRoute(location.pathname);
 
-    // For category routes, set the filter SYNCHRONOUSLY before returning.
-    // This way the fetchWords() call in app.js already uses the correct
-    // category filter, avoiding a wasted unfiltered fetch.
     if (route.name === 'category') {
+        // Set the filter SYNCHRONOUSLY so the fetchWords() call in app.js
+        // already uses the correct category filter.
         state.activeCategorySlug = route.slug;
-    }
 
-    if (route.name !== 'home') {
+        // Apply banner and meta once categories are loaded (need names).
+        // Use a short delay so fetchCategories() in app.js has time to
+        // populate state.allCategories before we read from it.
+        setTimeout(() => applyCategoryUI(route.slug), 350);
+    } else if (route.name !== 'home') {
         // Non-home route on initial load — dispatch after a short
         // delay so the DOM, categories, and initial feed are ready
         setTimeout(() => dispatch(), 350);
