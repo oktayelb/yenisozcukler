@@ -168,7 +168,6 @@ def add_challenge_suggestion(request):
         suggested_word = serializer.validated_data['suggested_word']
         etymology = serializer.validated_data.get('etymology', '')
         example_sentence = serializer.validated_data.get('example_sentence', '')
-        explanation = serializer.validated_data.get('explanation', '')
 
         with transaction.atomic():
             existing_word = ChallengeComment.objects.select_for_update().filter(
@@ -190,7 +189,6 @@ def add_challenge_suggestion(request):
                 suggested_word=suggested_word,
                 etymology=etymology,
                 example_sentence=example_sentence,
-                explanation=explanation,
                 score=0
             )
 

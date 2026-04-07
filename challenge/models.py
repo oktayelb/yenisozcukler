@@ -115,7 +115,6 @@ class ChallengeComment(models.Model):
     suggested_word = models.CharField(max_length=30, blank=False)
     etymology = models.CharField(max_length=200, blank=True, default='')
     example_sentence = models.CharField(max_length=200, blank=True, default='')
-    explanation = models.CharField(max_length=300, blank=True, default='')
     timestamp = models.DateTimeField(auto_now_add=True)
     score = models.IntegerField(default=0)
 
