@@ -33,7 +33,14 @@ class TranslationChallengeSerializer(serializers.ModelSerializer):
     def get_winner(self, obj):
         if not obj.is_closed:
             return None
-        top = obj.comments.order_by('-score', 'timestamp').first()
+            
+        # P1 FIX: Utilize the prefetched comments list if available to avoid N+1 queries.
+        if hasattr(obj, 'prefetched_ordered_comments'):
+            ordered_comments = obj.prefetched_ordered_comments
+            top = ordered_comments[0] if ordered_comments else None
+        else:
+            top = obj.comments.order_by('-score', 'timestamp').first()
+
         if top and top.score > 0:
             return {
                 'suggested_word': top.suggested_word,
@@ -114,4 +121,3 @@ class ChallengeSuggestionCreateSerializer(serializers.Serializer):
 
     def validate_example_sentence(self, value):
         return self._validate_text_field(value, "Örnek cümlede")
-

@@ -1,5 +1,5 @@
 from pathlib import Path
-from decouple import config, Csv  # <--- IMPORT ADDED
+from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -15,25 +15,22 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 # Reads ALLOWED_HOSTS from .env, converts comma-separated string to list
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
 
-
-# --- CLOUDFLARE VE GÜVENLİK AYARLARI (EKLENDİ) ---
+# --- CLOUDFLARE VE GÜVENLİK AYARLARI ---
 
 # Django 4.0+ için zorunlu: Admin panelindeki 403 hatasını çözer.
-# Cloudflare üzerinden gelen https isteklerini güvenilir kabul eder.
 CSRF_TRUSTED_ORIGINS = [
     'https://yenisozcukler.com',
     'https://www.yenisozcukler.com',
 ]
 
-# Cloudflare ile SSL (HTTPS) iletişimini Django'ya bildirir.
-# Bu ayar olmadan Django, isteğin güvenli olduğunu anlamayıp işlemi reddedebilir.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # Session cookie hardening — applies in all environments
-SESSION_COOKIE_HTTPONLY = True   # JS can never read the session cookie
-SESSION_COOKIE_SAMESITE = 'Strict'  # Blocks cross-site request cookie sending
+SESSION_COOKIE_HTTPONLY = True   
+SESSION_COOKIE_SAMESITE = 'Strict'  
+
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -46,6 +43,7 @@ INSTALLED_APPS = [
     'core',
     'challenge',
 ]
+
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
@@ -58,12 +56,22 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'core.middleware.CloudflareSecurityMiddleware', # Senin özel middleware'in
+    'core.middleware.CloudflareSecurityMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Note for S2: Once you run `pip install django-csp`, uncomment the line below:
+    # 'csp.middleware.CSPMiddleware',
 ]
+
+# --- CSP CONFIGURATION (S2 Fix Preparation) ---
+# Requires django-csp. Adjust domains based on your specific external resources.
+# CSP_DEFAULT_SRC = ("'self'",)
+# CSP_SCRIPT_SRC = ("'self'", "https://challenges.cloudflare.com", "https://fonts.googleapis.com")
+# CSP_STYLE_SRC = ("'self'", "'unsafe-inline'", "https://fonts.googleapis.com")
+# CSP_FONT_SRC = ("'self'", "https://fonts.gstatic.com")
+# CSP_IMG_SRC = ("'self'", "data:")
 
 ROOT_URLCONF = 'config.urls'
 
@@ -92,7 +100,6 @@ DATABASES = {
     }
 }
 
-# Password validation
 AUTH_PASSWORD_VALIDATORS = [
     { 'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator', },
     { 'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', },
@@ -100,25 +107,25 @@ AUTH_PASSWORD_VALIDATORS = [
     { 'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator', },
 ]
 
-# Internationalization
-LANGUAGE_CODE = 'tr-tr' # Türkçe karakterler ve formatlar için tr-tr yapıldı
-TIME_ZONE = 'Europe/Istanbul' # Saat dilimi düzeltildi
+LANGUAGE_CODE = 'tr-tr' 
+TIME_ZONE = 'Europe/Istanbul' 
 USE_I18N = True
 USE_TZ = True
 
 # --- STATIC FILES (CSS, JavaScript, Images) AYARLARI ---
 
 STATIC_URL = '/static/'
-
-# 1. Geliştirme ortamında statik dosyaların nerede aranacağı:
-# Django, 'core/static' klasörüne bakması gerektiğini buradan anlayacak.
 STATICFILES_DIRS = [
     BASE_DIR  / "static",
 ]
-
-# 2. collectstatic komutu çalıştırıldığında tüm dosyaların toplanacağı yer:
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# --- S1 Fix: Replaced deprecated STATICFILES_STORAGE with STORAGES ---
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -127,12 +134,11 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
     ],
+    # --- S8 Fix: Changed empty array to IsAuthenticated default ---
     'DEFAULT_PERMISSION_CLASSES': [
-        # Public API olduğu için boş bırakıldı, view bazlı kontrol var.
+        'rest_framework.permissions.IsAuthenticated',
     ]
 }
-
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 LOGGING = {
     'version': 1,
@@ -158,24 +164,14 @@ LOGGING = {
     },
 }
 
-
-
 if DEBUG:
-    # Geliştirme (Localhost) ortamında HTTPS zorlamasını kapatıyoruz
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
-    # 1. HTTP -> HTTPS Yönlendirmesi
-    
 else:
-    # Bu ayarlar SADECE canlı ortamda (Production) çalışmalı
     SECURE_SSL_REDIRECT = True
-
-    # 2. Çerez Güvenliği
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-
-    # 3. HSTS (HTTP Strict Transport Security)
-    SECURE_HSTS_SECONDS = 31536000  # 1 Yıl
+    SECURE_HSTS_SECONDS = 31536000 
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True

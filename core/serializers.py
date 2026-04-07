@@ -229,7 +229,8 @@ class AuthSerializer(serializers.Serializer):
         }
         
         try:
-            response = requests.post(verify_url, data=data, timeout=5)
+            # P7 Fix: Reduced timeout from 5 to 2.0 seconds to prevent worker exhaustion
+            response = requests.post(verify_url, data=data, timeout=2.0)
             result = response.json()
             
             if not result.get('success'):

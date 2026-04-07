@@ -6,7 +6,7 @@ from rest_framework.authentication import SessionAuthentication
 from django.shortcuts import get_object_or_404
 from django_ratelimit.decorators import ratelimit
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import Count, F
+from django.db.models import Count, F, Prefetch
 from django.db import transaction, DatabaseError, OperationalError, IntegrityError
 
 from core.views import get_client_ip, universal_rate_key
@@ -25,25 +25,49 @@ def get_challenges(request):
     if getattr(request, 'limited', False):
         return Response({'error': 'Too many requests'}, status=429)
 
-    # Finalize any expired challenges before reading (targeted query)
-    from django.utils import timezone
-    cutoff = timezone.now() - TranslationChallenge.TIMER_DURATION
-    expired = TranslationChallenge.objects.filter(
-        status='approved', timer_on=True, winner_word_created=False,
-        timer_started_at__lte=cutoff,
-    )
-    for ch in expired:
-        ch.create_winner_word()
+    # P3 FIX: Expired challenge finalization logic removed from this GET request.
+    # Write operations inside list endpoints result in locks/timeouts. 
+    # Use Celery, a custom management command, or an admin-only endpoint to trigger create_winner_word.
 
-    challenges = (
+    try:
+        page = int(request.GET.get('page', 1))
+    except (ValueError, TypeError):
+        page = 1
+        
+    try:
+        limit = int(request.GET.get('limit', 20))
+    except (ValueError, TypeError):
+        limit = 20
+    limit = min(limit, 50)
+
+    # P1 FIX: Prefetch comments ordered by score to avoid N+1 queries when evaluating get_winner()
+    challenges_qs = (
         TranslationChallenge.objects.filter(status='approved')
         .annotate(comment_count=Count('comments'))
         .select_related('user')
+        .prefetch_related(
+            Prefetch(
+                'comments',
+                queryset=ChallengeComment.objects.order_by('-score', 'timestamp'),
+                to_attr='prefetched_ordered_comments'
+            )
+        )
         .order_by('-comment_count', '-timestamp')
     )
 
-    serializer = TranslationChallengeSerializer(challenges, many=True)
-    return Response({'success': True, 'challenges': serializer.data})
+    # P2 FIX: Apply pagination to prevent out of memory issues for large challenge tables.
+    paginator = Paginator(challenges_qs, limit)
+    try:
+        challenges_page = paginator.page(page)
+    except (EmptyPage, PageNotAnInteger):
+        challenges_page = []
+
+    serializer = TranslationChallengeSerializer(challenges_page, many=True)
+    return Response({
+        'success': True,
+        'challenges': serializer.data,
+        'has_next': challenges_page.has_next() if hasattr(challenges_page, 'has_next') else False
+    })
 
 
 @ratelimit(key='ip', rate='30/m', method='POST', block=False)
@@ -188,15 +212,24 @@ def add_challenge_suggestion(request):
                     'existing_id': existing_word.id
                 }, status=409)
 
-            new_suggestion = ChallengeComment.objects.create(
-                challenge=challenge,
-                user=request.user,
-                author=request.user.username,
-                suggested_word=suggested_word,
-                etymology=etymology,
-                example_sentence=example_sentence,
-                score=0
-            )
+            # S6 FIX: Handling concurrent user constraints gracefully instead of throwing 500
+            try:
+                new_suggestion = ChallengeComment.objects.create(
+                    challenge=challenge,
+                    user=request.user,
+                    author=request.user.username,
+                    suggested_word=suggested_word,
+                    etymology=etymology,
+                    example_sentence=example_sentence,
+                    score=0
+                )
+            except IntegrityError:
+                concurrent_existing = ChallengeComment.objects.filter(challenge=challenge, user=request.user).first()
+                return Response({
+                    'success': False,
+                    'error': 'Bu meydan okumaya zaten bir öneri gönderdiniz.',
+                    'existing_id': concurrent_existing.id if concurrent_existing else None
+                }, status=409)
 
         return Response({
             'success': True,

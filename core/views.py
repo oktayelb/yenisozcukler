@@ -74,10 +74,12 @@ def _is_bot(ua):
 
 # --- DYNAMIC RENDERING VIEWS ---
 
+@permission_classes([])
 def index_view(request):
     """Serve SEO links to bots, SPA shell to browsers on home page."""
     if _is_bot(request.META.get('HTTP_USER_AGENT')):
-        words = Word.objects.filter(status='approved').order_by('-timestamp')[:50]
+        # P6 Fix: Added select_related('user')
+        words = Word.objects.filter(status='approved').select_related('user').order_by('-timestamp')[:50]
         response = render(request, 'bot_index.html', {'words': words})
     else:
         response = render(request, 'index.html')
@@ -85,11 +87,13 @@ def index_view(request):
     response['Vary'] = 'User-Agent'
     return response
 
+@permission_classes([])
 def category_view(request, slug):
     """Serve SEO links to bots, SPA shell to browsers on category pages."""
     if _is_bot(request.META.get('HTTP_USER_AGENT')):
         category = get_object_or_404(Category, slug=slug)
-        words = Word.objects.filter(status='approved', categories=category).order_by('-timestamp')[:50]
+        # P6 Fix: Added select_related('user')
+        words = Word.objects.filter(status='approved', categories=category).select_related('user').order_by('-timestamp')[:50]
         response = render(request, 'bot_category.html', {'category': category, 'words': words})
     else:
         response = render(request, 'index.html')
@@ -97,6 +101,7 @@ def category_view(request, slug):
     response['Vary'] = 'User-Agent'
     return response
 
+@permission_classes([])
 def word_detail(request, word_id):
     """Serve SSR page to bots, SPA shell to browsers."""
     if _is_bot(request.META.get('HTTP_USER_AGENT')):
@@ -112,6 +117,7 @@ def word_detail(request, word_id):
     response['Vary'] = 'User-Agent'
     return response
 
+@permission_classes([])
 def spa_catchall(request, *args, **kwargs):
     """Serve SPA shell for unmatched routes. Bots get 404."""
     if _is_bot(request.META.get('HTTP_USER_AGENT')):
@@ -326,7 +332,8 @@ def vote(request, entity_type, entity_id):
     else:
         return Response({'error': 'Geçersiz tip.'}, status=404)
 
-    obj = get_object_or_404(ModelClass.objects.select_for_update(), id=entity_id)
+    # P4 Fix: Removed select_for_update() to prevent SQLite database-level write locks
+    obj = get_object_or_404(ModelClass, id=entity_id)
     
     if entity_type == 'word' and obj.status != 'approved':
         return Response({'error': 'Geçersiz içerik.'}, status=404)
@@ -388,9 +395,14 @@ def vote(request, entity_type, entity_id):
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([]) 
+@transaction.atomic
 def add_word(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
+    
+    captcha_token = request.data.get('cf_turnstile_response')
+    if not captcha_token:
+        return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
     
     serializer = WordCreateSerializer(data=request.data, context={'request': request})
     
@@ -403,7 +415,19 @@ def add_word(request):
         else:
             save_kwargs['author'] = 'Anonim'
         
-        serializer.save(**save_kwargs)
+        word = serializer.save(**save_kwargs)
+        
+        # Otomatik kendi içeriğine oy verme işlemi
+        if request.user.is_authenticated:
+            WordVote.objects.create(
+                word=word,
+                user=request.user,
+                value=1,
+                ip_address=client_ip
+            )
+            word.score = 1
+            word.save(update_fields=['score'])
+
         cache.delete('total_approved_words_count_all')
         
         return Response({'success': True})
@@ -445,6 +469,7 @@ def add_example(request):
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def add_comment(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
@@ -453,13 +478,22 @@ def add_comment(request):
     
     if serializer.is_valid():
         word = get_object_or_404(Word, id=serializer.validated_data['word_id'], status='approved')
+        client_ip = get_client_ip(request)
 
         new_comment = Comment.objects.create(
             word=word,
             user=request.user,
             author=request.user.username,
             comment=serializer.validated_data['comment'],
-            score=0
+            score=1 # Otomatik self-upvote için skoru 1'den başlatıyoruz
+        )
+
+        # Otomatik kendi yorumuna oy verme işlemi
+        CommentVote.objects.create(
+            comment=new_comment,
+            user=request.user,
+            value=1,
+            ip_address=client_ip
         )
 
         if word.user and word.user != request.user:
@@ -535,6 +569,8 @@ def register_view(request):
                 user = User.objects.create_user(username=username, password=password)
                 login(request, user)
                 return Response({'success': True, 'username': user.username, 'message': 'Kayıt başarılı.'}, status=201)
+        except IntegrityError:
+            return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
         except Exception as e:
             logger.error('register_view failed for username=%s: %s', username, e, exc_info=True)
             return Response({'success': False, 'error': 'Kayıt oluşturulamadı.'}, status=500)
@@ -669,9 +705,11 @@ def get_my_words(request):
     else:
         return Response({'success': False, 'error': 'Yetkisiz erişim.'}, status=401)
 
+    # P5 Fix: Added prefetch_related('categories') to prevent N+1 query problem
     words_qs = Word.objects.filter(user=user, status='approved')\
         .annotate(comment_count=Count('comments'))\
         .select_related('user')\
+        .prefetch_related('categories')\
         .order_by('-timestamp')
     
     paginator = Paginator(words_qs, limit)
@@ -754,8 +792,14 @@ def mark_notifications_read(request):
 
     ids = request.data.get('ids')
     qs = Notification.objects.filter(recipient=request.user, is_read=False)
-    if ids and isinstance(ids, list):
+    
+    if ids is not None:
+        if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+            return Response({'success': False, 'error': 'Geçersiz ID formatı.'}, status=400)
         qs = qs.filter(id__in=ids)
+    else:
+        return Response({'success': False, 'error': 'İşaretlenecek bildirim ID\'leri eksik.'}, status=400)
+        
     qs.update(is_read=True)
 
     return Response({'success': True})
