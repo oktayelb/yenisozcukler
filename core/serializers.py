@@ -194,7 +194,7 @@ class CommentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Yorum 200 karakteri geçemez.")
         if not value:
             raise serializers.ValidationError("Yorum boş olamaz.")
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\'"?!:\-+#]', value))
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\'"?!\-+#]', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Yorumda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
         return value

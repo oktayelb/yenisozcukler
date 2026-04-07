@@ -235,7 +235,8 @@ def get_comments(request, word_id):
         limit = 10
     limit = min(limit, 20)
 
-    comments_qs = Comment.objects.filter(word_id=word_id).select_related('user').order_by('timestamp')
+    word = get_object_or_404(Word, id=word_id, status='approved')
+    comments_qs = Comment.objects.filter(word=word).select_related('user').order_by('timestamp')
     paginator = Paginator(comments_qs, limit)
 
     try:
@@ -668,7 +669,10 @@ def get_my_words(request):
     else:
         return Response({'success': False, 'error': 'Yetkisiz erişim.'}, status=401)
 
-    words_qs = Word.objects.filter(user=user, status='approved').select_related('user').order_by('-timestamp')
+    words_qs = Word.objects.filter(user=user, status='approved')\
+        .annotate(comment_count=Count('comments'))\
+        .select_related('user')\
+        .order_by('-timestamp')
     
     paginator = Paginator(words_qs, limit)
     try:

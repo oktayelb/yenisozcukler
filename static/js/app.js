@@ -89,24 +89,11 @@ function setupAllEventListeners() {
     const inputWord = document.getElementById('inputWord');
     if (inputWord) {
         inputWord.addEventListener('input', function() { this.value = this.value.replace(/^\s+/g, ''); });
-        inputWord.addEventListener('keypress', (e) => {
-            if (typeof allowOnlyLetters === 'function' && !allowOnlyLetters(e, true)) e.preventDefault();
-        });
     }
 
     const inputDef = document.getElementById('inputDef');
     if (inputDef) {
         inputDef.addEventListener('input', function() { updateCount(this); });
-        inputDef.addEventListener('keypress', (e) => {
-            if (typeof allowOnlyLetters === 'function' && !allowOnlyLetters(e, true)) e.preventDefault();
-        });
-    }
-
-    const inputExample = document.getElementById('inputExample');
-    if (inputExample) {
-        inputExample.addEventListener('keypress', (e) => {
-            if (typeof allowOnlyLetters === 'function' && !allowOnlyLetters(e, true)) e.preventDefault();
-        });
     }
 
     // Filter, Feed and Search logic

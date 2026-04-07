@@ -27,7 +27,6 @@ def get_challenges(request):
 
     # Finalize any expired challenges before reading (targeted query)
     from django.utils import timezone
-    import datetime
     cutoff = timezone.now() - TranslationChallenge.TIMER_DURATION
     expired = TranslationChallenge.objects.filter(
         status='approved', timer_on=True, winner_word_created=False,
