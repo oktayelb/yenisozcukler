@@ -161,8 +161,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
         if len(value) > 200:
             raise serializers.ValidationError("Köken bilgisi 200 karakteri geçemez.")
             
-        # Slightly more relaxed regex for etymology to allow < > for language derivations
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\'<>]', value))
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Köken bilgisinde geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
         return value
@@ -195,6 +194,9 @@ class CommentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Yorum 200 karakteri geçemez.")
         if not value:
             raise serializers.ValidationError("Yorum boş olamaz.")
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\'"?!:\-+#]', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Yorumda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
         return value
     
 

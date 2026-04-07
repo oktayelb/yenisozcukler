@@ -11,6 +11,8 @@ from django.http import HttpResponse, HttpResponseNotFound
 from django_ratelimit.decorators import ratelimit
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
 from django.db.models import Count, F, Sum, Q
@@ -523,6 +525,11 @@ def register_view(request):
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
 
         try:
+            validate_password(password)
+        except DjangoValidationError as e:
+            return Response({'success': False, 'error': e.messages[0]}, status=400)
+
+        try:
             with transaction.atomic():
                 user = User.objects.create_user(username=username, password=password)
                 login(request, user)
@@ -599,6 +606,11 @@ def change_password(request):
         return Response({'success': False, 'error': 'Yeni şifre en az 6 karakter olmalı.'}, status=400)
     if len(new_password) > 60:
         return Response({'success': False, 'error': 'Yeni şifre en fazla 60  karakter olabilir.'}, status=400)
+
+    try:
+        validate_password(new_password, user=user)
+    except DjangoValidationError as e:
+        return Response({'success': False, 'error': e.messages[0]}, status=400)
 
     user.set_password(new_password)
     user.save()

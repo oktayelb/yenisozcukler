@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404
 from django_ratelimit.decorators import ratelimit
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Count, F
-from django.db import transaction, DatabaseError, OperationalError
+from django.db import transaction, DatabaseError, OperationalError, IntegrityError
 
 from core.views import get_client_ip, universal_rate_key
 from .models import TranslationChallenge, ChallengeComment, ChallengeCommentVote
@@ -25,16 +25,23 @@ def get_challenges(request):
     if getattr(request, 'limited', False):
         return Response({'error': 'Too many requests'}, status=429)
 
-    challenges = list(
+    # Finalize any expired challenges before reading (targeted query)
+    from django.utils import timezone
+    import datetime
+    cutoff = timezone.now() - TranslationChallenge.TIMER_DURATION
+    expired = TranslationChallenge.objects.filter(
+        status='approved', timer_on=True, winner_word_created=False,
+        timer_started_at__lte=cutoff,
+    )
+    for ch in expired:
+        ch.create_winner_word()
+
+    challenges = (
         TranslationChallenge.objects.filter(status='approved')
         .annotate(comment_count=Count('comments'))
         .select_related('user')
         .order_by('-comment_count', '-timestamp')
     )
-
-    for ch in challenges:
-        if ch.timer_on and not ch.winner_word_created and ch.is_closed:
-            ch.create_winner_word()
 
     serializer = TranslationChallengeSerializer(challenges, many=True)
     return Response({'success': True, 'challenges': serializer.data})
@@ -244,12 +251,15 @@ def vote_challenge_comment(request, comment_id):
             comment.score = F('score') + (vote_val * 2)
             response_action = 'liked' if vote_val == 1 else 'disliked'
     else:
-        ChallengeCommentVote.objects.create(
-            value=vote_val,
-            ip_address=client_ip,
-            user=user,
-            comment=comment
-        )
+        try:
+            ChallengeCommentVote.objects.create(
+                value=vote_val,
+                ip_address=client_ip,
+                user=user,
+                comment=comment
+            )
+        except IntegrityError:
+            return Response({'error': 'Oy zaten kaydedildi.'}, status=409)
         comment.score = F('score') + vote_val
         response_action = 'liked' if vote_val == 1 else 'disliked'
 

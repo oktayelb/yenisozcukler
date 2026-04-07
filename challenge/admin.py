@@ -126,7 +126,7 @@ class TranslationChallengeAdmin(admin.ModelAdmin):
 
 class ChallengeCommentAdmin(admin.ModelAdmin):
     list_display = ('author', 'challenge', 'suggested_word', 'score', 'timestamp')
-    search_fields = ('suggested_word', 'etymology', 'example_sentence', 'explanation', 'author')
+    search_fields = ('suggested_word', 'etymology', 'example_sentence', 'author')
     list_filter = ('timestamp',)
 
 class ChallengeCommentVoteAdmin(admin.ModelAdmin):
