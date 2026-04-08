@@ -406,7 +406,6 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xl);
     border: 1px solid var(--glass-border);
-    border-left: 4px solid var(--accent);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -526,7 +525,6 @@
     padding: 18px;
     border-radius: var(--radius);
     border: 1px solid var(--border-subtle);
-    border-left: 4px solid var(--accent);
     margin-bottom: var(--spacing-sm);
     font-size: 0.92rem;
     display: flex;
@@ -544,7 +542,6 @@
 .suggestion-card {
     background: var(--input-bg);
     border: 1px solid var(--border-subtle);
-    border-left: 4px solid var(--accent);
     border-radius: var(--radius);
     padding: var(--spacing-md) 18px;
     margin-bottom: var(--spacing-sm);

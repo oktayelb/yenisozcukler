@@ -23,7 +23,6 @@
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm), var(--shadow-glow);
     border: 1px solid var(--border-light);
-    border-left: 4px solid var(--accent);
     position: relative;
     margin-bottom: var(--spacing-lg);
     display: flex;
@@ -506,7 +505,6 @@
 .form-card.expanded {
     max-width: 100%;
     margin: 0;
-    border-top: 4px solid var(--accent);
     cursor: default;
     animation: cardExpand 0.3s var(--ease-spring);
     transform-origin: top center;
@@ -646,11 +644,37 @@
     display: grid;
     grid-template-columns: 1fr 2fr;
     column-gap: var(--spacing-md);
-    row-gap: var(--spacing-md);
+    row-gap: var(--spacing-sm);
     align-items: start;
 }
 .span-half { grid-column: span 1; }
 .span-full { grid-column: span 2; }
+
+/* Word + Etymology stacked in left column */
+.word-etymology-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+/* Categories (optional) + Example sentence side by side */
+.category-example-row {
+    display: flex;
+    gap: var(--spacing-md);
+    align-items: start;
+}
+.category-example-row #categorySelectionContainer {
+    flex: 0 0 44%;
+    min-width: 0;
+}
+.category-example-row .form-group:last-child {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.category-example-row .form-group:last-child textarea {
+    min-height: 62px;
+    resize: vertical;
+}
 
 /* ========================================
    INPUTS & CONTROLS
@@ -735,7 +759,7 @@ input:focus, textarea:focus {
 .category-help-text.active { opacity: 1; }
 
 .form-submit-wrapper {
-    margin-top: var(--spacing-lg);
+    margin-top: var(--spacing-sm);
     grid-column: span 2;
     display: flex;
     justify-content: space-between;
@@ -1065,7 +1089,6 @@ input:focus, textarea:focus {
 .challenge-box {
     background: var(--card-bg);
     border: 1px solid var(--border-light);
-    border-left: 4px solid var(--accent);
     border-radius: var(--radius);
     margin-bottom: var(--spacing-md);
     overflow: hidden;

@@ -11,6 +11,9 @@
     }
     .span-half, .span-full { width: 100%; grid-column: auto; }
     .form-group { width: 100%; }
+    .word-etymology-group { width: 100%; }
+    .category-example-row { flex-direction: column; }
+    .category-example-row #categorySelectionContainer { max-width: 100%; min-width: 0; }
     .form-card.collapsed {
         width: 80%;
         padding: 14px var(--spacing-md);
