@@ -455,6 +455,12 @@ async function submitChallengeSuggestion() {
     if (!suggestedWord) {
         return showCustomAlert("Önerilen sözcük boş olamaz.", "error");
     }
+    if (!etymology) {
+        return showCustomAlert("Köken bilgisi boş olamaz.", "error");
+    }
+    if (!exampleSentence) {
+        return showCustomAlert("Örnek cümle boş olamaz.", "error");
+    }
 
     btn.disabled = true;
     btn.innerText = "Gönderiliyor...";

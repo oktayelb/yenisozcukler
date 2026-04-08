@@ -96,8 +96,8 @@ class ChallengeCommentSerializer(serializers.ModelSerializer):
 class ChallengeSuggestionCreateSerializer(serializers.Serializer):
     challenge_id = serializers.IntegerField(required=True)
     suggested_word = serializers.CharField(max_length=30, required=True)
-    etymology = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')
-    example_sentence = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')
+    etymology = serializers.CharField(max_length=200, required=True)
+    example_sentence = serializers.CharField(max_length=200, required=True)
     def validate_suggested_word(self, value):
         value = value.strip()
         if not value:
@@ -108,9 +108,9 @@ class ChallengeSuggestionCreateSerializer(serializers.Serializer):
         return value
 
     def _validate_text_field(self, value, field_name):
-        if not value:
-            return ''
         value = value.strip()
+        if not value:
+            raise serializers.ValidationError(f"{field_name} boş olamaz.")
         invalid_chars = set(re.findall(TURKISH_SAFE_PATTERN, value))
         if invalid_chars:
             raise serializers.ValidationError(f"{field_name} geçersiz karakterler bulundu: {' '.join(invalid_chars)}")

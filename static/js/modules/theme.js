@@ -1,21 +1,27 @@
 /* --- THEME --- */
 import { THEME_KEY } from './state.js';
 
+const SUN_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+const MOON_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+
+function updateBtn(btn, isDark) {
+    btn.innerHTML = isDark ? SUN_ICON : MOON_ICON;
+    btn.title = isDark ? 'Aydınlık Mod' : 'Karanlık Mod';
+    btn.setAttribute('aria-label', isDark ? 'Aydınlık Mod' : 'Karanlık Mod');
+}
+
 export function setupTheme() {
     const saved = localStorage.getItem(THEME_KEY);
     const btn = document.getElementById('darkModeToggle');
     const sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-    if (saved === 'dark' || (!saved && sysDark)) {
-        document.body.classList.add('dark-mode');
-        btn.textContent = 'Aydınlık Mod';
-    } else {
-        btn.textContent = 'Karanlık Mod';
-    }
+    const startDark = saved === 'dark' || (!saved && sysDark);
+    if (startDark) document.body.classList.add('dark-mode');
+    updateBtn(btn, startDark);
 
     btn.addEventListener('click', () => {
         const isDark = document.body.classList.toggle('dark-mode');
         localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
-        btn.textContent = isDark ? 'Aydınlık Mod' : 'Karanlık Mod';
+        updateBtn(btn, isDark);
     });
 }

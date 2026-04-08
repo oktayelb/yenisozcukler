@@ -117,7 +117,7 @@ export function appendCards(words, container, isModalMode) {
         setTimeout(() => {
             c.classList.remove('fade-in');
             c.classList.add('show');
-        }, i * 40);
+        }, i * 60 + 30);
     });
 }
 
