@@ -47,8 +47,11 @@ export async function submitWord() {
     const n = isUserLoggedIn ? state.currentUserUsername : 'Anonim';
 
     const btn = document.querySelector(".form-card button[type='submit']");
+    const turnstileToken = document.querySelector('#contributionForm [name="cf-turnstile-response"]')?.value;
 
     if (!w || !d || !ex || !et) return showCustomAlert("Lütfen tüm alanları doldurun.", "error");
+
+    if (!turnstileToken) return showCustomAlert("Lütfen robot olmadığınızı doğrulayın.", "error");
 
     if (d.length > 300) return showCustomAlert("Tanım çok uzun.", "error");
     if (ex.length > 200) return showCustomAlert("Örnek cümle çok uzun.", "error");
@@ -62,7 +65,8 @@ export async function submitWord() {
             example: ex,
             etymology: et,
             nickname: n,
-            category_ids: Array.from(state.selectedFormCategories)
+            category_ids: Array.from(state.selectedFormCategories),
+            cf_turnstile_response: turnstileToken
         });
 
         await playSubmitEnvelopeAnimation(btn);
@@ -77,8 +81,12 @@ export async function submitWord() {
         document.querySelectorAll('.category-pill.selected').forEach(el => el.classList.remove('selected'));
 
         showCustomAlert("Sözcük gönderildi (Onay bekleniyor)!");
+        if (window.turnstile) window.turnstile.reset(document.getElementById('wordFormTurnstile'));
 
-    } catch (e) { showCustomAlert(e.message, "error"); }
+    } catch (e) {
+        showCustomAlert(e.message, "error");
+        if (window.turnstile) window.turnstile.reset(document.getElementById('wordFormTurnstile'));
+    }
     finally {
         btn.disabled = false;
         btn.innerText = "Sözcüğü ekle";

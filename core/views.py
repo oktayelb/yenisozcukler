@@ -1,6 +1,8 @@
 # core/views.py
 import logging
+import requests as http_requests
 
+from decouple import config
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -30,6 +32,17 @@ from .serializers import (
 logger = logging.getLogger(__name__)
 
 # --- YARDIMCI FONKSİYONLAR ---
+
+def verify_turnstile(token):
+    try:
+        result = http_requests.post(
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+            data={'secret': config('CLOUDFLARE_SECRET_KEY'), 'response': token},
+            timeout=2.0
+        ).json()
+        return result.get('success', False)
+    except http_requests.RequestException:
+        return False
 
 def get_client_ip(request):
     cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
@@ -401,7 +414,7 @@ def add_word(request):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
     
     captcha_token = request.data.get('cf_turnstile_response')
-    if not captcha_token:
+    if not captcha_token or not verify_turnstile(captcha_token):
         return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
     
     serializer = WordCreateSerializer(data=request.data, context={'request': request})
