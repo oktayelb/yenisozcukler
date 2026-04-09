@@ -1,18 +1,14 @@
+{% extends 'base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    {% include 'head.html' %}
-</head>
 
-<body data-user-auth="{{ request.user.is_authenticated|yesno:'true,false' }}" 
-      data-username="{{ request.user.username|default:'' }}">
+{% block body_attrs %} data-user-auth="{{ request.user.is_authenticated|yesno:'true,false' }}" data-username="{{ request.user.username|default:'' }}"{% endblock %}
 
+{% block content %}
     <div class="notification-container" id="notificationContainer"></div>
-    <div id="modalBackdrop" class="modal-backdrop"></div> 
+    <div id="modalBackdrop" class="modal-backdrop"></div>
 
     <div class="app-layout">
-        
+
         <div class="header-controls">
             <button class="header-btn" id="darkModeToggle">Karanlık Mod</button>
         </div>
@@ -31,15 +27,8 @@
             {% endif %}
             <button class="header-btn" id="headerAboutBtn">Bu site nedir?</button>
         </div>
-        
-        <header>
-            <div class="logo-wrapper">
-                <div class="logo-card">
-                    <h1 id="mainTitle">Yeni Sözcükler</h1>
-                    <span class="subtitle" id="subtitleText">"Yeni sözcüklerini paylaş"</span>
-                </div>
-            </div>
-        </header>
+
+        {% include 'partials/header.html' %}
 
         <div class="top-app-bar" id="topAppBar">
             <div class="top-app-inner">
@@ -76,7 +65,7 @@
         </div>
 
         <div class="container">
-            
+
             <div class="form-card collapsed" id="contributionCard">
                 <button type="button"
                         class="form-collapse-btn"
@@ -212,165 +201,14 @@
                 <button class="load-more-btn" id="loadMoreBtn">Daha Fazla Göster</button>
             </div>
         </div>
-    </div> 
-    
-    <div id="addExampleModal" class="auth-overlay">
-        <div class="auth-box" style="max-width: 500px;">
-            <button class="close-btn auth-close" id="addExampleCloseBtn">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-            
-            <div class="auth-header">
-                <h2>Örnek Cümle Ekle</h2>
-                <h3 id="exampleModalWord" style="color:var(--accent); margin: 5px 0 10px 0; font-size: 1.4rem;"></h3>
-                <p style="color:var(--text-muted); font-size:0.9rem;">
-                    Bu işlem sadece bir kez yapılabilir ve sonrasında düzenlenemez.
-                </p>
-            </div>
-            
-            <div class="auth-form" style="margin-top:15px;">
-                <div class="form-group">
-                    <textarea id="newExampleInput" class="custom-textarea" rows="3" maxlength="200" 
-                            placeholder="Örnek cümleni buraya yaz..." 
-                            style="width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid var(--border-light); background:var(--input-bg); color:var(--text-main);"></textarea>
-                    <div class="char-count" id="exampleCharCount" style="text-align:right; font-size:0.8rem; color:var(--text-muted); margin-top:5px;">0 / 200</div>
-                </div>
-                <button id="submitExampleBtn" class="auth-submit-btn">Kaydet</button>
-            </div>
-        </div>
     </div>
+{% endblock %}
 
-    {% include 'constant_modals.html' %}
+{% block modals %}
+    {% include 'partials/modals_auth.html' %}
+    {% include 'partials/modals_user.html' %}
+{% endblock %}
 
-    <div id="profileModal" class="auth-overlay">
-        <div class="auth-box profile-modal-box">
-            <button class="close-btn auth-close" id="profileCloseBtn">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-
-            <div class="profile-header-simple">
-                <h2 id="profileUsername" class="profile-username">Yükleniyor...</h2>
-                <p class="profile-date-text">Üyelik Tarihi: <strong id="profileDate">-</strong></p>
-            </div>
-
-            <div class="profile-stats-container">
-                <div class="profile-stat-item clickable-stat" id="myWordsStatBtn" title="Yayınlanan sözcüklerini gör">
-                    <span class="stat-value text-accent" id="statWords">0</span>
-                    <span class="stat-label">Sözcük</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="profile-stat-item">
-                    <span class="stat-value text-accent" id="statComments">0</span>
-                    <span class="stat-label">Yorum</span>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="profile-stat-item">
-                    <span class="stat-value text-success" id="statScore">0</span>
-                    <span class="stat-label">Puan</span>
-                </div>
-            </div>
-
-            <div class="profile-notif-section edit-profile-btn" style="display:none; width:100%; margin-bottom:15px;">
-                <button class="profile-action-btn btn-notif" id="openNotificationsBtn" style="position:relative;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-                    Bildirimler
-                    <span class="notif-badge-inline" id="profileNotifBadge" style="display:none;"></span>
-                </button>
-            </div>
-
-            <div class="profile-actions-wrapper edit-profile-btn" style="display:none; width: 100%;">
-                <button class="profile-action-btn btn-edit" id="editProfileBtn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                    Profili Düzenle
-                </button>
-                <button class="profile-action-btn btn-logout" id="logoutBtn" title="Çıkış Yap">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                    Çıkış Yap
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div id="myWordsModal" class="auth-overlay">
-        <div class="auth-box" style="max-width: 600px; width: 95%; max-height: 85vh; display: flex; flex-direction: column;">
-            <button class="close-btn auth-close" id="myWordsCloseBtn">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-
-            <div class="auth-header" style="margin-bottom:15px; flex-shrink: 0;">
-                <h2>Sözcüklerim</h2>
-                <p style="color:var(--text-muted);">Onaylanmış ve yayına alınmış sözcüklerin.</p>
-            </div>
-
-            <div id="myWordsFeed" class="custom-scrollbar" style="flex-grow: 1; overflow-y: auto;"></div>
-            
-            <button id="myWordsProfileBtn" style="width:100%; padding:10px; background:none; border:none; color:var(--text-muted); cursor:pointer; margin-top:10px; flex-shrink: 0;">
-                &larr; Profile Dön
-            </button>
-        </div>
-    </div>
-
-    <div id="notificationsModal" class="auth-overlay">
-        <div class="auth-box" style="max-width: 500px; width: 95%; max-height: 85vh; display: flex; flex-direction: column;">
-            <button class="close-btn auth-close" id="notifCloseBtn">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-
-            <div class="auth-header" style="margin-bottom:15px; flex-shrink: 0;">
-                <h2>Bildirimler</h2>
-            </div>
-
-            <div id="notifFeed" class="custom-scrollbar" style="flex-grow: 1; overflow-y: auto;"></div>
-
-            <button id="notifLoadMoreBtn" style="width:100%; padding:10px; background:none; border:1px solid var(--border-light); color:var(--text-muted); cursor:pointer; margin-top:10px; border-radius:8px; display:none;">
-                Daha Fazla
-            </button>
-
-            <button id="notifBackToProfileBtn" style="width:100%; padding:10px; background:none; border:none; color:var(--text-muted); cursor:pointer; margin-top:10px; flex-shrink: 0;">
-                &larr; Profile Dön
-            </button>
-        </div>
-    </div>
-
-    <div id="editProfileModal" class="auth-overlay">
-        <div class="auth-box" style="max-width: 400px;">
-            <button class="close-btn auth-close" id="editProfileCloseBtn">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-            <div class="auth-header">
-                <h2>Profili Düzenle</h2>
-                <p style="color:var(--text-muted);">Kullanıcı bilgilerini buradan güncelleyebilirsin.</p>
-            </div>
-            
-            <h4 style="margin:0 0 10px 0; color:var(--text-main); font-size:1rem;">Kullanıcı Adı</h4>
-            <div class="auth-form" style="margin-bottom: 25px;">
-                <div class="form-group" style="display:flex; gap:10px;">
-                    <input type="text" id="newUsernameInput" placeholder="Kullanıcı Adı" maxlength="30" style="text-transform:lowercase;" oninput="this.value=this.value.toLowerCase()">
-                    <button class="auth-submit-btn" id="saveUsernameBtn" style="width:auto; margin-top:0; padding:0 20px; white-space:nowrap;">Kaydet</button>
-                </div>
-            </div>
-            <hr style="border:0; border-top:1px dashed var(--input-border); margin-bottom:20px;">
-            
-            <h4 style="margin:0 0 10px 0; color:var(--text-main); font-size:1rem;">Şifre Değiştir</h4>
-            <div class="auth-form">
-                <div class="form-group">
-                    <input type="password" id="currentPassword" maxlength="60" placeholder="Mevcut Şifre">
-                </div>
-                <div class="form-group">
-                    <input type="password" id="newPassword" maxlength="60" placeholder="Yeni Şifre (En az 6 karakter)">
-                </div>
-                <div class="form-group">
-                    <input type="password" id="newPasswordConfirm" maxlength="60" placeholder="Yeni Şifre (Tekrar)">
-                </div>
-                <button class="auth-submit-btn" id="savePasswordBtn">Şifreyi Güncelle</button>
-            </div>
-
-            <button id="backToProfileBtn" style="background:none; border:none; color:var(--text-muted); width:100%; margin-top:15px; cursor:pointer; font-size:0.9rem;">
-                &larr; Profile Geri Dön
-            </button>
-        </div>
-    </div>
-
+{% block scripts %}
     <script type="module" src="{% static 'js/app.js' %}"></script>
-</body>
-</html>
+{% endblock %}

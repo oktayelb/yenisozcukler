@@ -1,25 +1,26 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yeni Sözcükler - Türkçeye Yeni Sözcükler Türet</title>
-    <meta name="description" content="Yeni Türkçe sözcükler türetin, paylaşın ve oylayın. Türk dilinin gelişmesine katkıda bulunun.">
+{% extends 'base.html' %}
 
-    <meta property="og:title" content="Yeni Sözcükler - Türkçeye Yeni Sözcükler Türet">
-    <meta property="og:description" content="Yeni Türkçe sözcükler türetin, paylaşın ve oylayın. Türk dilinin gelişmesine katkıda bulunun.">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://yenisozcukler.com/">
-    <meta property="og:site_name" content="Yeni Sözcükler">
+{% block head %}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yeni Sözcükler - Türkçeye Yeni Sözcükler Türet</title>
+<meta name="description" content="Yeni Türkçe sözcükler türetin, paylaşın ve oylayın. Türk dilinin gelişmesine katkıda bulunun.">
 
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Yeni Sözcükler - Türkçeye Yeni Sözcükler Türet">
-    <meta name="twitter:description" content="Yeni Türkçe sözcükler türetin, paylaşın ve oylayın. Türk dilinin gelişmesine katkıda bulunun.">
+<meta property="og:title" content="Yeni Sözcükler - Türkçeye Yeni Sözcükler Türet">
+<meta property="og:description" content="Yeni Türkçe sözcükler türetin, paylaşın ve oylayın. Türk dilinin gelişmesine katkıda bulunun.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://yenisozcukler.com/">
+<meta property="og:site_name" content="Yeni Sözcükler">
 
-    <link rel="canonical" href="https://yenisozcukler.com/">
-    <meta name="robots" content="index, follow">
-</head>
-<body>
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Yeni Sözcükler - Türkçeye Yeni Sözcükler Türet">
+<meta name="twitter:description" content="Yeni Türkçe sözcükler türetin, paylaşın ve oylayın. Türk dilinin gelişmesine katkıda bulunun.">
+
+<link rel="canonical" href="https://yenisozcukler.com/">
+<meta name="robots" content="index, follow">
+{% endblock %}
+
+{% block content %}
     <header>
         <h1>Yeni Sözcükler</h1>
         <p>Türkçeye kazandırılan en yeni sözcükleri keşfedin, paylaşın ve oylayın.</p>
@@ -40,5 +41,4 @@
             {% endfor %}
         </ul>
     </main>
-</body>
-</html>
+{% endblock %}

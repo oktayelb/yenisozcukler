@@ -645,7 +645,7 @@
     grid-template-columns: 1fr 2fr;
     column-gap: var(--spacing-md);
     row-gap: var(--spacing-sm);
-    align-items: start;
+    align-items: stretch;
 }
 .span-half { grid-column: span 1; }
 .span-full { grid-column: span 2; }
@@ -657,11 +657,20 @@
     gap: var(--spacing-md);
 }
 
+.def-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+.def-wrapper textarea {
+    flex-grow: 1;
+}
+
 /* Categories (optional) + Example sentence side by side */
 .category-example-row {
     display: flex;
     gap: var(--spacing-md);
-    align-items: start;
+    align-items: stretch;
 }
 .category-example-row #categorySelectionContainer {
     flex: 0 0 44%;
@@ -670,10 +679,13 @@
 .category-example-row .form-group:last-child {
     flex: 1 1 0;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
 .category-example-row .form-group:last-child textarea {
     min-height: 62px;
     resize: vertical;
+    flex-grow: 1;
 }
 
 /* ========================================

@@ -1,51 +1,42 @@
+{% extends 'base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ word.word }} - Yeni Sözcükler</title>
-    <meta name="description" content="{{ word.definition }}{% if word.etymology %} (Köken: {{ word.etymology }}){% endif %}">
 
-    <meta property="og:title" content="{{ word.word }} - Yeni Sözcükler">
-    <meta property="og:description" content="{{ word.definition }}">
-    <meta property="og:type" content="article">
-    <meta property="og:url" content="https://yenisozcukler.com/sozcuk/{{ word.id }}/">
-    <meta property="og:site_name" content="Yeni Sözcükler">
+{% block head %}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ word.word }} - Yeni Sözcükler</title>
+<meta name="description" content="{{ word.definition }}{% if word.etymology %} (Köken: {{ word.etymology }}){% endif %}">
 
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="{{ word.word }} - Yeni Sözcükler">
-    <meta name="twitter:description" content="{{ word.definition }}">
+<meta property="og:title" content="{{ word.word }} - Yeni Sözcükler">
+<meta property="og:description" content="{{ word.definition }}">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://yenisozcukler.com/sozcuk/{{ word.id }}/">
+<meta property="og:site_name" content="Yeni Sözcükler">
 
-    <link rel="canonical" href="https://yenisozcukler.com/sozcuk/{{ word.id }}/">
-    <meta name="robots" content="index, follow">
-    <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ word.word }} - Yeni Sözcükler">
+<meta name="twitter:description" content="{{ word.definition }}">
 
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "DefinedTerm",
-        "name": "{{ word.word|escapejs }}",
-        "description": "{{ word.definition|escapejs }}"{% if word.etymology %},
-        "termCode": "{{ word.etymology|escapejs }}"{% endif %}
-    }
-    </script>
-</head>
+<link rel="canonical" href="https://yenisozcukler.com/sozcuk/{{ word.id }}/">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
 
-<body>
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "DefinedTerm",
+    "name": "{{ word.word|escapejs }}",
+    "description": "{{ word.definition|escapejs }}"{% if word.etymology %},
+    "termCode": "{{ word.etymology|escapejs }}"{% endif %}
+}
+</script>
+{% endblock %}
+
+{% block content %}
     <div class="app-layout">
-        <header>
-            <div class="logo-wrapper">
-                <div class="logo-card">
-                    <a href="/" style="text-decoration:none; color:inherit;">
-                        <h1>Yeni Sözcükler</h1>
-                    </a>
-                    <span class="subtitle">"Yeni sözcüklerini paylaş"</span>
-                </div>
-            </div>
-        </header>
+        {% include 'partials/header.html' with linked=True %}
 
         <div class="container">
             <div class="word-card show" style="max-width:640px; margin:20px auto;">
@@ -83,5 +74,4 @@
             </div>
         </div>
     </div>
-</body>
-</html>
+{% endblock %}
