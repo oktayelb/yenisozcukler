@@ -94,7 +94,7 @@ function createNotifItem(n) {
     const div = document.createElement('div');
     div.className = 'notif-item' + (n.is_read ? '' : ' notif-unread');
 
-    const isClickable = ['word_like', 'word_dislike', 'comment_like', 'comment_dislike', 'new_comment', 'challenge_like', 'challenge_dislike','challenge_win','word_rejected','challenge_rejected'].includes(n.notification_type) && n.word_id;
+    const isClickable = ['word_like', 'word_dislike', 'comment_like', 'comment_dislike', 'new_comment', 'challenge_like', 'challenge_dislike','challenge_win'].includes(n.notification_type) && n.word_id;
     if (isClickable) {
         div.style.cursor = 'pointer';
         div.addEventListener('click', () => {
