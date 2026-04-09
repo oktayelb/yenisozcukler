@@ -25,10 +25,6 @@ def get_challenges(request):
     if getattr(request, 'limited', False):
         return Response({'error': 'Too many requests'}, status=429)
 
-    # P3 FIX: Expired challenge finalization logic removed from this GET request.
-    # Write operations inside list endpoints result in locks/timeouts. 
-    # Use Celery, a custom management command, or an admin-only endpoint to trigger create_winner_word.
-
     try:
         page = int(request.GET.get('page', 1))
     except (ValueError, TypeError):
@@ -40,7 +36,6 @@ def get_challenges(request):
         limit = 20
     limit = min(limit, 50)
 
-    # P1 FIX: Prefetch comments ordered by score to avoid N+1 queries when evaluating get_winner()
     challenges_qs = (
         TranslationChallenge.objects.filter(status='approved')
         .annotate(comment_count=Count('comments'))
@@ -55,7 +50,6 @@ def get_challenges(request):
         .order_by('-comment_count', '-timestamp')
     )
 
-    # P2 FIX: Apply pagination to prevent out of memory issues for large challenge tables.
     paginator = Paginator(challenges_qs, limit)
     try:
         challenges_page = paginator.page(page)
@@ -182,7 +176,6 @@ def add_challenge_suggestion(request):
                 'error': 'Bu meydan okuma sona erdi, artık öneri eklenemez.'
             }, status=403)
 
-        # One suggestion per user per challenge
         existing_by_user = ChallengeComment.objects.filter(
             challenge=challenge,
             user=request.user
@@ -212,7 +205,6 @@ def add_challenge_suggestion(request):
                     'existing_id': existing_word.id
                 }, status=409)
 
-            # S6 FIX: Handling concurrent user constraints gracefully instead of throwing 500
             try:
                 new_suggestion = ChallengeComment.objects.create(
                     challenge=challenge,
@@ -297,6 +289,36 @@ def vote_challenge_comment(request, comment_id):
 
     comment.save()
     comment.refresh_from_db()
+
+    owner = comment.user if hasattr(comment, 'user') else None
+    if owner and owner != user:
+        from core.models import Notification
+        from django.core.cache import cache
+
+        like_type = 'challenge_like'
+        dislike_type = 'challenge_dislike'
+        current_type = like_type if vote_val == 1 else dislike_type
+        opposite_type = dislike_type if vote_val == 1 else like_type
+        
+        # Since Notification doesn't have a direct ChallengeComment FK, use `message`
+        msg_id = f"challenge_comment_{comment.id}"
+
+        if response_action == 'none':
+            deleted, _ = Notification.objects.filter(
+                recipient=owner, actor=user, notification_type=current_type, message=msg_id
+            ).delete()
+            if deleted:
+                cache.delete(f'notif_unread_{owner.id}')
+        else:
+            Notification.objects.filter(
+                recipient=owner, actor=user, notification_type=opposite_type, message=msg_id
+            ).delete()
+            
+            _, created = Notification.objects.get_or_create(
+                recipient=owner, actor=user, notification_type=current_type, message=msg_id
+            )
+            if created:
+                cache.delete(f'notif_unread_{owner.id}')
 
     return Response({
         'success': True,

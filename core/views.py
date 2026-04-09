@@ -89,9 +89,7 @@ def _is_bot(ua):
 
 @permission_classes([])
 def index_view(request):
-    """Serve SEO links to bots, SPA shell to browsers on home page."""
     if _is_bot(request.META.get('HTTP_USER_AGENT')):
-        # P6 Fix: Added select_related('user')
         words = Word.objects.filter(status='approved').select_related('user').order_by('-timestamp')[:50]
         response = render(request, 'bot_index.html', {'words': words})
     else:
@@ -102,10 +100,8 @@ def index_view(request):
 
 @permission_classes([])
 def category_view(request, slug):
-    """Serve SEO links to bots, SPA shell to browsers on category pages."""
     if _is_bot(request.META.get('HTTP_USER_AGENT')):
         category = get_object_or_404(Category, slug=slug)
-        # P6 Fix: Added select_related('user')
         words = Word.objects.filter(status='approved', categories=category).select_related('user').order_by('-timestamp')[:50]
         response = render(request, 'bot_category.html', {'category': category, 'words': words})
     else:
@@ -116,7 +112,6 @@ def category_view(request, slug):
 
 @permission_classes([])
 def word_detail(request, word_slug):
-    """Serve SSR page to bots, SPA shell to browsers."""
     if _is_bot(request.META.get('HTTP_USER_AGENT')):
         word = get_object_or_404(
             Word.objects.select_related('user').prefetch_related('categories'),
@@ -132,7 +127,6 @@ def word_detail(request, word_slug):
 
 @permission_classes([])
 def spa_catchall(request, *args, **kwargs):
-    """Serve SPA shell for unmatched routes. Bots get 404."""
     if _is_bot(request.META.get('HTTP_USER_AGENT')):
         return HttpResponseNotFound()
     return render(request, 'index.html')
@@ -291,7 +285,6 @@ def get_comments(request, word_id):
 @api_view(['GET'])
 @permission_classes([])
 def get_word(request, word_id):
-    """Single word API endpoint for SPA routing."""
     if getattr(request, 'limited', False):
         return Response({'error': 'Too many requests'}, status=429)
 
@@ -317,17 +310,20 @@ def get_word(request, word_id):
 @api_view(['GET'])
 @permission_classes([])
 def get_word_by_slug(request, word_slug):
-    """Single word API endpoint — lookup by slug for SPA routing."""
     if getattr(request, 'limited', False):
         return Response({'error': 'Too many requests'}, status=429)
 
-    word = get_object_or_404(
-        Word.objects.filter(status='approved')
-            .annotate(comment_count=Count('comments'))
-            .select_related('user')
-            .prefetch_related('categories'),
-        slug=word_slug
-    )
+    cache_key = f'word_slug_{word_slug}'
+    word = cache.get(cache_key)
+    if word is None:
+        word = get_object_or_404(
+            Word.objects.filter(status='approved')
+                .annotate(comment_count=Count('comments'))
+                .select_related('user')
+                .prefetch_related('categories'),
+            slug=word_slug
+        )
+        cache.set(cache_key, word, 60 * 60)
 
     user_votes = {}
     if request.user.is_authenticated:
@@ -371,7 +367,6 @@ def vote(request, entity_type, entity_id):
     else:
         return Response({'error': 'Geçersiz tip.'}, status=404)
 
-    # P4 Fix: Removed select_for_update() to prevent SQLite database-level write locks
     obj = get_object_or_404(ModelClass, id=entity_id)
     
     if entity_type == 'word' and obj.status != 'approved':
@@ -407,21 +402,39 @@ def vote(request, entity_type, entity_id):
     obj.save()
     obj.refresh_from_db()
 
-    if response_action != 'none':
-        owner = obj.user if hasattr(obj, 'user') else None
-        if owner and owner != user:
-            notif_type = 'word_vote' if entity_type == 'word' else 'comment_vote'
-            if not Notification.objects.filter(
-                recipient=owner, notification_type=notif_type,
+    owner = obj.user if hasattr(obj, 'user') else None
+    if owner and owner != user:
+        prefix = 'word' if entity_type == 'word' else 'comment'
+        like_type = f'{prefix}_like'
+        dislike_type = f'{prefix}_dislike'
+        current_type = like_type if vote_val == 1 else dislike_type
+        opposite_type = dislike_type if vote_val == 1 else like_type
+
+        if response_action == 'none':
+            deleted, _ = Notification.objects.filter(
+                recipient=owner, actor=user, notification_type=current_type,
                 **({'word': obj} if entity_type == 'word' else {'comment': obj}),
-            ).exists():
-                Notification.objects.create(
-                    recipient=owner,
-                    actor=user,
-                    notification_type=notif_type,
-                    word=obj if entity_type == 'word' else obj.word,
-                    comment=obj if entity_type == 'comment' else None,
+            ).delete()
+            if deleted:
+                cache.delete(f'notif_unread_{owner.id}')
+        else:
+            Notification.objects.filter(
+                recipient=owner, actor=user, notification_type=opposite_type,
+                **({'word': obj} if entity_type == 'word' else {'comment': obj}),
+            ).delete()
+            
+            if entity_type == 'word':
+                _, created = Notification.objects.get_or_create(
+                    recipient=owner, actor=user, notification_type=current_type, word=obj,
+                    defaults={'comment': None},
                 )
+            else:
+                _, created = Notification.objects.get_or_create(
+                    recipient=owner, actor=user, notification_type=current_type, comment=obj,
+                    defaults={'word': obj.word},
+                )
+            if created:
+                cache.delete(f'notif_unread_{owner.id}')
 
     return Response({
         'success': True,
@@ -433,7 +446,7 @@ def vote(request, entity_type, entity_id):
 @ratelimit(key=universal_rate_key, rate='5/m', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
-@permission_classes([]) 
+@permission_classes([])
 @transaction.atomic
 def add_word(request):
     if getattr(request, 'limited', False):
@@ -456,7 +469,6 @@ def add_word(request):
         
         word = serializer.save(**save_kwargs)
         
-        # Otomatik kendi içeriğine oy verme işlemi
         if request.user.is_authenticated:
             WordVote.objects.create(
                 word=word,
@@ -524,16 +536,17 @@ def add_comment(request):
             user=request.user,
             author=request.user.username,
             comment=serializer.validated_data['comment'],
-            score=1 # Otomatik self-upvote için skoru 1'den başlatıyoruz
+            score=0
         )
 
-        # Otomatik kendi yorumuna oy verme işlemi
         CommentVote.objects.create(
             comment=new_comment,
             user=request.user,
             value=1,
             ip_address=client_ip
         )
+        Comment.objects.filter(pk=new_comment.pk).update(score=F('score') + 1)
+        new_comment.score = 1
 
         if word.user and word.user != request.user:
             Notification.objects.create(
@@ -543,6 +556,7 @@ def add_comment(request):
                 word=word,
                 comment=new_comment,
             )
+            cache.delete(f'notif_unread_{word.user.id}')
 
         return Response({'success': True, 'comment': CommentSerializer(new_comment).data}, status=201)
     else:
@@ -559,6 +573,10 @@ def login_view(request):
     if getattr(request, 'limited', False):
          return Response({'success': False, 'error': 'Çok fazla giriş denemesi. Lütfen bekleyin.'}, status=429)
 
+    captcha_token = request.data.get('token')
+    if not captcha_token or not verify_turnstile(captcha_token):
+        return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
+
     serializer = AuthSerializer(data=request.data)
     if serializer.is_valid():
         username = serializer.validated_data['username']
@@ -566,11 +584,13 @@ def login_view(request):
 
         try:
             db_user = User.objects.get(username__iexact=username)
-            user = authenticate(request, username=db_user.username, password=password)
+            canonical_username = db_user.username
         except User.DoesNotExist:
-            user = None
+            canonical_username = username
         except User.MultipleObjectsReturned:
-            user = None
+            canonical_username = username
+
+        user = authenticate(request, username=canonical_username, password=password)
 
         if user is None:
             return Response({'success': False, 'error': 'Bu kullanıcı adı veya şifre hatalı.'}, status=400)
@@ -589,6 +609,10 @@ def login_view(request):
 def register_view(request):
     if getattr(request, 'limited', False):
          return Response({'success': False, 'error': 'Çok fazla kayıt denemesi. Lütfen daha sonra tekrar deneyin.'}, status=429)
+
+    captcha_token = request.data.get('token')
+    if not captcha_token or not verify_turnstile(captcha_token):
+        return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
 
     serializer = AuthSerializer(data=request.data)
     if serializer.is_valid():
@@ -744,7 +768,6 @@ def get_my_words(request):
     else:
         return Response({'success': False, 'error': 'Yetkisiz erişim.'}, status=401)
 
-    # P5 Fix: Added prefetch_related('categories') to prevent N+1 query problem
     words_qs = Word.objects.filter(user=user, status='approved')\
         .annotate(comment_count=Count('comments'))\
         .select_related('user')\
@@ -817,7 +840,11 @@ def get_unread_count(request):
     if getattr(request, 'limited', False):
         return Response({'error': 'Too many requests'}, status=429)
 
-    count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+    cache_key = f'notif_unread_{request.user.id}'
+    count = cache.get(cache_key)
+    if count is None:
+        count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+        cache.set(cache_key, count, 60)
     return Response({'success': True, 'unread_count': count})
 
 
@@ -840,5 +867,6 @@ def mark_notifications_read(request):
         return Response({'success': False, 'error': 'İşaretlenecek bildirim ID\'leri eksik.'}, status=400)
         
     qs.update(is_read=True)
+    cache.delete(f'notif_unread_{request.user.id}')
 
     return Response({'success': True})

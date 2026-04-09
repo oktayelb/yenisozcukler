@@ -19,12 +19,13 @@ def turkish_to_ascii(text):
 
 def generate_unique_slug(word_text, exclude_id=None):
     base = turkish_to_ascii(word_text)
-    slug = base
     qs = Word.objects.all()
     if exclude_id:
         qs = qs.exclude(id=exclude_id)
+    existing = set(qs.filter(slug__startswith=base).values_list('slug', flat=True))
+    slug = base
     counter = 2
-    while qs.filter(slug=slug).exists():
+    while slug in existing:
         slug = f'{base}{counter}'
         counter += 1
     return slug
@@ -119,7 +120,12 @@ class Comment(models.Model):
     comment = models.CharField(max_length=200, blank=False)
     timestamp = models.DateTimeField(auto_now_add=True)
     
-    score = models.IntegerField(default=0)
+    score = models.IntegerField(default=0, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['word', 'timestamp']),
+        ]
 
     @property
     def display_author(self):
@@ -180,8 +186,12 @@ class CommentVote(models.Model):
 
 class Notification(models.Model):
     TYPE_CHOICES = [
-        ('word_vote', 'Word Vote'),
-        ('comment_vote', 'Comment Vote'),
+        ('word_like', 'Word Like'),
+        ('word_dislike', 'Word Dislike'),
+        ('comment_like', 'Comment Like'),
+        ('comment_dislike', 'Comment Dislike'),
+        ('challenge_like', 'Challenge Like'),
+        ('challenge_dislike', 'Challenge Dislike'),
         ('new_comment', 'New Comment'),
         ('challenge_win', 'Challenge Win'),
         ('word_rejected', 'Word Rejected'),

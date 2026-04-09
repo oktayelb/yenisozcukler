@@ -111,13 +111,18 @@ export function loadMoreWords() {
 
 export function appendCards(words, container, isModalMode) {
     const frag = document.createDocumentFragment();
-    words.forEach(w => frag.appendChild(createCardElement(w, isModalMode)));
+    words.forEach((w, i) => {
+        const card = createCardElement(w, isModalMode);
+        card.style.animationDelay = `${i * 60 + 30}ms`;
+        frag.appendChild(card);
+    });
     container.appendChild(frag);
-    Array.from(container.children).slice(-words.length).forEach((c, i) => {
-        setTimeout(() => {
+    // Trigger show class on next frame so the animationDelay CSS takes effect
+    requestAnimationFrame(() => {
+        Array.from(container.children).slice(-words.length).forEach(c => {
             c.classList.remove('fade-in');
             c.classList.add('show');
-        }, i * 60 + 30);
+        });
     });
 }
 

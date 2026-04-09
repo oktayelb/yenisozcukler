@@ -125,7 +125,7 @@ class ChallengeComment(models.Model):
     etymology = models.CharField(max_length=200, blank=False)
     example_sentence = models.CharField(max_length=200, blank=False)
     timestamp = models.DateTimeField(auto_now_add=True)
-    score = models.IntegerField(default=0)
+    score = models.IntegerField(default=0, db_index=True)
 
     @property
     def display_author(self):
@@ -139,6 +139,9 @@ class ChallengeComment(models.Model):
     class Meta:
         db_table = 'core_challengecomment'
         unique_together = ('user', 'challenge')
+        indexes = [
+            models.Index(fields=['challenge', '-score', 'timestamp']),
+        ]
 
 
 class ChallengeCommentVote(models.Model):

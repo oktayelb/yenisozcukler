@@ -26,30 +26,15 @@ def validate_example_text(value):
 # --- OKUMA (READ) SERIALIZERS ---
 
 class NotificationSerializer(serializers.ModelSerializer):
-    actor_username = serializers.SerializerMethodField()
-    word_text = serializers.SerializerMethodField()
-    word_def = serializers.SerializerMethodField()
-    word_example = serializers.SerializerMethodField()
-    word_etymology = serializers.SerializerMethodField()
+    actor_username = serializers.CharField(source='actor.username', read_only=True, allow_null=True, default=None)
+    word_text = serializers.CharField(source='word.word', read_only=True, allow_null=True, default=None)
+    word_def = serializers.CharField(source='word.definition', read_only=True, allow_null=True, default=None)
+    word_example = serializers.CharField(source='word.example', read_only=True, allow_null=True, default=None)
+    word_etymology = serializers.CharField(source='word.etymology', read_only=True, allow_null=True, default=None)
 
     class Meta:
         model = Notification
         fields = ['id', 'notification_type', 'actor_username', 'word_text', 'word_def', 'word_example', 'word_etymology', 'message', 'is_read', 'timestamp', 'word_id', 'comment_id']
-
-    def get_actor_username(self, obj):
-        return obj.actor.username if obj.actor else None
-
-    def get_word_text(self, obj):
-        return obj.word.word if obj.word else None
-
-    def get_word_def(self, obj):
-        return obj.word.definition if obj.word else None
-
-    def get_word_example(self, obj):
-        return obj.word.example if obj.word else None
-
-    def get_word_etymology(self, obj):
-        return obj.word.etymology if obj.word else None
 
 
 class CategorySerializer(serializers.ModelSerializer):

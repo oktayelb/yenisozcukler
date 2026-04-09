@@ -10,6 +10,7 @@ let hasMoreNotifs = false;
 export function initNotifications() {
     if (!isUserLoggedIn) return;
     fetchUnreadCount();
+    setInterval(fetchUnreadCount, 30000); // poll every 30s
 }
 
 export async function fetchUnreadCount() {
@@ -57,10 +58,12 @@ async function loadNotifications(page) {
 
         if (d.notifications?.length > 0) {
             const unreadIds = [];
+            const frag = document.createDocumentFragment();
             d.notifications.forEach(n => {
-                feed.appendChild(createNotifItem(n));
+                frag.appendChild(createNotifItem(n));
                 if (!n.is_read) unreadIds.push(n.id);
             });
+            feed.appendChild(frag);
 
             // Mark visible notifications as read
             if (unreadIds.length > 0) {
@@ -91,7 +94,7 @@ function createNotifItem(n) {
     const div = document.createElement('div');
     div.className = 'notif-item' + (n.is_read ? '' : ' notif-unread');
 
-    const isClickable = ['word_vote', 'comment_vote', 'new_comment'].includes(n.notification_type) && n.word_id;
+    const isClickable = ['word_like', 'word_dislike', 'comment_like', 'comment_dislike', 'new_comment', 'challenge_like', 'challenge_dislike','challenge_win','word_rejected','challenge_rejected'].includes(n.notification_type) && n.word_id;
     if (isClickable) {
         div.style.cursor = 'pointer';
         div.addEventListener('click', () => {
@@ -119,9 +122,14 @@ function createNotifItem(n) {
 
 function getNotifIcon(type) {
     switch (type) {
-        case 'word_vote':
-        case 'comment_vote':
+        case 'word_like':
+        case 'comment_like':
+        case 'challenge_like':
             return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>';
+        case 'word_dislike':
+        case 'comment_dislike':
+        case 'challenge_dislike':
+            return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#e74c3c" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>';
         case 'new_comment':
             return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
         case 'challenge_win':
@@ -139,10 +147,18 @@ function buildNotifText(n) {
     const word = n.word_text ? `<strong>${escapeHTML(n.word_text)}</strong>` : '';
 
     switch (n.notification_type) {
-        case 'word_vote':
-            return `${actor} ${word} sözcüğünü beğendi.`;
-        case 'comment_vote':
-            return `${actor} ${word} sözcüğündeki yorumunuzu beğendi.`;
+        case 'word_like':
+            return `${actor} ${word} sözcüğünü hoş buldu.`;
+        case 'word_dislike':
+            return `${actor} ${word} sözcüğünüzü boş buldu.`;
+        case 'comment_like':
+            return `${actor} ${word} sözcüğündeki yorumunuzu hoş buldu.`;
+        case 'comment_dislike':
+            return `${actor} ${word} sözcüğündeki yorumunuzu boş buldu.`;
+        case 'challenge_like':
+            return `${actor} yarışma önerinizi hoş buldu.`;
+        case 'challenge_dislike':
+            return `${actor} yarışma önerinizi boş buldu.`;
         case 'new_comment':
             return `${actor} ${word} sözcüğünüze yorum yaptı.`;
         case 'challenge_win':
