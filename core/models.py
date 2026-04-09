@@ -1,5 +1,33 @@
 from django.db import models
 from django.contrib.auth.models import User
+import re
+
+
+TURKISH_CHAR_MAP = {
+    'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
+    'â': 'a', 'î': 'i', 'û': 'u',
+}
+
+
+def turkish_to_ascii(text):
+    text = text.lower()
+    for tr, en in TURKISH_CHAR_MAP.items():
+        text = text.replace(tr, en)
+    text = re.sub(r'[^a-z0-9]+', '-', text)
+    return text.strip('-')
+
+
+def generate_unique_slug(word_text, exclude_id=None):
+    base = turkish_to_ascii(word_text)
+    slug = base
+    qs = Word.objects.all()
+    if exclude_id:
+        qs = qs.exclude(id=exclude_id)
+    counter = 2
+    while qs.filter(slug=slug).exists():
+        slug = f'{base}{counter}'
+        counter += 1
+    return slug
 
 
 REJECTION_REASONS = [
@@ -48,6 +76,7 @@ class Word(models.Model):
     )
 
     word = models.CharField(max_length=50)
+    slug = models.SlugField(max_length=80, unique=True, null=True, db_index=True)
     definition = models.CharField(max_length=300)
     example = models.CharField(max_length=200, default="")
     etymology = models.CharField(max_length=200, default="")
@@ -60,6 +89,11 @@ class Word(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     score = models.IntegerField(default=0, db_index=True)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = generate_unique_slug(self.word, exclude_id=self.pk)
+        super().save(*args, **kwargs)
 
     @property
     def display_author(self):

@@ -35,7 +35,7 @@
             {% for word in words %}
             <li>
                 <article>
-                    <h3><a href="/sozcuk/{{ word.id }}/">{{ word.word }}</a></h3>
+                    <h3><a href="/sozcuk/{{ word.slug }}/">{{ word.word }}</a></h3>
                     <p>{{ word.definition|truncatechars:160 }}</p>
                 </article>
             </li>

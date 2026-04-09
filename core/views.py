@@ -115,12 +115,12 @@ def category_view(request, slug):
     return response
 
 @permission_classes([])
-def word_detail(request, word_id):
+def word_detail(request, word_slug):
     """Serve SSR page to bots, SPA shell to browsers."""
     if _is_bot(request.META.get('HTTP_USER_AGENT')):
         word = get_object_or_404(
             Word.objects.select_related('user').prefetch_related('categories'),
-            id=word_id,
+            slug=word_slug,
             status='approved'
         )
         response = render(request, 'word_detail.html', {'word': word})
@@ -301,6 +301,32 @@ def get_word(request, word_id):
             .select_related('user')
             .prefetch_related('categories'),
         id=word_id
+    )
+
+    user_votes = {}
+    if request.user.is_authenticated:
+        vote = WordVote.objects.filter(user=request.user, word=word).values('value').first()
+        if vote:
+            user_votes[word.id] = vote['value']
+
+    serializer = WordSerializer(word, context={'user_votes': user_votes})
+    return Response({'success': True, 'word': serializer.data})
+
+
+@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@api_view(['GET'])
+@permission_classes([])
+def get_word_by_slug(request, word_slug):
+    """Single word API endpoint — lookup by slug for SPA routing."""
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    word = get_object_or_404(
+        Word.objects.filter(status='approved')
+            .annotate(comment_count=Count('comments'))
+            .select_related('user')
+            .prefetch_related('categories'),
+        slug=word_slug
     )
 
     user_votes = {}

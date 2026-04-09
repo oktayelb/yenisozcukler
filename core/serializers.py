@@ -83,7 +83,7 @@ class WordSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Word
-        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'definition', 'example', 'etymology', 'comment_count', 'categories'] 
+        fields = ['id', 'word', 'slug', 'author', 'score', 'timestamp', 'user_vote', 'definition', 'example', 'etymology', 'comment_count', 'categories']
 
     def get_user_vote(self, obj):
         votes = self.context.get('user_votes', {})

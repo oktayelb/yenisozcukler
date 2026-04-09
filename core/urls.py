@@ -9,11 +9,12 @@ urlpatterns = [
     path('', views.index_view, name='index'),
 
     # SEO: Server-side rendered word detail (bots) / SPA shell (browsers)
-    path('sozcuk/<int:word_id>/', views.word_detail, name='word_detail'),
+    path('sozcuk/<slug:word_slug>/', views.word_detail, name='word_detail'),
 
     # GET API
     path('api/words', views.get_words, name='get_words'),
     path('api/word/<int:word_id>', views.get_word, name='get_word'),
+    path('api/word-by-slug/<slug:word_slug>', views.get_word_by_slug, name='get_word_by_slug'),
     path('api/comments/<int:word_id>', views.get_comments, name='get_comments'),
     path('api/categories', views.get_categories, name='get_categories'),
     path('api/my-words', views.get_my_words, name='get_my_words'),

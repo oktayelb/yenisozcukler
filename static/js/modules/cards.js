@@ -10,6 +10,7 @@ export function createCardElement(item, isModalMode) {
     const card = document.createElement('div');
     card.className = 'word-card fade-in';
     card.setAttribute('data-id', item.id);
+    card.setAttribute('data-slug', item.slug);
 
     card.addEventListener('click', (e) => {
         if (e.target.closest('.vote-btn') ||
@@ -23,7 +24,7 @@ export function createCardElement(item, isModalMode) {
         if (link) e.preventDefault();
 
         // Push clean URL to address bar (skip if already there)
-        const wordUrl = `/sozcuk/${item.id}/`;
+        const wordUrl = `/sozcuk/${item.slug}/`;
         if (location.pathname !== wordUrl) {
             history.pushState(null, '', wordUrl);
         }
@@ -38,7 +39,7 @@ export function createCardElement(item, isModalMode) {
     const contentDiv = document.createElement('div');
 
     const wordLink = document.createElement('a');
-    wordLink.href = `/sozcuk/${item.id}/`;
+    wordLink.href = `/sozcuk/${item.slug}/`;
     wordLink.style.cssText = 'text-decoration:none; color:inherit;';
     const wordTitle = document.createElement('h3');
     wordTitle.textContent = item.word;
@@ -114,7 +115,7 @@ export function createCardElement(item, isModalMode) {
 
     const hint = document.createElement('a');
     hint.className = 'click-hint';
-    hint.href = `/sozcuk/${item.id}/`;
+    hint.href = `/sozcuk/${item.slug}/`;
     hint.style.textDecoration = 'none';
     hint.style.color = 'inherit';
     const cCount = Number(item.comment_count) || 0;

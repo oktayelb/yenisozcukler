@@ -26,8 +26,8 @@ export let isRouterDispatching = false;
 
 function matchRoute(path) {
     let m;
-    m = path.match(/^\/sozcuk\/(\d+)\/?$/);
-    if (m) return { name: 'word', id: parseInt(m[1], 10) };
+    m = path.match(/^\/sozcuk\/([\w-]+)\/?$/);
+    if (m) return { name: 'word', slug: m[1] };
 
     m = path.match(/^\/kategori\/([\w-]+)\/?$/);
     if (m) return { name: 'category', slug: m[1] };
@@ -54,7 +54,7 @@ function dispatch() {
 
         switch (route.name) {
             case 'word':
-                handleWordRoute(route.id);
+                handleWordRoute(route.slug);
                 break;
             case 'category':
                 handleCategoryRoute(route.slug);
@@ -117,9 +117,23 @@ function handleHomeRoute() {
     }
 }
 
-async function handleWordRoute(wordId) {
-    // Already showing this word
-    if (state.activeCardClone && state.currentWordId === wordId) return;
+async function handleWordRoute(wordSlug) {
+    // Try clicking an existing card in the DOM (avoids an extra API call)
+    const card = document.querySelector(`.word-card[data-slug="${wordSlug}"]`);
+    if (card) {
+        // Already showing this word
+        if (state.activeCardClone && state.currentWordId === card.dataset.id * 1) return;
+        // Close existing overlay first
+        if (state.activeCardClone) {
+            closeCommentView();
+            await new Promise(r => setTimeout(r, 420));
+        }
+        card.click();
+        return;
+    }
+
+    // Already showing this slug (opened from a non-card path, e.g. notification)
+    if (state.activeCardClone && state.currentWordSlug === wordSlug) return;
 
     // Close existing overlay first
     if (state.activeCardClone) {
@@ -127,17 +141,11 @@ async function handleWordRoute(wordId) {
         await new Promise(r => setTimeout(r, 420));
     }
 
-    // Try clicking an existing card in the DOM (avoids an extra API call)
-    const card = document.querySelector(`.word-card[data-id="${wordId}"]`);
-    if (card) {
-        card.click();
-        return;
-    }
-
     // Card not in DOM — fetch word data from API and open overlay
     try {
-        const data = await apiRequest(`/api/word/${wordId}`);
+        const data = await apiRequest(`/api/word-by-slug/${wordSlug}`);
         const w = data.word;
+        state.currentWordSlug = wordSlug;
         updatePageMeta(
             `${w.word} - Yeni Sözcükler`,
             w.def || w.definition
