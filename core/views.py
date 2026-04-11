@@ -367,7 +367,7 @@ def vote(request, entity_type, entity_id):
     else:
         return Response({'error': 'Geçersiz tip.'}, status=404)
 
-    obj = get_object_or_404(ModelClass, id=entity_id)
+    obj = get_object_or_404(ModelClass.objects.select_for_update(), id=entity_id)
     
     if entity_type == 'word' and obj.status != 'approved':
         return Response({'error': 'Geçersiz içerik.'}, status=404)
@@ -382,7 +382,7 @@ def vote(request, entity_type, entity_id):
             response_action = 'none'
         else:
             existing_vote.value = vote_val
-            existing_vote.save()
+            existing_vote.save(update_fields=['value'])
             obj.score = F('score') + (vote_val * 2)
             response_action = 'liked' if vote_val == 1 else 'disliked'
     else:
@@ -399,7 +399,7 @@ def vote(request, entity_type, entity_id):
         obj.score = F('score') + vote_val
         response_action = 'liked' if vote_val == 1 else 'disliked'
 
-    obj.save()
+    obj.save(update_fields=['score'])
     obj.refresh_from_db()
 
     owner = obj.user if hasattr(obj, 'user') else None
@@ -410,30 +410,40 @@ def vote(request, entity_type, entity_id):
         current_type = like_type if vote_val == 1 else dislike_type
         opposite_type = dislike_type if vote_val == 1 else like_type
 
+        # This dictionary is critical to preventing the lookup_kwargs error.
+        lookup_kwargs = {'word': obj} if entity_type == 'word' else {'comment': obj}
+
         if response_action == 'none':
-            deleted, _ = Notification.objects.filter(
-                recipient=owner, actor=user, notification_type=current_type,
-                **({'word': obj} if entity_type == 'word' else {'comment': obj}),
-            ).delete()
-            if deleted:
+            # SOFT DELETE: Instead of .delete(), we deactivate it.
+            updated = Notification.objects.filter(
+                recipient=owner, actor=user, notification_type=current_type, **lookup_kwargs
+            ).update(is_active=False)
+            
+            if updated:
                 cache.delete(f'notif_unread_{owner.id}')
         else:
+            # Deactivate the opposite vote type (e.g. they switched from dislike to like)
             Notification.objects.filter(
-                recipient=owner, actor=user, notification_type=opposite_type,
-                **({'word': obj} if entity_type == 'word' else {'comment': obj}),
-            ).delete()
+                recipient=owner, actor=user, notification_type=opposite_type, **lookup_kwargs
+            ).update(is_active=False)
             
-            if entity_type == 'word':
-                _, created = Notification.objects.get_or_create(
-                    recipient=owner, actor=user, notification_type=current_type, word=obj,
-                    defaults={'comment': None},
-                )
-            else:
-                _, created = Notification.objects.get_or_create(
-                    recipient=owner, actor=user, notification_type=current_type, comment=obj,
-                    defaults={'word': obj.word},
-                )
-            if created:
+            # This defaults dictionary is also required for get_or_create
+            defaults = {'comment': None} if entity_type == 'word' else {'word': obj.word}
+            defaults['is_active'] = True
+            
+            # Fetch or create the notification. 
+            notif, created = Notification.objects.get_or_create(
+                recipient=owner, actor=user, notification_type=current_type, 
+                **lookup_kwargs, defaults=defaults
+            )
+            
+            # REVIVE: If it existed but was deactivated, turn it back on.
+            if not created and not notif.is_active:
+                notif.is_active = True
+                notif.is_read = False  # Mark unread so they see it again
+                notif.save(update_fields=['is_active', 'is_read'])
+                cache.delete(f'notif_unread_{owner.id}')
+            elif created:
                 cache.delete(f'notif_unread_{owner.id}')
 
     return Response({
@@ -491,6 +501,7 @@ def add_word(request):
 @api_view(['PATCH'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def add_example(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
@@ -500,7 +511,7 @@ def add_example(request):
     if serializer.is_valid():
         word_id = serializer.validated_data['word_id']
         new_example = serializer.validated_data['example']
-        word = get_object_or_404(Word, id=word_id)
+        word = get_object_or_404(Word.objects.select_for_update(), id=word_id)
 
         if word.user != request.user:
             return Response({'success': False, 'error': 'Bu kelimeyi düzenleme yetkiniz yok.'}, status=403)
@@ -509,7 +520,7 @@ def add_example(request):
             return Response({'success': False, 'error': 'Bu kelimenin zaten bir örnek cümlesi var.'}, status=400)
 
         word.example = new_example
-        word.save()
+        word.save(update_fields=['example'])
         return Response({'success': True, 'message': 'Örnek cümle başarıyla eklendi.'})
 
     first_error = next(iter(serializer.errors.values()))[0]
@@ -577,30 +588,28 @@ def login_view(request):
     if not captcha_token or not verify_turnstile(captcha_token):
         return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
 
-    serializer = AuthSerializer(data=request.data)
-    if serializer.is_valid():
-        username = serializer.validated_data['username']
-        password = serializer.validated_data['password']
+    username = request.data.get('username', '').strip()
+    password = request.data.get('password', '')
 
-        try:
-            db_user = User.objects.get(username__iexact=username)
-            canonical_username = db_user.username
-        except User.DoesNotExist:
-            canonical_username = username
-        except User.MultipleObjectsReturned:
-            canonical_username = username
+    if not username or not password:
+        return Response({'success': False, 'error': 'Geçersiz veri.'}, status=400)
 
-        user = authenticate(request, username=canonical_username, password=password)
+    try:
+        db_user = User.objects.get(username__iexact=username)
+        canonical_username = db_user.username
+    except User.DoesNotExist:
+        canonical_username = username
+    except User.MultipleObjectsReturned:
+        canonical_username = username
 
-        if user is None:
-            return Response({'success': False, 'error': 'Bu kullanıcı adı veya şifre hatalı.'}, status=400)
-        
-        login(request, user)    
+    user = authenticate(request, username=canonical_username, password=password)
 
-        return Response({'success': True, 'username': user.username, 'message': 'Giriş başarılı.'})
+    if user is None:
+        return Response({'success': False, 'error': 'Bu kullanıcı adı veya şifre hatalı.'}, status=400)
     
-    first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
-    return Response({'success': False, 'error': first_error}, status=400)
+    login(request, user)    
+
+    return Response({'success': True, 'username': user.username, 'message': 'Giriş başarılı.'})
 
 @ratelimit(key='ip', rate='10/h', method='POST', block=False)
 @ratelimit(key=universal_rate_key, rate='2/h', method='POST', block=False)
@@ -810,13 +819,12 @@ def get_notifications(request):
         return Response({'error': 'Too many requests'}, status=429)
 
     page_number = request.GET.get('page', 1)
-    try:
-        limit = int(request.GET.get('limit', 20))
-    except (ValueError, TypeError):
-        limit = 20
-    limit = min(limit, 50)
+    limit = min(int(request.GET.get('limit', 20)), 50)
 
-    qs = Notification.objects.filter(recipient=request.user).select_related('actor', 'word', 'comment')
+    # Filtering strictly for active notifications to prevent spam
+    qs = Notification.objects.filter(recipient=request.user, is_active=True).select_related(
+        'actor', 'word', 'comment', 'challenge_comment', 'challenge_comment__challenge'
+    )
     paginator = Paginator(qs, limit)
     try:
         page = paginator.page(page_number)
@@ -843,7 +851,7 @@ def get_unread_count(request):
     cache_key = f'notif_unread_{request.user.id}'
     count = cache.get(cache_key)
     if count is None:
-        count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+        count = Notification.objects.filter(recipient=request.user, is_read=False, is_active=True).count()
         cache.set(cache_key, count, 60)
     return Response({'success': True, 'unread_count': count})
 
@@ -857,7 +865,7 @@ def mark_notifications_read(request):
         return Response({'error': 'Too many requests'}, status=429)
 
     ids = request.data.get('ids')
-    qs = Notification.objects.filter(recipient=request.user, is_read=False)
+    qs = Notification.objects.filter(recipient=request.user, is_read=False, is_active=True)
     
     if ids is not None:
         if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):

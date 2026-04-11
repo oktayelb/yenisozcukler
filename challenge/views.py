@@ -271,7 +271,7 @@ def vote_challenge_comment(request, comment_id):
             response_action = 'none'
         else:
             existing_vote.value = vote_val
-            existing_vote.save()
+            existing_vote.save(update_fields=['value']) # Fix: Added update_fields
             comment.score = F('score') + (vote_val * 2)
             response_action = 'liked' if vote_val == 1 else 'disliked'
     else:
@@ -287,7 +287,7 @@ def vote_challenge_comment(request, comment_id):
         comment.score = F('score') + vote_val
         response_action = 'liked' if vote_val == 1 else 'disliked'
 
-    comment.save()
+    comment.save(update_fields=['score']) # Fix: Added update_fields
     comment.refresh_from_db()
 
     owner = comment.user if hasattr(comment, 'user') else None
@@ -300,24 +300,33 @@ def vote_challenge_comment(request, comment_id):
         current_type = like_type if vote_val == 1 else dislike_type
         opposite_type = dislike_type if vote_val == 1 else like_type
         
-        # Since Notification doesn't have a direct ChallengeComment FK, use `message`
-        msg_id = f"challenge_comment_{comment.id}"
-
         if response_action == 'none':
-            deleted, _ = Notification.objects.filter(
-                recipient=owner, actor=user, notification_type=current_type, message=msg_id
-            ).delete()
-            if deleted:
+            # SOFT DELETE
+            updated = Notification.objects.filter(
+                recipient=owner, actor=user, notification_type=current_type, challenge_comment_id=comment.id
+            ).update(is_active=False)
+            
+            if updated:
                 cache.delete(f'notif_unread_{owner.id}')
         else:
+            # Deactivate opposite vote type
             Notification.objects.filter(
-                recipient=owner, actor=user, notification_type=opposite_type, message=msg_id
-            ).delete()
+                recipient=owner, actor=user, notification_type=opposite_type, challenge_comment_id=comment.id
+            ).update(is_active=False)
             
-            _, created = Notification.objects.get_or_create(
-                recipient=owner, actor=user, notification_type=current_type, message=msg_id
+            # Fetch or create the notification
+            notif, created = Notification.objects.get_or_create(
+                recipient=owner, actor=user, notification_type=current_type, challenge_comment_id=comment.id,
+                defaults={'is_active': True}
             )
-            if created:
+            
+            # REVIVE: If it existed but was deactivated, turn it back on.
+            if not created and not notif.is_active:
+                notif.is_active = True
+                notif.is_read = False
+                notif.save(update_fields=['is_active', 'is_read'])
+                cache.delete(f'notif_unread_{owner.id}')
+            elif created:
                 cache.delete(f'notif_unread_{owner.id}')
 
     return Response({

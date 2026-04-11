@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.cache import cache
 import re
 
 
@@ -94,7 +95,22 @@ class Word(models.Model):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = generate_unique_slug(self.word, exclude_id=self.pk)
+            
         super().save(*args, **kwargs)
+        
+        # Cache Invalidation: Clear this specific word's cache when edited or approved
+        if self.slug:
+            cache.delete(f'word_slug_{self.slug}')
+        # Also clear the global approved words count so the feed stays accurate
+        cache.delete('total_approved_words_count_all')
+
+    def delete(self, *args, **kwargs):
+        # Cache Invalidation: Clear cache when a word is deleted (e.g. by an admin)
+        if self.slug:
+            cache.delete(f'word_slug_{self.slug}')
+        cache.delete('total_approved_words_count_all')
+        
+        super().delete(*args, **kwargs)
 
     @property
     def display_author(self):
@@ -215,15 +231,17 @@ class Notification(models.Model):
 
     word = models.ForeignKey(Word, on_delete=models.CASCADE, null=True, blank=True)
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE, null=True, blank=True)
+    challenge_comment = models.ForeignKey('challenge.ChallengeComment', on_delete=models.CASCADE, null=True, blank=True)
 
     message = models.CharField(max_length=300, blank=True, default='')
     is_read = models.BooleanField(default=False, db_index=True)
+    is_active = models.BooleanField(default=True, db_index=True)  # <-- NEW FIELD
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         ordering = ['-timestamp']
         indexes = [
-            models.Index(fields=['recipient', 'is_read', '-timestamp']),
+            models.Index(fields=['recipient','is_active', 'is_read', '-timestamp']),
         ]
 
     def __str__(self):

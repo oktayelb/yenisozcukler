@@ -208,7 +208,7 @@ async function submitChallenge() {
     }
 }
 
-function openChallengeDiscussion(ch) {
+export function openChallengeDiscussion(ch) {
     if (state.activeChallengeView) return;
     state.currentChallengeId = ch.id;
 

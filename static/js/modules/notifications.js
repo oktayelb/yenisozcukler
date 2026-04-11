@@ -3,6 +3,7 @@ import { isUserLoggedIn } from './state.js';
 import { apiRequest, escapeHTML } from './utils.js';
 import { openModal, closeModal } from './modal.js';
 import { animateAndOpenCommentView } from './comments.js';
+import { openChallengeDiscussion } from './challenge.js';
 
 let notifPage = 1;
 let hasMoreNotifs = false;
@@ -94,12 +95,31 @@ function createNotifItem(n) {
     const div = document.createElement('div');
     div.className = 'notif-item' + (n.is_read ? '' : ' notif-unread');
 
-    const isClickable = ['word_like', 'word_dislike', 'comment_like', 'comment_dislike', 'new_comment', 'challenge_like', 'challenge_dislike','challenge_win'].includes(n.notification_type) && n.word_id;
-    if (isClickable) {
+    const type = n.notification_type;
+    const wordRouteTypes = ['word_like', 'word_dislike', 'comment_like', 'comment_dislike', 'new_comment', 'challenge_win'];
+    const challengeRouteTypes = ['challenge_like', 'challenge_dislike'];
+
+    const isWordClickable = wordRouteTypes.includes(type) && n.word_id;
+    const isChallengeClickable = challengeRouteTypes.includes(type) && n.challenge_id;
+
+    if (isWordClickable) {
         div.style.cursor = 'pointer';
         div.addEventListener('click', () => {
             closeModal('notificationsModal', true);
             animateAndOpenCommentView(null, n.word_id, n.word_text, n.word_def || '', n.word_example || '', n.word_etymology || '', true);
+        });
+    } else if (isChallengeClickable) {
+        div.style.cursor = 'pointer';
+        div.addEventListener('click', () => {
+            closeModal('notificationsModal', true);
+            openChallengeDiscussion({
+                id: n.challenge_id,
+                foreign_word: n.challenge_foreign_word || '',
+                meaning: n.challenge_meaning || '',
+                timer_on: !!n.challenge_timer_on,
+                is_closed: !!n.challenge_is_closed,
+                time_remaining_seconds: n.challenge_time_remaining_seconds,
+            });
         });
     }
 
@@ -155,10 +175,14 @@ function buildNotifText(n) {
             return `${actor} ${word} sözcüğündeki yorumunuzu hoş buldu.`;
         case 'comment_dislike':
             return `${actor} ${word} sözcüğündeki yorumunuzu boş buldu.`;
-        case 'challenge_like':
-            return `${actor} yarışma önerinizi hoş buldu.`;
-        case 'challenge_dislike':
-            return `${actor} yarışma önerinizi boş buldu.`;
+        case 'challenge_like': {
+            const suggested = n.challenge_suggested_word ? `<strong>${escapeHTML(n.challenge_suggested_word)}</strong> ` : '';
+            return `${actor} ${suggested}yarışma önerinizi hoş buldu.`;
+        }
+        case 'challenge_dislike': {
+            const suggested = n.challenge_suggested_word ? `<strong>${escapeHTML(n.challenge_suggested_word)}</strong> ` : '';
+            return `${actor} ${suggested}yarışma önerinizi boş buldu.`;
+        }
         case 'new_comment':
             return `${actor} ${word} sözcüğünüze yorum yaptı.`;
         case 'challenge_win':
