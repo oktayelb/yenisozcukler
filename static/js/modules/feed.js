@@ -1,6 +1,6 @@
 /* --- FEED & WORDS --- */
 import { state, ITEMS_PER_PAGE } from './state.js';
-import { apiRequest } from './utils.js';
+import { apiRequest, updatePageMeta } from './utils.js';
 import { createCardElement } from './cards.js';
 import { toggleContributionForm } from './form.js';
 
@@ -61,6 +61,10 @@ export function handleTagClick(slug, name, description) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     updateFilterBanner(true, name, description);
+    updatePageMeta(
+        `${name} - Yeni Sözcükler`,
+        description || `${name} kategorisindeki yeni Türkçe sözcükler.`
+    );
 
     fetchWords(state.currentPage);
 }
@@ -69,6 +73,11 @@ export function clearCategoryFilter() {
     state.activeCategorySlug = null;
     state.currentPage = 1;
     updateFilterBanner(false);
+    updatePageMeta();
+    // Update URL when user explicitly clears filter (not during router dispatch)
+    if (location.pathname !== '/') {
+        history.pushState(null, '', '/');
+    }
     fetchWords(state.currentPage);
 }
 
@@ -102,13 +111,18 @@ export function loadMoreWords() {
 
 export function appendCards(words, container, isModalMode) {
     const frag = document.createDocumentFragment();
-    words.forEach(w => frag.appendChild(createCardElement(w, isModalMode)));
+    words.forEach((w, i) => {
+        const card = createCardElement(w, isModalMode);
+        card.style.animationDelay = `${i * 60 + 30}ms`;
+        frag.appendChild(card);
+    });
     container.appendChild(frag);
-    Array.from(container.children).slice(-words.length).forEach((c, i) => {
-        setTimeout(() => {
+    // Trigger show class on next frame so the animationDelay CSS takes effect
+    requestAnimationFrame(() => {
+        Array.from(container.children).slice(-words.length).forEach(c => {
             c.classList.remove('fade-in');
             c.classList.add('show');
-        }, i * 40);
+        });
     });
 }
 
@@ -117,6 +131,11 @@ export function executeSearch(query) {
     if (state.currentSearchQuery === trimmed) return;
     state.currentSearchQuery = trimmed;
     state.currentPage = 1;
+    if (trimmed) {
+        updatePageMeta(`"${trimmed}" araması - Yeni Sözcükler`, `"${trimmed}" için arama sonuçları.`);
+    } else {
+        updatePageMeta();
+    }
     fetchWords(state.currentPage);
 }
 

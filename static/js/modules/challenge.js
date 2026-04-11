@@ -208,7 +208,7 @@ async function submitChallenge() {
     }
 }
 
-function openChallengeDiscussion(ch) {
+export function openChallengeDiscussion(ch) {
     if (state.activeChallengeView) return;
     state.currentChallengeId = ch.id;
 
@@ -239,8 +239,6 @@ function openChallengeDiscussion(ch) {
                       placeholder="Köken bilgisi (ör: Farsça 'del' + Türkçe '-li')" maxlength="200" autocomplete="off">
                <textarea id="challengeExampleInput" class="custom-textarea-minimal" rows="2"
                          placeholder="Örnek cümle..." maxlength="200"></textarea>
-               <textarea id="challengeExplanationInput" class="custom-textarea-minimal" rows="2"
-                         placeholder="Neden bu sözcüğü öneriyorsunuz? (İsteğe bağlı)" maxlength="300"></textarea>
                <div class="custom-comment-footer">
                    <button class="send-btn-minimal" id="submitChallengeSuggestionBtn">Karşılık Öner</button>
                </div>
@@ -300,10 +298,8 @@ function openChallengeDiscussion(ch) {
                 if (e.key === 'Enter') { e.preventDefault(); submitChallengeSuggestion(); }
             });
         });
-        ['challengeExampleInput', 'challengeExplanationInput'].forEach(id => {
-            document.getElementById(id)?.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitChallengeSuggestion(); }
-            });
+        document.getElementById('challengeExampleInput')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitChallengeSuggestion(); }
         });
     }
 
@@ -409,15 +405,6 @@ function createSuggestionCard(s, isClosed = false, winnerId = null) {
         card.appendChild(exEl);
     }
 
-    // Explanation (optional)
-    const displayExpl = s.explanation || '';
-    if (displayExpl) {
-        const explEl = document.createElement('div');
-        explEl.className = 'suggestion-explanation';
-        explEl.textContent = displayExpl;
-        card.appendChild(explEl);
-    }
-
     // Footer: meta + votes
     const footer = document.createElement('div');
     footer.className = 'suggestion-footer';
@@ -459,16 +446,20 @@ async function submitChallengeSuggestion() {
     const wordInput = state.activeChallengeView.querySelector('#challengeSuggestedWordInput');
     const etyInput = state.activeChallengeView.querySelector('#challengeEtymologyInput');
     const exInput = state.activeChallengeView.querySelector('#challengeExampleInput');
-    const explInput = state.activeChallengeView.querySelector('#challengeExplanationInput');
     const btn = state.activeChallengeView.querySelector('#submitChallengeSuggestionBtn');
 
     const suggestedWord = wordInput?.value.trim() || '';
     const etymology = etyInput?.value.trim() || '';
     const exampleSentence = exInput?.value.trim() || '';
-    const explanation = explInput?.value.trim() || '';
 
     if (!suggestedWord) {
         return showCustomAlert("Önerilen sözcük boş olamaz.", "error");
+    }
+    if (!etymology) {
+        return showCustomAlert("Köken bilgisi boş olamaz.", "error");
+    }
+    if (!exampleSentence) {
+        return showCustomAlert("Örnek cümle boş olamaz.", "error");
     }
 
     btn.disabled = true;
@@ -485,8 +476,7 @@ async function submitChallengeSuggestion() {
                 challenge_id: state.currentChallengeId,
                 suggested_word: suggestedWord,
                 etymology: etymology,
-                example_sentence: exampleSentence,
-                explanation: explanation
+                example_sentence: exampleSentence
             })
         });
 

@@ -5,96 +5,145 @@
 :root {
     --font-heading: 'Caveat', cursive;
     --font-body: 'Merriweather', serif;
-    --radius: 12px;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --radius-lg: 24px;
+    --radius-pill: 50px;
+    --spacing-xs: 8px;
+    --spacing-sm: 12px;
     --spacing-md: 20px;
-    
+    --spacing-lg: 32px;
+    --spacing-xl: 48px;
+
     /* KATMANLAR (Z-INDEX) */
     --z-base: 1;
     --z-header: 1000;
     --z-modal-backdrop: 1050;
     --z-tooltip: 1100;
-    
+
     /* MODAL HİYERARŞİSİ */
-    --z-modal-base: 3000;     
-    --z-drawer: 4000;         
-    --z-auth-overlay: 5000;   
-    --z-notification: 9999;   
+    --z-modal-base: 3000;
+    --z-drawer: 4000;
+    --z-auth-overlay: 5000;
+    --z-notification: 9999;
+
+    /* SPRING PHYSICS - cubic-bezier approximations */
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-out-back: cubic-bezier(0.34, 1.3, 0.64, 1);
+    --ease-in-out-smooth: cubic-bezier(0.65, 0, 0.35, 1);
+    --ease-bounce: cubic-bezier(0.68, -0.6, 0.32, 1.6);
+
+    /* DURATIONS */
+    --duration-fast: 0.15s;
+    --duration-normal: 0.25s;
+    --duration-slow: 0.4s;
+    --duration-enter: 0.5s;
 
     /* RENKLER (DEFAULT / LIGHT) */
-    --bg-color: #f4f1ea;
-    --card-bg: #fffbf6;
-    --text-main: #2c2c2c;
-    --text-muted: #5d5c61;
+    --bg-color: #f6f3ed;
+    --bg-secondary: #edeae3;
+    --card-bg: #fffcf7;
+    --card-bg-glass: rgba(255, 252, 247, 0.72);
+    --text-main: #1a1a1a;
+    --text-muted: #6b6a6e;
     --accent: #8e7f7f;
-    --border-light: rgba(142, 127, 127, 0.3);
-    
-    --subtitle-color: #5d5c61; 
+    --accent-rgb: 142, 127, 127;
+    --accent-hover: #7a6c6c;
+    --border-light: rgba(142, 127, 127, 0.18);
+    --border-subtle: rgba(142, 127, 127, 0.08);
+
+    --subtitle-color: #6b6a6e;
 
     /* Form Inputs */
-    --input-bg: #f4f1ea;        
-    --input-focus-bg: #ffffff;   
-    --input-text: #2c2c2c;     
-    --input-border: rgba(142, 127, 127, 0.2);
-    
+    --input-bg: #f0ede6;
+    --input-focus-bg: #ffffff;
+    --input-text: #1a1a1a;
+    --input-border: rgba(142, 127, 127, 0.15);
+
     /* İMZA VE YORUM KUTUSU */
-    --sig-color: #8899a6; 
+    --sig-color: #8899a6;
 
     /* Comment Box */
-    --comment-box-bg: #f4f1ea;
-    --comment-box-text: #2c2c2c;
-    --comment-box-border: rgba(142, 127, 127, 0.2);
+    --comment-box-bg: #f0ede6;
+    --comment-box-text: #1a1a1a;
+    --comment-box-border: rgba(142, 127, 127, 0.15);
     --comment-placeholder: #999999;
     --comment-btn-bg: #8e7f7f;
-    --comment-btn-text: #f4f1ea;
-    
-    --success-color: #4CAF50;
-    --error-color: #f44336;
+    --comment-btn-text: #f6f3ed;
+
+    --success-color: #34a853;
+    --error-color: #ea4335;
     --like-active: #E53935;
     --dislike-active: #5C6BC0;
 
-    --shadow-sm: 0 4px 15px rgba(60, 50, 40, 0.1);
-    --shadow-lg: 0 15px 30px rgba(60, 50, 40, 0.15);
-    
+    /* LAYERED SHADOWS (Apple-style depth) */
+    --shadow-xs: 0 1px 2px rgba(60, 50, 40, 0.04);
+    --shadow-sm: 0 2px 8px rgba(60, 50, 40, 0.06), 0 1px 3px rgba(60, 50, 40, 0.04);
+    --shadow-md: 0 4px 16px rgba(60, 50, 40, 0.08), 0 2px 6px rgba(60, 50, 40, 0.04);
+    --shadow-lg: 0 12px 40px rgba(60, 50, 40, 0.12), 0 4px 12px rgba(60, 50, 40, 0.06);
+    --shadow-xl: 0 24px 60px rgba(60, 50, 40, 0.16), 0 8px 20px rgba(60, 50, 40, 0.08);
+    --shadow-glow: 0 0 0 1px rgba(142, 127, 127, 0.08);
+
+    /* GLASSMORPHISM */
+    --glass-blur: blur(24px);
+    --glass-blur-heavy: blur(40px);
+    --glass-bg: rgba(255, 252, 247, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.5);
+
     /* TAG COLORS */
     --tag-bg: #ebe7e0;
     --tag-bg-hover: #e0dcd5;
     --tag-text: #5d5c61;
     --tag-selected-bg: #8e7f7f;
-    --tag-selected-text: #fffbf6;
+    --tag-selected-text: #fffcf7;
 }
 
 /* DARK MODE */
 body.dark-mode {
-    --bg-color: #2c2c34; 
-    --card-bg: #3c3c45; 
-    --text-main: #f0f0f0; 
-    --text-muted: #a0a0a0;
-    --accent: #b8a9a9; 
-    --border-light: rgba(255, 255, 255, 0.1);
-    
-    --subtitle-color: #a0a0a0; 
-    
-    --input-bg: #2c2c34; 
-    --input-focus-bg: #3c3c45; 
-    --input-text: #f0f0f0; 
-    --input-border: rgba(255, 255, 255, 0.1);
-    
-    --sig-color: #aab8c2;
-    --comment-box-bg: #2c2c34;
-    --comment-box-text: #f0f0f0;
-    --comment-box-border: rgba(255, 255, 255, 0.1);
-    --comment-placeholder: #666;
-    --comment-btn-bg: #b8a9a9;
-    --comment-btn-text: #2c2c34;
+    --bg-color: #1a1a22;
+    --bg-secondary: #242430;
+    --card-bg: #2a2a36;
+    --card-bg-glass: rgba(42, 42, 54, 0.72);
+    --text-main: #f0f0f0;
+    --text-muted: #9a9aa0;
+    --accent: #c4b5b5;
+    --accent-rgb: 196, 181, 181;
+    --accent-hover: #d4c5c5;
+    --border-light: rgba(255, 255, 255, 0.08);
+    --border-subtle: rgba(255, 255, 255, 0.04);
 
-    --shadow-sm: 0 4px 15px rgba(0, 0, 0, 0.4); 
-    --shadow-lg: 0 8px 25px rgba(0, 0, 0, 0.6);
-    --like-active: #FF7043; 
+    --subtitle-color: #9a9aa0;
+
+    --input-bg: #1e1e28;
+    --input-focus-bg: #2a2a36;
+    --input-text: #f0f0f0;
+    --input-border: rgba(255, 255, 255, 0.08);
+
+    --sig-color: #aab8c2;
+    --comment-box-bg: #1e1e28;
+    --comment-box-text: #f0f0f0;
+    --comment-box-border: rgba(255, 255, 255, 0.08);
+    --comment-placeholder: #555;
+    --comment-btn-bg: #c4b5b5;
+    --comment-btn-text: #1a1a22;
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.2);
+    --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.5), 0 8px 20px rgba(0, 0, 0, 0.25);
+    --shadow-glow: 0 0 0 1px rgba(255, 255, 255, 0.05);
+
+    --glass-bg: rgba(30, 30, 40, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.08);
+
+    --like-active: #FF7043;
     --dislike-active: #7986CB;
-    
-    --tag-bg: #464650;
-    --tag-bg-hover: #50505a;
-    --tag-text: #ccc;
-    --tag-selected-bg: #b8a9a9;
-    --tag-selected-text: #2c2c34;
+
+    --tag-bg: #353540;
+    --tag-bg-hover: #40404c;
+    --tag-text: #bbb;
+    --tag-selected-bg: #c4b5b5;
+    --tag-selected-text: #1a1a22;
 }

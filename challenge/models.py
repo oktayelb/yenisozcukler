@@ -8,6 +8,7 @@ class TranslationChallenge(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
     ]
 
     user = models.ForeignKey(
@@ -25,6 +26,7 @@ class TranslationChallenge(models.Model):
 
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending', db_index=True)
+    rejection_reason = models.CharField(max_length=300, blank=True, default='')
     timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
 
     timer_on = models.BooleanField(default=False)
@@ -56,27 +58,46 @@ class TranslationChallenge(models.Model):
         return None
 
     def create_winner_word(self):
-        from django.db import transaction
-        from core.models import Word
+        from core.models import Word, Notification
 
-        with transaction.atomic():
-            locked = TranslationChallenge.objects.select_for_update().get(pk=self.pk)
-            if not locked.is_closed or locked.winner_word_created:
-                return None
-            top = locked.comments.order_by('-score', 'timestamp').first()
-            if not top or top.score <= 0:
-                return None
-            word = Word.objects.create(
-                word=top.suggested_word,
-                definition=locked.meaning[:300],
-                etymology=(top.etymology or '')[:200],
-                example=(top.example_sentence or '')[:200],
-                user=top.user,
-                author=top.display_author,
-                status='approved',
+        if not self.is_closed or self.winner_word_created:
+            return None
+
+        # S3 FIX: Atomic update pattern to replace select_for_update.
+        # This safely ensures only one process/thread can transition winner_word_created from False to True.
+        rows_updated = TranslationChallenge.objects.filter(
+            pk=self.pk,
+            winner_word_created=False
+        ).update(winner_word_created=True)
+
+        if rows_updated == 0:
+            # Another process already secured the lock and processed this.
+            return None
+
+        top = self.comments.order_by('-score', 'timestamp').first()
+        if not top or top.score <= 0:
+            self.winner_word_created = True
+            return None
+
+        word = Word.objects.create(
+            word=top.suggested_word,
+            definition=self.meaning[:300],
+            etymology=(top.etymology or '')[:200],
+            example=(top.example_sentence or '')[:200],
+            user=top.user,
+            author=top.display_author,
+            status='approved',
+        )
+
+        # Notify the winner
+        if top.user:
+            Notification.objects.create(
+                recipient=top.user,
+                notification_type='challenge_win',
+                word=word,
+                message=f'"{top.suggested_word}" sözcüğünüz "{self.foreign_word}" yarışmasını kazandı!',
             )
-            locked.winner_word_created = True
-            locked.save(update_fields=['winner_word_created'])
+
         self.winner_word_created = True
         return word
 
@@ -101,11 +122,10 @@ class ChallengeComment(models.Model):
     challenge = models.ForeignKey(TranslationChallenge, on_delete=models.CASCADE, related_name='comments')
     author = models.CharField(max_length=50, default='Anonim')
     suggested_word = models.CharField(max_length=30, blank=False)
-    etymology = models.CharField(max_length=200, blank=True, default='')
-    example_sentence = models.CharField(max_length=200, blank=True, default='')
-    explanation = models.CharField(max_length=300, blank=True, default='')
+    etymology = models.CharField(max_length=200, blank=False)
+    example_sentence = models.CharField(max_length=200, blank=False)
     timestamp = models.DateTimeField(auto_now_add=True)
-    score = models.IntegerField(default=0)
+    score = models.IntegerField(default=0, db_index=True)
 
     @property
     def display_author(self):
@@ -119,6 +139,9 @@ class ChallengeComment(models.Model):
     class Meta:
         db_table = 'core_challengecomment'
         unique_together = ('user', 'challenge')
+        indexes = [
+            models.Index(fields=['challenge', '-score', 'timestamp']),
+        ]
 
 
 class ChallengeCommentVote(models.Model):

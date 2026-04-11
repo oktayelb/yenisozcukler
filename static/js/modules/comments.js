@@ -1,14 +1,16 @@
 /* === DETAIL VIEW & COMMENTS === */
 import { state, isUserLoggedIn, COMMENTS_PER_PAGE } from './state.js';
-import { escapeHTML, apiRequest, showCustomAlert } from './utils.js';
+import { escapeHTML, apiRequest, showCustomAlert, updatePageMeta } from './utils.js';
 import { createVoteControls } from './voting.js';
 import { openAuthModal } from './auth.js';
 import { openProfileModal } from './profile.js';
+import { isRouterDispatching } from './router.js';
 
 export function animateAndOpenCommentView(originalCard, wordId, wordText, wordDef, wordExample, wordEtymology, isModalMode = false) {
     if (state.activeCardClone) return;
 
     state.currentWordId = wordId;
+    updatePageMeta(`${wordText} - Yeni Sözcükler`, wordDef);
 
     const backdrop = document.getElementById('modalBackdrop');
     backdrop.style.display = 'block';
@@ -81,6 +83,15 @@ export function closeCommentView() {
     const backdrop = document.getElementById('modalBackdrop');
     backdrop.classList.remove('show');
     state.activeCardClone.classList.remove('expanded');
+
+    // Restore URL to the feed page (skip when router is navigating to another word)
+    if (!isRouterDispatching && location.pathname.startsWith('/sozcuk/')) {
+        const baseUrl = state.activeCategorySlug
+            ? `/kategori/${state.activeCategorySlug}/`
+            : '/';
+        history.pushState(null, '', baseUrl);
+        updatePageMeta();
+    }
 
     setTimeout(() => {
         if (state.activeCardClone) state.activeCardClone.remove();

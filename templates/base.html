@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    {% block head %}{% include 'partials/head.html' %}{% endblock %}
+    {% block head_extra %}{% endblock %}
+</head>
+<body{% block body_attrs %}{% endblock %}>
+    {% block content %}{% endblock %}
+    {% block modals %}{% endblock %}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

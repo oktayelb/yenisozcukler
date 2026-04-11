@@ -5,6 +5,11 @@ import { openModal, closeModal } from './modal.js';
 import { openProfileModal } from './profile.js';
 import { submitWord } from './form.js';
 
+const RESERVED_USERNAMES = [
+    'admin', 'administrator', 'moderator', 'mod', 'sistem', 'system', 
+    'root', 'anonim', 'anonymous', 'support', 'destek', 'yenisozcukler'
+];
+
 export function openAuthModal() {
     toggleAuthMode('login');
     openModal('authModal');
@@ -83,7 +88,7 @@ export function handleAuthSubmit() {
     const u = document.getElementById('authUsername').value.trim();
     const p = document.getElementById('authPassword').value.trim();
     const pConfirm = document.getElementById('authPasswordConfirm').value.trim();
-    const t = document.querySelector('[name="cf-turnstile-response"]')?.value;
+    const t = document.querySelector('#authForm [name="cf-turnstile-response"]')?.value;
     const err = document.getElementById('authErrorMsg');
     const btn = document.getElementById('authSubmitBtn');
 
@@ -96,6 +101,11 @@ export function handleAuthSubmit() {
 
     if (u.length > 30) {
         if (err) { err.innerText = "Kullanıcı adı en fazla 30 karakter olabilir."; err.style.display = 'block'; }
+        return;
+    }
+
+    if (state.currentAuthMode === 'register' && RESERVED_USERNAMES.includes(u.toLowerCase())) {
+        if (err) { err.innerText = "Bu kullanıcı adı sistem tarafından ayrılmıştır."; err.style.display = 'block'; }
         return;
     }
 
@@ -136,7 +146,7 @@ export function handleAuthSubmit() {
     })
     .catch(e => {
         if (err) { err.innerText = e.message; err.style.display = 'block'; }
-        if (window.turnstile) window.turnstile.reset();
+        if (window.turnstile) window.turnstile.reset(document.getElementById('authFormTurnstile'));
     })
     .finally(() => {
         btn.disabled = false;

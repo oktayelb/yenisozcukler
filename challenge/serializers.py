@@ -33,7 +33,14 @@ class TranslationChallengeSerializer(serializers.ModelSerializer):
     def get_winner(self, obj):
         if not obj.is_closed:
             return None
-        top = obj.comments.order_by('-score', 'timestamp').first()
+            
+        # P1 FIX: Utilize the prefetched comments list if available to avoid N+1 queries.
+        if hasattr(obj, 'prefetched_ordered_comments'):
+            ordered_comments = obj.prefetched_ordered_comments
+            top = ordered_comments[0] if ordered_comments else None
+        else:
+            top = obj.comments.order_by('-score', 'timestamp').first()
+
         if top and top.score > 0:
             return {
                 'suggested_word': top.suggested_word,
@@ -75,7 +82,7 @@ class ChallengeCommentSerializer(serializers.ModelSerializer):
         model = ChallengeComment
         fields = [
             'id', 'challenge', 'author', 'suggested_word', 'etymology',
-            'example_sentence', 'explanation', 'timestamp', 'score', 'user_vote',
+            'example_sentence', 'timestamp', 'score', 'user_vote',
         ]
 
     def get_user_vote(self, obj):
@@ -89,10 +96,8 @@ class ChallengeCommentSerializer(serializers.ModelSerializer):
 class ChallengeSuggestionCreateSerializer(serializers.Serializer):
     challenge_id = serializers.IntegerField(required=True)
     suggested_word = serializers.CharField(max_length=30, required=True)
-    etymology = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')
-    example_sentence = serializers.CharField(max_length=200, required=False, allow_blank=True, default='')
-    explanation = serializers.CharField(max_length=300, required=False, allow_blank=True, default='')
-
+    etymology = serializers.CharField(max_length=200, required=True)
+    example_sentence = serializers.CharField(max_length=200, required=True)
     def validate_suggested_word(self, value):
         value = value.strip()
         if not value:
@@ -103,9 +108,9 @@ class ChallengeSuggestionCreateSerializer(serializers.Serializer):
         return value
 
     def _validate_text_field(self, value, field_name):
-        if not value:
-            return ''
         value = value.strip()
+        if not value:
+            raise serializers.ValidationError(f"{field_name} boş olamaz.")
         invalid_chars = set(re.findall(TURKISH_SAFE_PATTERN, value))
         if invalid_chars:
             raise serializers.ValidationError(f"{field_name} geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
@@ -116,6 +121,3 @@ class ChallengeSuggestionCreateSerializer(serializers.Serializer):
 
     def validate_example_sentence(self, value):
         return self._validate_text_field(value, "Örnek cümlede")
-
-    def validate_explanation(self, value):
-        return self._validate_text_field(value, "Açıklamada")

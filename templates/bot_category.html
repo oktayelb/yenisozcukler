@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ category.name }} Sözcükleri - Yeni Sözcükler</title>
+<meta name="description" content="{% if category.description %}{{ category.description }}{% else %}{{ category.name }} kategorisindeki yeni Türkçe sözcükler.{% endif %}">
+
+<meta property="og:title" content="{{ category.name }} Sözcükleri - Yeni Sözcükler">
+<meta property="og:description" content="{% if category.description %}{{ category.description }}{% else %}{{ category.name }} kategorisindeki yeni Türkçe sözcükler.{% endif %}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://yenisozcukler.com/kategori/{{ category.slug }}/">
+<meta property="og:site_name" content="Yeni Sözcükler">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ category.name }} Sözcükleri - Yeni Sözcükler">
+<meta name="twitter:description" content="{% if category.description %}{{ category.description }}{% else %}{{ category.name }} kategorisindeki yeni Türkçe sözcükler.{% endif %}">
+
+<link rel="canonical" href="https://yenisozcukler.com/kategori/{{ category.slug }}/">
+<meta name="robots" content="index, follow">
+{% endblock %}
+
+{% block content %}
+    <header>
+        <nav><a href="/">&larr; Ana Sayfaya Dön</a></nav>
+        <h1>{{ category.name }} Kategorisi</h1>
+        {% if category.description %}
+        <p>{{ category.description }}</p>
+        {% endif %}
+    </header>
+
+    <main>
+        <h2>Bu Kategorideki Sözcükler</h2>
+        <ul>
+            {% for word in words %}
+            <li>
+                <article>
+                    <h3><a href="/sozcuk/{{ word.slug }}/">{{ word.word }}</a></h3>
+                    <p>{{ word.definition|truncatechars:160 }}</p>
+                </article>
+            </li>
+            {% empty %}
+            <li>Bu kategoride henüz sözcük bulunmuyor.</li>
+            {% endfor %}
+        </ul>
+    </main>
+{% endblock %}

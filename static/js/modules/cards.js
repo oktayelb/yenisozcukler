@@ -4,12 +4,13 @@ import { createVoteControls } from './voting.js';
 import { animateAndOpenCommentView } from './comments.js';
 import { openProfileModal } from './profile.js';
 import { openAddExampleModal } from './example.js';
-import { handleTagClick } from './feed.js';
+import { navigateTo } from './router.js';
 
 export function createCardElement(item, isModalMode) {
     const card = document.createElement('div');
     card.className = 'word-card fade-in';
     card.setAttribute('data-id', item.id);
+    card.setAttribute('data-slug', item.slug);
 
     card.addEventListener('click', (e) => {
         if (e.target.closest('.vote-btn') ||
@@ -17,6 +18,16 @@ export function createCardElement(item, isModalMode) {
             e.target.closest('.user-badge') ||
             e.target.closest('.add-example-btn') ||
             e.target.closest('.tag-badge')) return;
+
+        // Prevent <a> tags from navigating — we handle it via SPA
+        const link = e.target.closest('a');
+        if (link) e.preventDefault();
+
+        // Push clean URL to address bar (skip if already there)
+        const wordUrl = `/sozcuk/${item.slug}/`;
+        if (location.pathname !== wordUrl) {
+            history.pushState(null, '', wordUrl);
+        }
 
         animateAndOpenCommentView(card, item.id, item.word, item.def || item.definition, item.example, item.etymology, isModalMode);
     });
@@ -27,9 +38,13 @@ export function createCardElement(item, isModalMode) {
 
     const contentDiv = document.createElement('div');
 
+    const wordLink = document.createElement('a');
+    wordLink.href = `/sozcuk/${item.slug}/`;
+    wordLink.style.cssText = 'text-decoration:none; color:inherit;';
     const wordTitle = document.createElement('h3');
     wordTitle.textContent = item.word;
-    contentDiv.appendChild(wordTitle);
+    wordLink.appendChild(wordTitle);
+    contentDiv.appendChild(wordLink);
 
     if (item.etymology) {
         const etyDiv = document.createElement('div');
@@ -74,17 +89,20 @@ export function createCardElement(item, isModalMode) {
         tagsDiv.className = 'tag-list';
 
         item.categories.forEach(cat => {
-            const tag = document.createElement('span');
+            const tag = document.createElement('a');
             tag.className = 'tag-badge';
+            tag.href = `/kategori/${cat.slug}/`;
             tag.innerText = cat.name;
+            tag.style.textDecoration = 'none';
 
             if (cat.description) {
                 tag.setAttribute('data-desc', cat.description);
             }
 
             tag.addEventListener('click', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                handleTagClick(cat.slug, cat.name, cat.description);
+                navigateTo(`/kategori/${cat.slug}/`);
             });
             tagsDiv.appendChild(tag);
         });
@@ -95,10 +113,14 @@ export function createCardElement(item, isModalMode) {
     const foot = document.createElement('div');
     foot.className = 'word-footer';
 
-    const hint = document.createElement('div');
+    const hint = document.createElement('a');
     hint.className = 'click-hint';
+    hint.href = `/sozcuk/${item.slug}/`;
+    hint.style.textDecoration = 'none';
+    hint.style.color = 'inherit';
     const cCount = Number(item.comment_count) || 0;
     hint.innerHTML = `Yorumlar (${cCount}) <span>&rarr;</span>`;
+    hint.addEventListener('click', (e) => e.preventDefault());
     foot.appendChild(hint);
 
     const authorName = item.author ? item.author : 'Anonim';

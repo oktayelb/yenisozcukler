@@ -1,0 +1,12 @@
+<header>
+    <div class="logo-wrapper">
+        <div class="logo-card">
+            {% if linked %}
+                <a href="/" style="text-decoration:none; color:inherit;"><h1>Yeni Sözcükler</h1></a>
+            {% else %}
+                <h1 id="mainTitle">Yeni Sözcükler</h1>
+            {% endif %}
+            <span class="subtitle"{% if not linked %} id="subtitleText"{% endif %}>"Yeni sözcüklerini paylaş"</span>
+        </div>
+    </div>
+</header>

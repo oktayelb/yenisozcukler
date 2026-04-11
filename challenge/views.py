@@ -6,8 +6,8 @@ from rest_framework.authentication import SessionAuthentication
 from django.shortcuts import get_object_or_404
 from django_ratelimit.decorators import ratelimit
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import Count, F
-from django.db import transaction, DatabaseError, OperationalError
+from django.db.models import Count, F, Prefetch
+from django.db import transaction, DatabaseError, OperationalError, IntegrityError
 
 from core.views import get_client_ip, universal_rate_key
 from .models import TranslationChallenge, ChallengeComment, ChallengeCommentVote
@@ -25,19 +25,43 @@ def get_challenges(request):
     if getattr(request, 'limited', False):
         return Response({'error': 'Too many requests'}, status=429)
 
-    challenges = list(
+    try:
+        page = int(request.GET.get('page', 1))
+    except (ValueError, TypeError):
+        page = 1
+        
+    try:
+        limit = int(request.GET.get('limit', 20))
+    except (ValueError, TypeError):
+        limit = 20
+    limit = min(limit, 50)
+
+    challenges_qs = (
         TranslationChallenge.objects.filter(status='approved')
         .annotate(comment_count=Count('comments'))
         .select_related('user')
+        .prefetch_related(
+            Prefetch(
+                'comments',
+                queryset=ChallengeComment.objects.order_by('-score', 'timestamp'),
+                to_attr='prefetched_ordered_comments'
+            )
+        )
         .order_by('-comment_count', '-timestamp')
     )
 
-    for ch in challenges:
-        if ch.timer_on and not ch.winner_word_created and ch.is_closed:
-            ch.create_winner_word()
+    paginator = Paginator(challenges_qs, limit)
+    try:
+        challenges_page = paginator.page(page)
+    except (EmptyPage, PageNotAnInteger):
+        challenges_page = []
 
-    serializer = TranslationChallengeSerializer(challenges, many=True)
-    return Response({'success': True, 'challenges': serializer.data})
+    serializer = TranslationChallengeSerializer(challenges_page, many=True)
+    return Response({
+        'success': True,
+        'challenges': serializer.data,
+        'has_next': challenges_page.has_next() if hasattr(challenges_page, 'has_next') else False
+    })
 
 
 @ratelimit(key='ip', rate='30/m', method='POST', block=False)
@@ -152,7 +176,6 @@ def add_challenge_suggestion(request):
                 'error': 'Bu meydan okuma sona erdi, artık öneri eklenemez.'
             }, status=403)
 
-        # One suggestion per user per challenge
         existing_by_user = ChallengeComment.objects.filter(
             challenge=challenge,
             user=request.user
@@ -168,7 +191,6 @@ def add_challenge_suggestion(request):
         suggested_word = serializer.validated_data['suggested_word']
         etymology = serializer.validated_data.get('etymology', '')
         example_sentence = serializer.validated_data.get('example_sentence', '')
-        explanation = serializer.validated_data.get('explanation', '')
 
         with transaction.atomic():
             existing_word = ChallengeComment.objects.select_for_update().filter(
@@ -183,16 +205,23 @@ def add_challenge_suggestion(request):
                     'existing_id': existing_word.id
                 }, status=409)
 
-            new_suggestion = ChallengeComment.objects.create(
-                challenge=challenge,
-                user=request.user,
-                author=request.user.username,
-                suggested_word=suggested_word,
-                etymology=etymology,
-                example_sentence=example_sentence,
-                explanation=explanation,
-                score=0
-            )
+            try:
+                new_suggestion = ChallengeComment.objects.create(
+                    challenge=challenge,
+                    user=request.user,
+                    author=request.user.username,
+                    suggested_word=suggested_word,
+                    etymology=etymology,
+                    example_sentence=example_sentence,
+                    score=0
+                )
+            except IntegrityError:
+                concurrent_existing = ChallengeComment.objects.filter(challenge=challenge, user=request.user).first()
+                return Response({
+                    'success': False,
+                    'error': 'Bu meydan okumaya zaten bir öneri gönderdiniz.',
+                    'existing_id': concurrent_existing.id if concurrent_existing else None
+                }, status=409)
 
         return Response({
             'success': True,
@@ -242,21 +271,63 @@ def vote_challenge_comment(request, comment_id):
             response_action = 'none'
         else:
             existing_vote.value = vote_val
-            existing_vote.save()
+            existing_vote.save(update_fields=['value']) # Fix: Added update_fields
             comment.score = F('score') + (vote_val * 2)
             response_action = 'liked' if vote_val == 1 else 'disliked'
     else:
-        ChallengeCommentVote.objects.create(
-            value=vote_val,
-            ip_address=client_ip,
-            user=user,
-            comment=comment
-        )
+        try:
+            ChallengeCommentVote.objects.create(
+                value=vote_val,
+                ip_address=client_ip,
+                user=user,
+                comment=comment
+            )
+        except IntegrityError:
+            return Response({'error': 'Oy zaten kaydedildi.'}, status=409)
         comment.score = F('score') + vote_val
         response_action = 'liked' if vote_val == 1 else 'disliked'
 
-    comment.save()
+    comment.save(update_fields=['score']) # Fix: Added update_fields
     comment.refresh_from_db()
+
+    owner = comment.user if hasattr(comment, 'user') else None
+    if owner and owner != user:
+        from core.models import Notification
+        from django.core.cache import cache
+
+        like_type = 'challenge_like'
+        dislike_type = 'challenge_dislike'
+        current_type = like_type if vote_val == 1 else dislike_type
+        opposite_type = dislike_type if vote_val == 1 else like_type
+        
+        if response_action == 'none':
+            # SOFT DELETE
+            updated = Notification.objects.filter(
+                recipient=owner, actor=user, notification_type=current_type, challenge_comment_id=comment.id
+            ).update(is_active=False)
+            
+            if updated:
+                cache.delete(f'notif_unread_{owner.id}')
+        else:
+            # Deactivate opposite vote type
+            Notification.objects.filter(
+                recipient=owner, actor=user, notification_type=opposite_type, challenge_comment_id=comment.id
+            ).update(is_active=False)
+            
+            # Fetch or create the notification
+            notif, created = Notification.objects.get_or_create(
+                recipient=owner, actor=user, notification_type=current_type, challenge_comment_id=comment.id,
+                defaults={'is_active': True}
+            )
+            
+            # REVIVE: If it existed but was deactivated, turn it back on.
+            if not created and not notif.is_active:
+                notif.is_active = True
+                notif.is_read = False
+                notif.save(update_fields=['is_active', 'is_read'])
+                cache.delete(f'notif_unread_{owner.id}')
+            elif created:
+                cache.delete(f'notif_unread_{owner.id}')
 
     return Response({
         'success': True,

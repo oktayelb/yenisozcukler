@@ -2,70 +2,124 @@
    5. responsive.css - Mobile Overrides
    ======================================= */
 
-@media (max-width: 900px) { 
-    .form-fields { display: flex; flex-direction: column; gap: var(--spacing-md); align-items: stretch; } 
+@media (max-width: 900px) {
+    .form-fields {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-md);
+        align-items: stretch;
+    }
     .span-half, .span-full { width: 100%; grid-column: auto; }
     .form-group { width: 100%; }
-    .form-card.collapsed { width: 80%; padding: 12px 20px; align-self: center; }
+    .word-etymology-group { width: 100%; }
+    .category-example-row { flex-direction: column; }
+    .category-example-row #categorySelectionContainer { max-width: 100%; min-width: 0; }
+    .form-card.collapsed {
+        width: 80%;
+        padding: 14px var(--spacing-md);
+        align-self: center;
+    }
     .form-header-toggle { justify-content: center; }
     .form-group label { display: block; text-align: center; width: 100%; }
     .char-limit { text-align: right; }
-    .form-submit-wrapper { flex-direction: row; justify-content: space-between; align-items: center; gap: 10px; }
+    .form-submit-wrapper {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        gap: var(--spacing-sm);
+    }
     .submission-hint { text-align: left; font-size: 1rem; }
-    .form-card button { width: auto; min-width: 0; padding: 12px 20px; font-size: 1rem; }
-    
-    header { margin: 80px 0 20px; }
-    .logo-card { padding: 15px 20px; width: auto; max-width: 100%; }
+    .form-card button { width: auto; min-width: 0; padding: 12px var(--spacing-md); font-size: 1rem; }
+
+    header { margin: 80px 0 var(--spacing-md); }
+    .logo-card {
+        padding: var(--spacing-sm) var(--spacing-md);
+        width: auto;
+        max-width: 100%;
+    }
     .logo-card h1 { font-size: 2.8rem; }
     .logo-card .subtitle { font-size: 1.1rem; }
-    
-    /* MODAL MOBILE OVERRIDES - Adjusted for new structure */
-    .auth-box { 
-        width: 92%; 
-        padding: 30px 20px; /* Reduced side padding for small screens */
-        border-radius: 20px; 
-    } 
-    .about-box { 
-        max-height: 85vh; 
-        padding: 30px 20px; 
+
+    /* MODAL MOBILE OVERRIDES */
+    .auth-box {
+        width: 92%;
+        padding: 30px var(--spacing-md);
+        border-radius: var(--radius-lg);
+    }
+    .about-box {
+        max-height: 85vh;
+        padding: 30px var(--spacing-md);
     }
     .auth-tabs {
-        margin-bottom: 25px;
-        border-radius: 10px;
+        margin-bottom: var(--spacing-lg);
+        border-radius: var(--radius-sm);
     }
     .auth-tab {
         font-size: 1rem;
         padding: 10px 5px;
     }
-    
-    /* Profile Modal Mobile Adjustments */
+
+    /* Profile Modal Mobile */
     .profile-modal-box {
-        padding: 30px 20px;
+        padding: 30px var(--spacing-md);
     }
     .profile-stats-container {
-        padding: 12px 5px; 
+        padding: var(--spacing-sm) 5px;
     }
     .stat-value {
-        font-size: 1.2rem; 
+        font-size: 1.2rem;
     }
     .stat-label {
-        font-size: 0.7rem;
+        font-size: 0.68rem;
     }
 
-    /* Fix for My Words Modal on Mobile */
+    /* My Words Modal Mobile */
     #myWordsModal .auth-box {
         max-height: 85vh;
         width: 95% !important;
         display: flex;
         flex-direction: column;
         margin: auto;
-        padding: 25px 15px;
+        padding: var(--spacing-lg) var(--spacing-sm);
     }
-
     #myWordsFeed {
         flex: 1;
         overflow-y: auto;
         min-height: 0;
         max-height: none;
+    }
+
+    /* Container spacing */
+    .container {
+        gap: var(--spacing-lg);
+    }
+    .app-layout {
+        padding: var(--spacing-md);
+    }
+}
+
+/* Small phones */
+@media (max-width: 480px) {
+    .word-card {
+        padding: var(--spacing-md) var(--spacing-md);
+        border-radius: var(--radius);
+        margin-bottom: var(--spacing-md);
+    }
+    .word-card h3 {
+        font-size: 1.5rem;
+        padding-right: 90px;
+    }
+    .vote-container-floating {
+        padding: 6px var(--spacing-sm);
+        gap: 10px;
+        top: var(--spacing-md);
+        right: var(--spacing-md);
+    }
+    .vote-score {
+        font-size: 1rem;
+    }
+    .header-btn {
+        padding: 8px var(--spacing-sm);
+        font-size: 0.82rem;
     }
 }

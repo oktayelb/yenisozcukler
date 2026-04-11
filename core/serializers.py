@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Word, Comment, Category
+from .models import Word, Comment, Category, Notification
 import re
 import requests
 from decouple import config
@@ -24,6 +24,72 @@ def validate_example_text(value):
 
 
 # --- OKUMA (READ) SERIALIZERS ---
+
+class NotificationSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source='actor.username', read_only=True, allow_null=True, default=None)
+    word_text = serializers.CharField(source='word.word', read_only=True, allow_null=True, default=None)
+    word_def = serializers.CharField(source='word.definition', read_only=True, allow_null=True, default=None)
+    word_example = serializers.CharField(source='word.example', read_only=True, allow_null=True, default=None)
+    word_etymology = serializers.CharField(source='word.etymology', read_only=True, allow_null=True, default=None)
+
+    # Challenge-comment notifications (challenge_like / challenge_dislike)
+    challenge_comment_id = serializers.IntegerField(read_only=True, allow_null=True)
+    challenge_id = serializers.SerializerMethodField()
+    challenge_foreign_word = serializers.SerializerMethodField()
+    challenge_meaning = serializers.SerializerMethodField()
+    challenge_timer_on = serializers.SerializerMethodField()
+    challenge_is_closed = serializers.SerializerMethodField()
+    challenge_time_remaining_seconds = serializers.SerializerMethodField()
+    challenge_suggested_word = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Notification
+        fields = [
+            'id', 'notification_type', 'actor_username',
+            'word_text', 'word_def', 'word_example', 'word_etymology',
+            'message', 'is_read', 'timestamp', 'word_id', 'comment_id',
+            'challenge_comment_id', 'challenge_id', 'challenge_foreign_word',
+            'challenge_meaning', 'challenge_timer_on', 'challenge_is_closed',
+            'challenge_time_remaining_seconds', 'challenge_suggested_word',
+        ]
+
+    def _challenge(self, obj):
+        cc = getattr(obj, 'challenge_comment', None)
+        return cc.challenge if cc else None
+
+    def get_challenge_id(self, obj):
+        ch = self._challenge(obj)
+        return ch.id if ch else None
+
+    def get_challenge_foreign_word(self, obj):
+        ch = self._challenge(obj)
+        return ch.foreign_word if ch else None
+
+    def get_challenge_meaning(self, obj):
+        ch = self._challenge(obj)
+        return ch.meaning if ch else None
+
+    def get_challenge_timer_on(self, obj):
+        ch = self._challenge(obj)
+        return ch.timer_on if ch else None
+
+    def get_challenge_is_closed(self, obj):
+        ch = self._challenge(obj)
+        return ch.is_closed if ch else None
+
+    def get_challenge_time_remaining_seconds(self, obj):
+        ch = self._challenge(obj)
+        if ch is None:
+            return None
+        remaining = ch.time_remaining
+        if remaining is not None:
+            return int(remaining.total_seconds())
+        return None
+
+    def get_challenge_suggested_word(self, obj):
+        cc = getattr(obj, 'challenge_comment', None)
+        return cc.suggested_word if cc else None
+
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -56,7 +122,7 @@ class WordSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Word
-        fields = ['id', 'word', 'author', 'score', 'timestamp', 'user_vote', 'definition', 'example', 'etymology', 'comment_count', 'categories'] 
+        fields = ['id', 'word', 'slug', 'author', 'score', 'timestamp', 'user_vote', 'definition', 'example', 'etymology', 'comment_count', 'categories']
 
     def get_user_vote(self, obj):
         votes = self.context.get('user_votes', {})
@@ -134,8 +200,7 @@ class WordCreateSerializer(serializers.ModelSerializer):
         if len(value) > 200:
             raise serializers.ValidationError("Köken bilgisi 200 karakteri geçemez.")
             
-        # Slightly more relaxed regex for etymology to allow < > for language derivations
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\'<>]', value))
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Köken bilgisinde geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
         return value
@@ -168,6 +233,9 @@ class CommentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Yorum 200 karakteri geçemez.")
         if not value:
             raise serializers.ValidationError("Yorum boş olamaz.")
+        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\'"?!\-+#]', value))
+        if invalid_chars:
+            raise serializers.ValidationError(f"Yorumda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
         return value
     
 
@@ -200,7 +268,8 @@ class AuthSerializer(serializers.Serializer):
         }
         
         try:
-            response = requests.post(verify_url, data=data, timeout=5)
+            # P7 Fix: Reduced timeout from 5 to 2.0 seconds to prevent worker exhaustion
+            response = requests.post(verify_url, data=data, timeout=2.0)
             result = response.json()
             
             if not result.get('success'):
@@ -221,7 +290,7 @@ class ChangeUsernameSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("Kullanıcı adı boş olamaz.")
 
-        if value.lower() == 'anonim':
+        if value.lower() in ['anonim', 'admin', 'moderator']:
             raise serializers.ValidationError("Bu kullanıcı adı sistem tarafından ayrılmıştır.")
 
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ0-9_]', value))

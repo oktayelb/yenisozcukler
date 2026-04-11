@@ -1,31 +1,48 @@
 # core/views.py
 import logging
+import requests as http_requests
 
+from decouple import config
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication
 
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
+from django.http import HttpResponse, HttpResponseNotFound
 from django_ratelimit.decorators import ratelimit
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.core.cache import cache
 from django.db.models import Count, F, Sum, Q
 from django.db import transaction, DatabaseError, OperationalError, IntegrityError
 
-from .models import Word, Comment, WordVote, CommentVote, Category
+from .models import Word, Comment, WordVote, CommentVote, Category, Notification
 from .serializers import (
     WordSerializer, CommentSerializer,
     WordCreateSerializer, CommentCreateSerializer,
     AuthSerializer, ChangeUsernameSerializer,
-    WordAddExampleSerializer, CategorySerializer
+    WordAddExampleSerializer, CategorySerializer,
+    NotificationSerializer
 )
 
 logger = logging.getLogger(__name__)
 
 # --- YARDIMCI FONKSİYONLAR ---
+
+def verify_turnstile(token):
+    try:
+        result = http_requests.post(
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+            data={'secret': config('CLOUDFLARE_SECRET_KEY'), 'response': token},
+            timeout=2.0
+        ).json()
+        return result.get('success', False)
+    except http_requests.RequestException:
+        return False
 
 def get_client_ip(request):
     cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
@@ -42,6 +59,78 @@ def universal_rate_key(group, request):
     if hasattr(request, 'user') and request.user.is_authenticated:
         return f"user_{request.user.id}"
     return f"ip_{get_client_ip(request)}"
+
+# --- ROBOTS.TXT ---
+
+_ROBOTS_TXT = (
+    "User-agent: *\n"
+    "Allow: /\n"
+    "Disallow: /api/\n"
+    "Disallow: /admin/\n"
+)
+
+def robots_txt(request):
+    return HttpResponse(_ROBOTS_TXT, content_type='text/plain')
+
+# --- BOT DETECTION ---
+
+BOT_SPECIFIC = [
+    'googlebot', 'bingbot', 'yandexbot', 'duckduckbot', 'baiduspider',
+    'slurp', 'facebookexternalhit', 'linkedinbot',
+    'whatsapp', 'telegrambot', 'discordbot', 'applebot',
+]
+BOT_GENERIC = ['bot', 'crawler', 'spider', 'scraper', 'preview']
+
+def _is_bot(ua):
+    ua = (ua or '').lower()
+    return any(p in ua for p in BOT_SPECIFIC) or any(p in ua for p in BOT_GENERIC)
+
+# --- DYNAMIC RENDERING VIEWS ---
+
+@permission_classes([])
+def index_view(request):
+    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+        words = Word.objects.filter(status='approved').select_related('user').order_by('-timestamp')[:50]
+        response = render(request, 'bot_index.html', {'words': words})
+    else:
+        response = render(request, 'index.html')
+    
+    response['Vary'] = 'User-Agent'
+    return response
+
+@permission_classes([])
+def category_view(request, slug):
+    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+        category = get_object_or_404(Category, slug=slug)
+        words = Word.objects.filter(status='approved', categories=category).select_related('user').order_by('-timestamp')[:50]
+        response = render(request, 'bot_category.html', {'category': category, 'words': words})
+    else:
+        response = render(request, 'index.html')
+        
+    response['Vary'] = 'User-Agent'
+    return response
+
+@permission_classes([])
+def word_detail(request, word_slug):
+    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+        word = get_object_or_404(
+            Word.objects.select_related('user').prefetch_related('categories'),
+            slug=word_slug,
+            status='approved'
+        )
+        response = render(request, 'word_detail.html', {'word': word})
+    else:
+        response = render(request, 'index.html')
+
+    response['Vary'] = 'User-Agent'
+    return response
+
+@permission_classes([])
+def spa_catchall(request, *args, **kwargs):
+    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+        return HttpResponseNotFound()
+    return render(request, 'index.html')
+
 
 # --- OKUMA (READ) ENDPOINTLERİ ---
 
@@ -159,7 +248,8 @@ def get_comments(request, word_id):
         limit = 10
     limit = min(limit, 20)
 
-    comments_qs = Comment.objects.filter(word_id=word_id).select_related('user').order_by('timestamp')
+    word = get_object_or_404(Word, id=word_id, status='approved')
+    comments_qs = Comment.objects.filter(word=word).select_related('user').order_by('timestamp')
     paginator = Paginator(comments_qs, limit)
 
     try:
@@ -189,6 +279,61 @@ def get_comments(request, word_id):
         'comments': serializer.data,
         'has_next': comments_page.has_next() if hasattr(comments_page, 'has_next') else False
     })
+
+
+@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@api_view(['GET'])
+@permission_classes([])
+def get_word(request, word_id):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    word = get_object_or_404(
+        Word.objects.filter(status='approved')
+            .annotate(comment_count=Count('comments'))
+            .select_related('user')
+            .prefetch_related('categories'),
+        id=word_id
+    )
+
+    user_votes = {}
+    if request.user.is_authenticated:
+        vote = WordVote.objects.filter(user=request.user, word=word).values('value').first()
+        if vote:
+            user_votes[word.id] = vote['value']
+
+    serializer = WordSerializer(word, context={'user_votes': user_votes})
+    return Response({'success': True, 'word': serializer.data})
+
+
+@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@api_view(['GET'])
+@permission_classes([])
+def get_word_by_slug(request, word_slug):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    cache_key = f'word_slug_{word_slug}'
+    word = cache.get(cache_key)
+    if word is None:
+        word = get_object_or_404(
+            Word.objects.filter(status='approved')
+                .annotate(comment_count=Count('comments'))
+                .select_related('user')
+                .prefetch_related('categories'),
+            slug=word_slug
+        )
+        cache.set(cache_key, word, 60 * 60)
+
+    user_votes = {}
+    if request.user.is_authenticated:
+        vote = WordVote.objects.filter(user=request.user, word=word).values('value').first()
+        if vote:
+            user_votes[word.id] = vote['value']
+
+    serializer = WordSerializer(word, context={'user_votes': user_votes})
+    return Response({'success': True, 'word': serializer.data})
+
 
 # --- YAZMA (WRITE) ENDPOINTLERİ ---
 
@@ -237,7 +382,7 @@ def vote(request, entity_type, entity_id):
             response_action = 'none'
         else:
             existing_vote.value = vote_val
-            existing_vote.save()
+            existing_vote.save(update_fields=['value'])
             obj.score = F('score') + (vote_val * 2)
             response_action = 'liked' if vote_val == 1 else 'disliked'
     else:
@@ -254,23 +399,72 @@ def vote(request, entity_type, entity_id):
         obj.score = F('score') + vote_val
         response_action = 'liked' if vote_val == 1 else 'disliked'
 
-    obj.save()
+    obj.save(update_fields=['score'])
     obj.refresh_from_db()
 
+    owner = obj.user if hasattr(obj, 'user') else None
+    if owner and owner != user:
+        prefix = 'word' if entity_type == 'word' else 'comment'
+        like_type = f'{prefix}_like'
+        dislike_type = f'{prefix}_dislike'
+        current_type = like_type if vote_val == 1 else dislike_type
+        opposite_type = dislike_type if vote_val == 1 else like_type
+
+        # This dictionary is critical to preventing the lookup_kwargs error.
+        lookup_kwargs = {'word': obj} if entity_type == 'word' else {'comment': obj}
+
+        if response_action == 'none':
+            # SOFT DELETE: Instead of .delete(), we deactivate it.
+            updated = Notification.objects.filter(
+                recipient=owner, actor=user, notification_type=current_type, **lookup_kwargs
+            ).update(is_active=False)
+            
+            if updated:
+                cache.delete(f'notif_unread_{owner.id}')
+        else:
+            # Deactivate the opposite vote type (e.g. they switched from dislike to like)
+            Notification.objects.filter(
+                recipient=owner, actor=user, notification_type=opposite_type, **lookup_kwargs
+            ).update(is_active=False)
+            
+            # This defaults dictionary is also required for get_or_create
+            defaults = {'comment': None} if entity_type == 'word' else {'word': obj.word}
+            defaults['is_active'] = True
+            
+            # Fetch or create the notification. 
+            notif, created = Notification.objects.get_or_create(
+                recipient=owner, actor=user, notification_type=current_type, 
+                **lookup_kwargs, defaults=defaults
+            )
+            
+            # REVIVE: If it existed but was deactivated, turn it back on.
+            if not created and not notif.is_active:
+                notif.is_active = True
+                notif.is_read = False  # Mark unread so they see it again
+                notif.save(update_fields=['is_active', 'is_read'])
+                cache.delete(f'notif_unread_{owner.id}')
+            elif created:
+                cache.delete(f'notif_unread_{owner.id}')
+
     return Response({
-        'success': True, 
-        'new_score': obj.score, 
-        'user_action': response_action 
+        'success': True,
+        'new_score': obj.score,
+        'user_action': response_action
     })
 
 @ratelimit(key='ip', rate='30/m', method='POST', block=False)
 @ratelimit(key=universal_rate_key, rate='5/m', method='POST', block=False)
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
-@permission_classes([]) 
+@permission_classes([])
+@transaction.atomic
 def add_word(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
+    
+    captcha_token = request.data.get('cf_turnstile_response')
+    if not captcha_token or not verify_turnstile(captcha_token):
+        return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
     
     serializer = WordCreateSerializer(data=request.data, context={'request': request})
     
@@ -280,11 +474,21 @@ def add_word(request):
         
         if request.user.is_authenticated:
             save_kwargs['user'] = request.user
-            # Author field stays empty for authenticated users, handled dynamically by display_author
         else:
             save_kwargs['author'] = 'Anonim'
         
-        serializer.save(**save_kwargs)
+        word = serializer.save(**save_kwargs)
+        
+        if request.user.is_authenticated:
+            WordVote.objects.create(
+                word=word,
+                user=request.user,
+                value=1,
+                ip_address=client_ip
+            )
+            word.score = 1
+            word.save(update_fields=['score'])
+
         cache.delete('total_approved_words_count_all')
         
         return Response({'success': True})
@@ -297,6 +501,7 @@ def add_word(request):
 @api_view(['PATCH'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def add_example(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
@@ -306,7 +511,7 @@ def add_example(request):
     if serializer.is_valid():
         word_id = serializer.validated_data['word_id']
         new_example = serializer.validated_data['example']
-        word = get_object_or_404(Word, id=word_id)
+        word = get_object_or_404(Word.objects.select_for_update(), id=word_id)
 
         if word.user != request.user:
             return Response({'success': False, 'error': 'Bu kelimeyi düzenleme yetkiniz yok.'}, status=403)
@@ -315,7 +520,7 @@ def add_example(request):
             return Response({'success': False, 'error': 'Bu kelimenin zaten bir örnek cümlesi var.'}, status=400)
 
         word.example = new_example
-        word.save()
+        word.save(update_fields=['example'])
         return Response({'success': True, 'message': 'Örnek cümle başarıyla eklendi.'})
 
     first_error = next(iter(serializer.errors.values()))[0]
@@ -326,6 +531,7 @@ def add_example(request):
 @api_view(['POST'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
+@transaction.atomic
 def add_comment(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
@@ -334,6 +540,7 @@ def add_comment(request):
     
     if serializer.is_valid():
         word = get_object_or_404(Word, id=serializer.validated_data['word_id'], status='approved')
+        client_ip = get_client_ip(request)
 
         new_comment = Comment.objects.create(
             word=word,
@@ -342,6 +549,26 @@ def add_comment(request):
             comment=serializer.validated_data['comment'],
             score=0
         )
+
+        CommentVote.objects.create(
+            comment=new_comment,
+            user=request.user,
+            value=1,
+            ip_address=client_ip
+        )
+        Comment.objects.filter(pk=new_comment.pk).update(score=F('score') + 1)
+        new_comment.score = 1
+
+        if word.user and word.user != request.user:
+            Notification.objects.create(
+                recipient=word.user,
+                actor=request.user,
+                notification_type='new_comment',
+                word=word,
+                comment=new_comment,
+            )
+            cache.delete(f'notif_unread_{word.user.id}')
+
         return Response({'success': True, 'comment': CommentSerializer(new_comment).data}, status=201)
     else:
         first_error = next(iter(serializer.errors.values()))[0]
@@ -357,29 +584,32 @@ def login_view(request):
     if getattr(request, 'limited', False):
          return Response({'success': False, 'error': 'Çok fazla giriş denemesi. Lütfen bekleyin.'}, status=429)
 
-    serializer = AuthSerializer(data=request.data)
-    if serializer.is_valid():
-        username = serializer.validated_data['username']
-        password = serializer.validated_data['password']
+    captcha_token = request.data.get('token')
+    if not captcha_token or not verify_turnstile(captcha_token):
+        return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
 
-        # Case-insensitive username lookup before authenticating
-        try:
-            db_user = User.objects.get(username__iexact=username)
-            user = authenticate(request, username=db_user.username, password=password)
-        except User.DoesNotExist:
-            user = None
-        except User.MultipleObjectsReturned:
-            user = None
+    username = request.data.get('username', '').strip()
+    password = request.data.get('password', '')
 
-        if user is None:
-            return Response({'success': False, 'error': 'Bu kullanıcı adı veya şifre hatalı.'}, status=400)
-        
-        login(request, user)    
+    if not username or not password:
+        return Response({'success': False, 'error': 'Geçersiz veri.'}, status=400)
 
-        return Response({'success': True, 'username': user.username, 'message': 'Giriş başarılı.'})
+    try:
+        db_user = User.objects.get(username__iexact=username)
+        canonical_username = db_user.username
+    except User.DoesNotExist:
+        canonical_username = username
+    except User.MultipleObjectsReturned:
+        canonical_username = username
+
+    user = authenticate(request, username=canonical_username, password=password)
+
+    if user is None:
+        return Response({'success': False, 'error': 'Bu kullanıcı adı veya şifre hatalı.'}, status=400)
     
-    first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
-    return Response({'success': False, 'error': first_error}, status=400)
+    login(request, user)    
+
+    return Response({'success': True, 'username': user.username, 'message': 'Giriş başarılı.'})
 
 @ratelimit(key='ip', rate='10/h', method='POST', block=False)
 @ratelimit(key=universal_rate_key, rate='2/h', method='POST', block=False)
@@ -388,6 +618,10 @@ def login_view(request):
 def register_view(request):
     if getattr(request, 'limited', False):
          return Response({'success': False, 'error': 'Çok fazla kayıt denemesi. Lütfen daha sonra tekrar deneyin.'}, status=429)
+
+    captcha_token = request.data.get('token')
+    if not captcha_token or not verify_turnstile(captcha_token):
+        return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
 
     serializer = AuthSerializer(data=request.data)
     if serializer.is_valid():
@@ -398,10 +632,17 @@ def register_view(request):
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
 
         try:
+            validate_password(password)
+        except DjangoValidationError as e:
+            return Response({'success': False, 'error': e.messages[0]}, status=400)
+
+        try:
             with transaction.atomic():
                 user = User.objects.create_user(username=username, password=password)
                 login(request, user)
                 return Response({'success': True, 'username': user.username, 'message': 'Kayıt başarılı.'}, status=201)
+        except IntegrityError:
+            return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
         except Exception as e:
             logger.error('register_view failed for username=%s: %s', username, e, exc_info=True)
             return Response({'success': False, 'error': 'Kayıt oluşturulamadı.'}, status=500)
@@ -475,6 +716,11 @@ def change_password(request):
     if len(new_password) > 60:
         return Response({'success': False, 'error': 'Yeni şifre en fazla 60  karakter olabilir.'}, status=400)
 
+    try:
+        validate_password(new_password, user=user)
+    except DjangoValidationError as e:
+        return Response({'success': False, 'error': e.messages[0]}, status=400)
+
     user.set_password(new_password)
     user.save()
     update_session_auth_hash(request, user)
@@ -499,8 +745,6 @@ def change_username(request):
             with transaction.atomic():
                 user.username = new_username
                 user.save()
-
-                # Removed Word and Comment bulk update - database is no longer denormalized!
                 
                 return Response({'success': True, 'message': 'Kullanıcı adı başarıyla değiştirildi.'})
                 
@@ -533,7 +777,11 @@ def get_my_words(request):
     else:
         return Response({'success': False, 'error': 'Yetkisiz erişim.'}, status=401)
 
-    words_qs = Word.objects.filter(user=user, status='approved').select_related('user').order_by('-timestamp')
+    words_qs = Word.objects.filter(user=user, status='approved')\
+        .annotate(comment_count=Count('comments'))\
+        .select_related('user')\
+        .prefetch_related('categories')\
+        .order_by('-timestamp')
     
     paginator = Paginator(words_qs, limit)
     try:
@@ -559,3 +807,74 @@ def get_my_words(request):
         'words': serializer.data,
         'total_count': paginator.count
     })
+
+# --- BİLDİRİM (NOTIFICATION) ENDPOINTLERİ ---
+
+@ratelimit(key=universal_rate_key, rate='60/m', method='GET', block=False)
+@api_view(['GET'])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def get_notifications(request):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    page_number = request.GET.get('page', 1)
+    limit = min(int(request.GET.get('limit', 20)), 50)
+
+    # Filtering strictly for active notifications to prevent spam
+    qs = Notification.objects.filter(recipient=request.user, is_active=True).select_related(
+        'actor', 'word', 'comment', 'challenge_comment', 'challenge_comment__challenge'
+    )
+    paginator = Paginator(qs, limit)
+    try:
+        page = paginator.page(page_number)
+    except (PageNotAnInteger, EmptyPage):
+        page = []
+
+    serializer = NotificationSerializer(page, many=True)
+
+    return Response({
+        'success': True,
+        'notifications': serializer.data,
+        'has_next': page.has_next() if hasattr(page, 'has_next') else False,
+    })
+
+
+@ratelimit(key=universal_rate_key, rate='120/m', method='GET', block=False)
+@api_view(['GET'])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def get_unread_count(request):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    cache_key = f'notif_unread_{request.user.id}'
+    count = cache.get(cache_key)
+    if count is None:
+        count = Notification.objects.filter(recipient=request.user, is_read=False, is_active=True).count()
+        cache.set(cache_key, count, 60)
+    return Response({'success': True, 'unread_count': count})
+
+
+@ratelimit(key=universal_rate_key, rate='30/m', method='POST', block=False)
+@api_view(['POST'])
+@authentication_classes([SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def mark_notifications_read(request):
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    ids = request.data.get('ids')
+    qs = Notification.objects.filter(recipient=request.user, is_read=False, is_active=True)
+    
+    if ids is not None:
+        if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+            return Response({'success': False, 'error': 'Geçersiz ID formatı.'}, status=400)
+        qs = qs.filter(id__in=ids)
+    else:
+        return Response({'success': False, 'error': 'İşaretlenecek bildirim ID\'leri eksik.'}, status=400)
+        
+    qs.update(is_read=True)
+    cache.delete(f'notif_unread_{request.user.id}')
+
+    return Response({'success': True})

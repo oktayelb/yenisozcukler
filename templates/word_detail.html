@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block head %}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ word.word }} - Yeni Sözcükler</title>
+<meta name="description" content="{{ word.definition }}{% if word.etymology %} (Köken: {{ word.etymology }}){% endif %}">
+
+<meta property="og:title" content="{{ word.word }} - Yeni Sözcükler">
+<meta property="og:description" content="{{ word.definition }}">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://yenisozcukler.com/sozcuk/{{ word.slug }}/">
+<meta property="og:site_name" content="Yeni Sözcükler">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ word.word }} - Yeni Sözcükler">
+<meta name="twitter:description" content="{{ word.definition }}">
+
+<link rel="canonical" href="https://yenisozcukler.com/sozcuk/{{ word.slug }}/">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "DefinedTerm",
+    "name": "{{ word.word|escapejs }}",
+    "description": "{{ word.definition|escapejs }}"{% if word.etymology %},
+    "termCode": "{{ word.etymology|escapejs }}"{% endif %}
+}
+</script>
+{% endblock %}
+
+{% block content %}
+    <div class="app-layout">
+        {% include 'partials/header.html' with linked=True %}
+
+        <div class="container">
+            <div class="word-card show" style="max-width:640px; margin:20px auto;">
+                <div>
+                    <h2 style="color:var(--accent); margin:0 0 8px;">{{ word.word }}</h2>
+
+                    {% if word.etymology %}
+                    <div class="word-etymology" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">
+                        <em>Köken:</em> {{ word.etymology }}
+                    </div>
+                    {% endif %}
+
+                    <p style="margin:0 0 10px;">{{ word.definition }}</p>
+
+                    {% if word.example %}
+                    <div class="word-example">"{{ word.example }}"</div>
+                    {% endif %}
+                </div>
+
+                {% if word.categories.all %}
+                <div class="tag-list" style="margin-top:12px;">
+                    {% for cat in word.categories.all %}
+                    <a href="/kategori/{{ cat.slug }}/" class="tag-badge" style="text-decoration:none;">{{ cat.name }}</a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="word-footer" style="margin-top:12px;">
+                    <span>Yazar: {{ word.display_author }}</span>
+                </div>
+            </div>
+
+            <div style="text-align:center; margin:30px 0;">
+                <a href="/" style="color:var(--accent); font-size:1rem;">Tüm sözcüklere göz at</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
