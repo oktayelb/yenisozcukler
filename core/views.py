@@ -37,14 +37,20 @@ logger = logging.getLogger(__name__)
 def verify_turnstile(token):
     if settings.DEBUG:
         return True
+    if not token:
+        return False
     try:
-        result = http_requests.post(
+        resp = http_requests.post(
             'https://challenges.cloudflare.com/turnstile/v0/siteverify',
             data={'secret': config('CLOUDFLARE_SECRET_KEY'), 'response': token},
-            timeout=2.0
-        ).json()
+            timeout=5,
+        )
+        result = resp.json()
+        if not result.get('success', False):
+            logger.warning('Turnstile rejected: %s', result.get('error-codes', []))
         return result.get('success', False)
-    except http_requests.RequestException:
+    except http_requests.RequestException as e:
+        logger.error('Turnstile request failed: %s', e)
         return False
 
 def get_client_ip(request):
@@ -477,7 +483,7 @@ def add_word(request):
         return Response({'success': False, 'error': 'Çok fazla istek gönderdiniz.'}, status=429)
     
     captcha_token = request.data.get('cf_turnstile_response')
-    if not captcha_token or not verify_turnstile(captcha_token):
+    if not verify_turnstile(captcha_token):
         return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
     
     serializer = WordCreateSerializer(data=request.data, context={'request': request})
@@ -599,7 +605,7 @@ def login_view(request):
          return Response({'success': False, 'error': 'Çok fazla giriş denemesi. Lütfen bekleyin.'}, status=429)
 
     captcha_token = request.data.get('token')
-    if not captcha_token or not verify_turnstile(captcha_token):
+    if not verify_turnstile(captcha_token):
         return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
 
     username = request.data.get('username', '').strip()
@@ -634,7 +640,7 @@ def register_view(request):
          return Response({'success': False, 'error': 'Çok fazla kayıt denemesi. Lütfen daha sonra tekrar deneyin.'}, status=429)
 
     captcha_token = request.data.get('token')
-    if not captcha_token or not verify_turnstile(captcha_token):
+    if not verify_turnstile(captcha_token):
         return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
 
     serializer = AuthSerializer(data=request.data)

@@ -124,7 +124,7 @@ export function handleAuthSubmit() {
         }
     }
 
-    if (!t) {
+    if (!t && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
         if (err) { err.innerText = "Robot doğrulaması gerekli."; err.style.display = 'block'; }
         return;
     }
