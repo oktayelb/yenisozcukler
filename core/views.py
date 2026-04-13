@@ -2,6 +2,7 @@
 import logging
 import requests as http_requests
 
+from django.conf import settings
 from decouple import config
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
@@ -34,6 +35,8 @@ logger = logging.getLogger(__name__)
 # --- YARDIMCI FONKSİYONLAR ---
 
 def verify_turnstile(token):
+    if settings.DEBUG:
+        return True
     try:
         result = http_requests.post(
             'https://challenges.cloudflare.com/turnstile/v0/siteverify',
@@ -59,6 +62,17 @@ def universal_rate_key(group, request):
     if hasattr(request, 'user') and request.user.is_authenticated:
         return f"user_{request.user.id}"
     return f"ip_{get_client_ip(request)}"
+
+def login_username_key(group, request):
+    """Rate-limit key that reads username from JSON body (not request.POST)."""
+    import json
+    username = ''
+    try:
+        body = json.loads(request.body)
+        username = body.get('username', '').strip().lower()
+    except (json.JSONDecodeError, AttributeError, UnicodeDecodeError):
+        username = request.POST.get('username', '').strip().lower()
+    return username or get_client_ip(request)
 
 # --- ROBOTS.TXT ---
 
@@ -577,7 +591,7 @@ def add_comment(request):
 ## Profil İşlemleri
 
 @ratelimit(key='ip', rate='20/m', method='POST', block=False)
-@ratelimit(key='post:username', rate='5/10m', method='POST', block=False)
+@ratelimit(key=login_username_key, rate='5/10m', method='POST', block=False)
 @api_view(['POST'])
 @permission_classes([])
 def login_view(request):
