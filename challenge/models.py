@@ -58,7 +58,8 @@ class TranslationChallenge(models.Model):
         return None
 
     def create_winner_word(self):
-        from core.models import Word, Notification
+        from core.models import Word, WordVote, Notification
+        from django.db import transaction, IntegrityError
 
         if not self.is_closed or self.winner_word_created:
             return None
@@ -74,20 +75,43 @@ class TranslationChallenge(models.Model):
             # Another process already secured the lock and processed this.
             return None
 
+        self.winner_word_created = True
+
         top = self.comments.order_by('-score', 'timestamp').first()
         if not top or top.score <= 0:
-            self.winner_word_created = True
             return None
 
-        word = Word.objects.create(
-            word=top.suggested_word,
-            definition=self.meaning[:300],
-            etymology=(top.etymology or '')[:200],
-            example=(top.example_sentence or '')[:200],
-            user=top.user,
-            author=top.display_author,
-            status='approved',
-        )
+        with transaction.atomic():
+            word = Word.objects.create(
+                word=top.suggested_word,
+                definition=self.meaning[:300],
+                etymology=(top.etymology or '')[:200],
+                example=(top.example_sentence or '')[:200],
+                user=top.user,
+                author=top.display_author,
+                status='approved',
+            )
+
+            # Convert the winning comment's likes into word upvotes.
+            like_votes = top.votes.filter(value=1).select_related('user')
+            likes_transferred = 0
+            for v in like_votes:
+                if not v.user_id:
+                    continue
+                try:
+                    WordVote.objects.create(
+                        user=v.user,
+                        word=word,
+                        value=1,
+                        ip_address=v.ip_address,
+                    )
+                    likes_transferred += 1
+                except IntegrityError:
+                    pass
+
+            if likes_transferred:
+                word.score = likes_transferred
+                word.save(update_fields=['score'])
 
         # Notify the winner
         if top.user:
@@ -98,7 +122,6 @@ class TranslationChallenge(models.Model):
                 message=f'"{top.suggested_word}" sözcüğünüz "{self.foreign_word}" yarışmasını kazandı!',
             )
 
-        self.winner_word_created = True
         return word
 
     def __str__(self):

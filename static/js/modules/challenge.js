@@ -433,7 +433,9 @@ function createSuggestionCard(s, isClosed = false, winnerId = null) {
     meta.appendChild(dateEl);
 
     footer.appendChild(meta);
-    footer.appendChild(createChallengeVoteControls(s, isClosed));
+    if (!isClosed) {
+        footer.appendChild(createChallengeVoteControls(s, isClosed));
+    }
     card.appendChild(footer);
 
     return card;

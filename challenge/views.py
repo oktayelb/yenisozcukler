@@ -6,8 +6,9 @@ from rest_framework.authentication import SessionAuthentication
 from django.shortcuts import get_object_or_404
 from django_ratelimit.decorators import ratelimit
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import Count, F, Prefetch
+from django.db.models import Count, F, Prefetch, Case, When, Value, BooleanField
 from django.db import transaction, DatabaseError, OperationalError, IntegrityError
+from django.utils import timezone
 
 from core.views import get_client_ip, universal_rate_key
 from .models import TranslationChallenge, ChallengeComment, ChallengeCommentVote
@@ -36,9 +37,19 @@ def get_challenges(request):
         limit = 20
     limit = min(limit, 50)
 
+    now = timezone.now()
+    closed_cutoff = now - TranslationChallenge.TIMER_DURATION
+
     challenges_qs = (
         TranslationChallenge.objects.filter(status='approved')
-        .annotate(comment_count=Count('comments'))
+        .annotate(
+            comment_count=Count('comments'),
+            closed_flag=Case(
+                When(timer_on=True, timer_started_at__lte=closed_cutoff, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            ),
+        )
         .select_related('user')
         .prefetch_related(
             Prefetch(
@@ -47,7 +58,7 @@ def get_challenges(request):
                 to_attr='prefetched_ordered_comments'
             )
         )
-        .order_by('-comment_count', '-timestamp')
+        .order_by('closed_flag', '-comment_count', '-timestamp')
     )
 
     paginator = Paginator(challenges_qs, limit)
@@ -55,6 +66,15 @@ def get_challenges(request):
         challenges_page = paginator.page(page)
     except (EmptyPage, PageNotAnInteger):
         challenges_page = []
+
+    # Auto-create winner words for newly closed challenges on this page.
+    if challenges_page:
+        for ch in challenges_page:
+            if ch.closed_flag and not ch.winner_word_created:
+                try:
+                    ch.create_winner_word()
+                except (DatabaseError, OperationalError, IntegrityError):
+                    pass
 
     serializer = TranslationChallengeSerializer(challenges_page, many=True)
     return Response({
@@ -98,6 +118,13 @@ def get_challenge_comments(request, challenge_id):
         return Response({'error': 'Too many requests'}, status=429)
 
     challenge = get_object_or_404(TranslationChallenge, id=challenge_id, status='approved')
+
+    if challenge.is_closed and not challenge.winner_word_created:
+        try:
+            challenge.create_winner_word()
+            challenge.refresh_from_db()
+        except (DatabaseError, OperationalError, IntegrityError):
+            pass
 
     try:
         page = int(request.GET.get('page', 1))
