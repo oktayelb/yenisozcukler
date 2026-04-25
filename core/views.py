@@ -648,7 +648,7 @@ def register_view(request):
         username = serializer.validated_data['username'].lower()
         password = serializer.validated_data['password']
 
-        if User.objects.filter(username=username).exists():
+        if User.objects.filter(username__iexact=username).exists():
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
 
         try:

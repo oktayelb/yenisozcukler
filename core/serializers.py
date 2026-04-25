@@ -2,8 +2,6 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Word, Comment, Category, Notification
 import re
-import requests
-from decouple import config
 
 # --- YARDIMCI FONKSİYONLAR (HELPER FUNCTIONS) ---
 
@@ -240,45 +238,23 @@ class CommentCreateSerializer(serializers.ModelSerializer):
     
 
 class AuthSerializer(serializers.Serializer):
+    # Turnstile verification is handled by the view (verify_turnstile) before the
+    # serializer runs. Verifying here too would consume the single-use token a
+    # second time and fail with `timeout-or-duplicate`.
     username = serializers.CharField(max_length=30)
     password = serializers.CharField(min_length=6, max_length=60, write_only=True)
-    token = serializers.CharField(write_only=True, required=True)
-    
+
     def validate_username(self, value):
         value = value.strip()
 
         if value.lower() == 'anonim':
             raise serializers.ValidationError("Bu kullanıcı adı sistem tarafından ayrılmıştır, alınamaz.")
-        
+
         invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ0-9_]', value))
         if invalid_chars:
             raise serializers.ValidationError(f"Kullanıcı adında geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-            
+
         return value
-
-    def validate(self, attrs):
-        token = attrs.get('token')
-        
-        secret_key = config('CLOUDFLARE_SECRET_KEY')
-        verify_url = "https://challenges.cloudflare.com/turnstile/v0/siteverify"
-        
-        data = {
-            'secret': secret_key,
-            'response': token
-        }
-        
-        try:
-            # P7 Fix: Reduced timeout from 5 to 2.0 seconds to prevent worker exhaustion
-            response = requests.post(verify_url, data=data, timeout=2.0)
-            result = response.json()
-            
-            if not result.get('success'):
-                raise serializers.ValidationError({"token": "Robot doğrulaması başarısız oldu. Lütfen tekrar deneyin."})
-                
-        except requests.RequestException:
-             raise serializers.ValidationError({"token": "Doğrulama sunucusuna ulaşılamadı. Lütfen internet bağlantınızı kontrol edin."})
-
-        return attrs
 
 class ChangeUsernameSerializer(serializers.Serializer):
     new_username = serializers.CharField(max_length=30, required=True)
