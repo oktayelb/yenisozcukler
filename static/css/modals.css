@@ -71,6 +71,25 @@
     flex: 1;
     padding-right: 10px;
 }
+.kvkk-box {
+    max-width: 820px;
+}
+.kvkk-content {
+    font-size: 0.95rem;
+    line-height: 1.75;
+}
+.kvkk-content .about-heading {
+    font-size: 1.9rem;
+    margin: 0 40px var(--spacing-md) 0;
+    line-height: 1.25;
+}
+.kvkk-content ul {
+    margin: var(--spacing-sm) 0 var(--spacing-md);
+    padding-left: 22px;
+}
+.kvkk-content li {
+    margin-bottom: 8px;
+}
 .auth-overlay.show .auth-box, .about-overlay.show .about-box {
     transform: scale(1) translateY(0);
     opacity: 1;

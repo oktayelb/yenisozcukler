@@ -7,7 +7,7 @@ import { state, isUserLoggedIn } from './modules/state.js';
 import { updateCount } from './modules/utils.js';
 import { setupTheme } from './modules/theme.js';
 import { setupSortBar } from './modules/sort.js';
-import { openModal, closeModal, closeAuthModal, showAboutInfo, closeAboutInfo, closeProfileModal, closeEditProfileModal, closeMyWordsModal } from './modules/modal.js';
+import { openModal, closeModal, closeAuthModal, showAboutInfo, closeAboutInfo, showKvkkInfo, closeKvkkInfo, closeProfileModal, closeEditProfileModal, closeMyWordsModal } from './modules/modal.js';
 import { toggleAuthMode, setupAuthTriggers, handleAuthSubmit, handleLogout, openAuthModal } from './modules/auth.js';
 import { fetchCategories } from './modules/categories.js';
 import { fetchWords, clearCategoryFilter, loadMoreWords, executeSearch, focusContributionForm } from './modules/feed.js';
@@ -36,11 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initNotifications();
     fetchCategories();
 
-    // Always fetch the home feed — it's the background content
+    // Always fetch the home feed. It's the background content
     // that shows when overlays close or user navigates back to /
     fetchWords(state.currentPage);
 
-    // Init router — handles non-home routes (e.g. /sozcuk/5/)
+    // Init router. Handles non-home routes (e.g. /sozcuk/5/)
     // by opening the correct overlay after the feed loads
     initRouter();
 });
@@ -57,6 +57,11 @@ function setupAllEventListeners() {
     document.getElementById('aboutModal')?.addEventListener('click', closeAboutInfo);
     document.getElementById('aboutCloseBtn')?.addEventListener('click', (e) => closeAboutInfo(e, true));
     document.getElementById('headerAboutBtn')?.addEventListener('click', showAboutInfo);
+
+    // KVKK Modal
+    document.getElementById('kvkkModal')?.addEventListener('click', closeKvkkInfo);
+    document.getElementById('kvkkCloseBtn')?.addEventListener('click', (e) => closeKvkkInfo(e, true));
+    document.getElementById('headerKvkkBtn')?.addEventListener('click', showKvkkInfo);
 
     // Auth Modal
     document.getElementById('authModal')?.addEventListener('click', closeAuthModal);

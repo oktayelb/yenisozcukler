@@ -50,6 +50,14 @@
         max-height: 85vh;
         padding: 30px var(--spacing-md);
     }
+    .kvkk-content {
+        font-size: 0.88rem;
+        line-height: 1.65;
+    }
+    .kvkk-content .about-heading {
+        font-size: 1.45rem;
+        margin-right: 36px;
+    }
     .auth-tabs {
         margin-bottom: var(--spacing-lg);
         border-radius: var(--radius-sm);
@@ -121,5 +129,14 @@
     .header-btn {
         padding: 8px var(--spacing-sm);
         font-size: 0.82rem;
+    }
+    .header-controls {
+        gap: 6px;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .header-kvkk-btn {
+        padding-left: 10px;
+        padding-right: 10px;
     }
 }

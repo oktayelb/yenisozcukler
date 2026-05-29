@@ -1,6 +1,6 @@
 # core/signals.py
 
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from .models import Word, Comment
@@ -35,3 +35,16 @@ def claim_guest_content(sender, instance, created, **kwargs):
             author__iexact=nickname,
             user__isnull=True
         ).update(user=instance)
+
+
+@receiver(pre_delete, sender=User)
+def anonymize_deleted_user_content(sender, instance, **kwargs):
+    anonymous_label = 'silinmiş kullanıcı'
+
+    Word.objects.filter(user=instance).update(author=anonymous_label)
+    Comment.objects.filter(user=instance).update(author=anonymous_label)
+
+    from challenge.models import TranslationChallenge, ChallengeComment
+
+    TranslationChallenge.objects.filter(user=instance).update(author=anonymous_label)
+    ChallengeComment.objects.filter(user=instance).update(author=anonymous_label)
