@@ -392,11 +392,6 @@
     padding: var(--spacing-sm);
     border-radius: var(--radius);
 }
-#userWordsList .word-card:hover {
-    transform: translateY(-4px);
-    border-color: var(--accent);
-    box-shadow: var(--shadow-md);
-}
 #editProfileModal, #myWordsModal { z-index: var(--z-modal-base); }
 #myWordsModal .auth-box { max-width: 650px; display: flex; flex-direction: column; }
 #myWordsFeed {

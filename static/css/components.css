@@ -15,7 +15,7 @@
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
 /* ========================================
-   WORD CARDS - Apple-style depth & motion
+   WORD CARDS
    ======================================== */
 .word-card {
     background: var(--card-bg);
@@ -47,12 +47,6 @@
                 transform var(--duration-enter) var(--ease-spring);
 }
 
-.word-card:hover {
-    transform: translateY(-6px) scale(1.005);
-    box-shadow: var(--shadow-lg), var(--shadow-glow);
-    border-color: rgba(var(--accent-rgb), 0.35);
-    will-change: transform;
-}
 .word-card:active {
     transform: translateY(-2px) scale(0.995);
     transition-duration: var(--duration-fast);
@@ -120,14 +114,6 @@
     display: inline-block;
     transition: transform var(--duration-normal) var(--ease-spring);
 }
-.word-card:hover .click-hint {
-    color: var(--accent);
-    opacity: 1;
-}
-.word-card:hover .click-hint span {
-    transform: translateX(4px);
-}
-
 /* ========================================
    TAGS & CATEGORIES
    ======================================== */
@@ -546,8 +532,8 @@
     100% { left: 100%; }
 }
 .form-card.collapsed:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 8px 32px rgba(var(--accent-rgb), 0.45);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 22px rgba(var(--accent-rgb), 0.32);
 }
 .form-card.collapsed:active {
     transform: translateY(-1px) scale(0.98);
@@ -877,10 +863,6 @@ input:focus, textarea:focus {
                 box-shadow var(--duration-normal) ease;
     z-index: 5;
     cursor: default;
-}
-.word-card:hover .vote-container-floating {
-    transform: scale(1.06);
-    box-shadow: 0 6px 20px rgba(var(--accent-rgb), 0.35);
 }
 .vote-container {
     display: flex;
