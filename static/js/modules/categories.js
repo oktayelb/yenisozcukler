@@ -1,6 +1,7 @@
 /* --- CATEGORIES & HASHTAGS --- */
 import { state } from './state.js';
 import { apiRequest } from './utils.js';
+import { restoreContributionDraft, saveContributionDraft } from './form.js';
 
 export async function fetchCategories() {
     try {
@@ -30,6 +31,11 @@ function renderCategorySelection() {
         const pill = document.createElement('div');
         pill.className = 'category-pill';
         pill.textContent = cat.name;
+        pill.dataset.categoryId = cat.id;
+
+        if (state.selectedFormCategories.has(Number(cat.id))) {
+            pill.classList.add('selected');
+        }
 
         const desc = cat.description || "";
 
@@ -38,6 +44,8 @@ function renderCategorySelection() {
         pill.addEventListener('click', () => toggleCategorySelection(cat.id, pill, desc));
         container.appendChild(pill);
     });
+
+    restoreContributionDraft({ restoreFields: false, expand: false });
 }
 
 function toggleCategorySelection(id, el, description) {
@@ -63,4 +71,6 @@ function toggleCategorySelection(id, el, description) {
             helpText.classList.remove('active');
         }
     }
+
+    saveContributionDraft();
 }

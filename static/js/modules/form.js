@@ -2,6 +2,111 @@
 import { state, isUserLoggedIn } from './state.js';
 import { apiRequest, showCustomAlert, updateCount } from './utils.js';
 
+const CONTRIBUTION_DRAFT_KEY = 'contributionFormDraft';
+const CONTRIBUTION_DRAFT_FIELDS = {
+    inputWord: 'word',
+    inputDef: 'definition',
+    inputExample: 'example',
+    inputEtymology: 'etymology',
+};
+
+function readContributionDraft() {
+    try {
+        return JSON.parse(localStorage.getItem(CONTRIBUTION_DRAFT_KEY) || '{}');
+    } catch {
+        return {};
+    }
+}
+
+function hasContributionDraftContent(draft) {
+    return Boolean(
+        draft.word ||
+        draft.definition ||
+        draft.example ||
+        draft.etymology ||
+        (Array.isArray(draft.category_ids) && draft.category_ids.length > 0)
+    );
+}
+
+export function saveContributionDraft() {
+    const draft = {
+        word: document.getElementById('inputWord')?.value || '',
+        definition: document.getElementById('inputDef')?.value || '',
+        example: document.getElementById('inputExample')?.value || '',
+        etymology: document.getElementById('inputEtymology')?.value || '',
+        category_ids: Array.from(state.selectedFormCategories),
+        updated_at: Date.now(),
+    };
+
+    try {
+        if (hasContributionDraftContent(draft)) {
+            localStorage.setItem(CONTRIBUTION_DRAFT_KEY, JSON.stringify(draft));
+        } else {
+            localStorage.removeItem(CONTRIBUTION_DRAFT_KEY);
+        }
+    } catch {
+        // localStorage may be unavailable in private or restricted contexts.
+    }
+}
+
+export function clearContributionDraft() {
+    try {
+        localStorage.removeItem(CONTRIBUTION_DRAFT_KEY);
+    } catch {
+        // Ignore storage failures.
+    }
+}
+
+export function restoreContributionDraft({ restoreFields = true, expand = true } = {}) {
+    const draft = readContributionDraft();
+    if (!hasContributionDraftContent(draft)) return false;
+
+    if (restoreFields) {
+        Object.entries(CONTRIBUTION_DRAFT_FIELDS).forEach(([id, key]) => {
+            const field = document.getElementById(id);
+            if (field && typeof draft[key] === 'string') {
+                field.value = draft[key];
+            }
+        });
+
+        const defField = document.getElementById('inputDef');
+        if (defField) updateCount(defField);
+    }
+
+    if (Array.isArray(draft.category_ids)) {
+        state.selectedFormCategories.clear();
+        draft.category_ids.forEach(id => {
+            const numericId = Number(id);
+            if (Number.isFinite(numericId)) state.selectedFormCategories.add(numericId);
+        });
+    }
+
+    document.querySelectorAll('.category-pill').forEach(pill => {
+        const id = Number(pill.dataset.categoryId);
+        pill.classList.toggle('selected', state.selectedFormCategories.has(id));
+    });
+
+    if (expand) {
+        const card = document.getElementById('contributionCard');
+        const title = document.getElementById('contributionTitle');
+        if (card && card.classList.contains('collapsed')) {
+            card.classList.remove('collapsed');
+            card.classList.add('expanded');
+            if (title) title.innerHTML = '';
+        }
+    }
+
+    return true;
+}
+
+export function initContributionDraft() {
+    restoreContributionDraft();
+
+    Object.keys(CONTRIBUTION_DRAFT_FIELDS).forEach(id => {
+        document.getElementById(id)?.addEventListener('input', saveContributionDraft);
+    });
+}
+
 export function toggleContributionForm() {
     const card = document.getElementById('contributionCard');
     const title = document.getElementById('contributionTitle');
@@ -79,6 +184,7 @@ export async function submitWord() {
 
         state.selectedFormCategories.clear();
         document.querySelectorAll('.category-pill.selected').forEach(el => el.classList.remove('selected'));
+        clearContributionDraft();
 
         showCustomAlert("Sözcük gönderildi (Onay bekleniyor)!");
         if (window.turnstile) window.turnstile.reset(document.getElementById('wordFormTurnstile'));

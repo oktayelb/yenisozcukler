@@ -11,7 +11,7 @@ import { openModal, closeModal, closeAuthModal, showAboutInfo, closeAboutInfo, s
 import { toggleAuthMode, setupAuthTriggers, handleAuthSubmit, handleLogout, openAuthModal } from './modules/auth.js';
 import { fetchCategories } from './modules/categories.js';
 import { fetchWords, clearCategoryFilter, loadMoreWords, executeSearch, focusContributionForm } from './modules/feed.js';
-import { toggleContributionForm, initTopAppBar, handleWordSubmit } from './modules/form.js';
+import { toggleContributionForm, initTopAppBar, handleWordSubmit, initContributionDraft } from './modules/form.js';
 import { submitExample } from './modules/example.js';
 import { closeCommentView } from './modules/comments.js';
 import { openProfileModal, openMyWordsModal, openEditProfileModal, handleChangeUsername, handleChangePassword, backToProfile } from './modules/profile.js';
@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAuthTriggers();
     setupSortBar();
     setupTheme();
+    initContributionDraft();
     initTopAppBar();
     setupChallengeBox();
     initNotifications();
