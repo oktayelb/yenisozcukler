@@ -41,6 +41,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'core',
+    # Challenge özelliği kapatıldı (URL'leri ve arayüzü kaldırıldı) ama uygulama
+    # INSTALLED_APPS'te kalmak zorunda: core.Notification.challenge_comment FK'sı
+    # ve core migration'ları (0024, 0025) challenge modellerine bağımlı.
+    # Kaldırılırsa Django açılışta RuntimeError verir.
     'challenge',
 ]
 
@@ -97,6 +101,14 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR.parent / 'sozluk.db',
+        'OPTIONS': {
+            # WAL: yazma işlemi sırasında okuyucular bloklanmaz.
+            # IMMEDIATE: transaction.atomic blokları kilit yükseltme
+            # deadlock'una düşmeden doğrudan yazma kilidi alır.
+            'transaction_mode': 'IMMEDIATE',
+            'timeout': 20,
+            'init_command': 'PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;',
+        },
     }
 }
 
@@ -128,6 +140,12 @@ STORAGES = {
 }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# django-ratelimit'in key='ip' anahtarı varsayılan olarak REMOTE_ADDR okur;
+# Cloudflare arkasında bu, ziyaretçinin değil CF edge sunucusunun IP'sidir ve
+# tüm ziyaretçiler aynı limit kovasını paylaşır. Gerçek IP'yi CF-Connecting-IP
+# üzerinden çözen yardımcı fonksiyonu kullan (dev'de REMOTE_ADDR'a düşer).
+RATELIMIT_IP_META_KEY = 'core.views.get_client_ip'
 
 # REST FRAMEWORK AYARLARI
 REST_FRAMEWORK = {

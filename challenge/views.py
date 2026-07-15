@@ -18,7 +18,7 @@ from .serializers import (
 )
 
 
-@ratelimit(key='ip', rate='60/m', method='GET', block=False)
+@ratelimit(key='ip', rate='600/m', method='GET', block=False)
 @api_view(['GET'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([])
@@ -109,7 +109,7 @@ def add_challenge(request):
         return Response({'success': False, 'error': first_error}, status=400)
 
 
-@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@ratelimit(key='ip', rate='1000/m', method='GET', block=False)
 @api_view(['GET'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([])

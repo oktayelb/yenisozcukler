@@ -154,7 +154,7 @@ def spa_catchall(request, *args, **kwargs):
 
 # --- OKUMA (READ) ENDPOINTLERİ ---
 
-@ratelimit(key='ip', rate='60/m', method='GET', block=False)
+@ratelimit(key='ip', rate='600/m', method='GET', block=False)
 @api_view(['GET'])
 @permission_classes([])
 def get_categories(request):
@@ -172,7 +172,7 @@ def get_categories(request):
 
     return Response({'success': True, 'categories': categories_data})
 
-@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@ratelimit(key='ip', rate='1000/m', method='GET', block=False)
 @api_view(['GET'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([])
@@ -253,7 +253,7 @@ def get_words(request):
         'total_count': total_count
     })
 
-@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@ratelimit(key='ip', rate='1000/m', method='GET', block=False)
 @api_view(['GET'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([])
@@ -301,7 +301,7 @@ def get_comments(request, word_id):
     })
 
 
-@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@ratelimit(key='ip', rate='1000/m', method='GET', block=False)
 @api_view(['GET'])
 @permission_classes([])
 def get_word(request, word_id):
@@ -326,7 +326,7 @@ def get_word(request, word_id):
     return Response({'success': True, 'word': serializer.data})
 
 
-@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@ratelimit(key='ip', rate='1000/m', method='GET', block=False)
 @api_view(['GET'])
 @permission_classes([])
 def get_word_by_slug(request, word_slug):
@@ -680,7 +680,7 @@ def logout_view(request):
     logout(request)
     return Response({'success': True})
 
-@ratelimit(key='ip', rate='30/m', method='GET', block=False)
+@ratelimit(key='ip', rate='300/m', method='GET', block=False)
 @api_view(['GET'])
 @permission_classes([])
 def get_user_profile(request):
@@ -774,7 +774,7 @@ def change_username(request):
     first_error = next(iter(serializer.errors.values()))[0]
     return Response({'success': False, 'error': first_error}, status=400)
     
-@ratelimit(key='ip', rate='60/m', method='GET', block=False)
+@ratelimit(key='ip', rate='300/m', method='GET', block=False)
 @api_view(['GET'])
 @authentication_classes([SessionAuthentication])
 @permission_classes([])
