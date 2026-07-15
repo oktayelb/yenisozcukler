@@ -15,7 +15,6 @@ import { toggleContributionForm, initTopAppBar, handleWordSubmit, initContributi
 import { submitExample } from './modules/example.js';
 import { closeCommentView } from './modules/comments.js';
 import { openProfileModal, openMyWordsModal, openEditProfileModal, handleChangeUsername, handleChangePassword, backToProfile } from './modules/profile.js';
-import { setupChallengeBox, closeChallengeDiscussion } from './modules/challenge.js';
 import { initNotifications, openNotificationsModal, closeNotificationsModal, notifBackToProfile, loadMoreNotifications } from './modules/notifications.js';
 import { initRouter } from './modules/router.js';
 
@@ -33,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTheme();
     initContributionDraft();
     initTopAppBar();
-    setupChallengeBox();
     initNotifications();
     fetchCategories();
 
@@ -51,7 +49,6 @@ function setupAllEventListeners() {
     // Backdrop / Overlays
     document.getElementById('modalBackdrop')?.addEventListener('click', () => {
         closeCommentView();
-        closeChallengeDiscussion();
     });
 
     // About Modal

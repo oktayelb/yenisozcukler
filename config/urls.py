@@ -5,7 +5,6 @@ from decouple import config
 urlpatterns = [
     path(config('ADMIN_PATH'), admin.site.urls),
     path('', include('core.urls')), # Connects to core/urls.py
-    path('', include('challenge.urls')),
 ]
 
 

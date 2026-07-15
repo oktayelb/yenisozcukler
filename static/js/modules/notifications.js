@@ -3,7 +3,6 @@ import { isUserLoggedIn } from './state.js';
 import { apiRequest, escapeHTML } from './utils.js';
 import { openModal, closeModal } from './modal.js';
 import { animateAndOpenCommentView } from './comments.js';
-import { openChallengeDiscussion } from './challenge.js';
 
 let notifPage = 1;
 let hasMoreNotifs = false;
@@ -97,29 +96,14 @@ function createNotifItem(n) {
 
     const type = n.notification_type;
     const wordRouteTypes = ['word_like', 'word_dislike', 'comment_like', 'comment_dislike', 'new_comment', 'challenge_win'];
-    const challengeRouteTypes = ['challenge_like', 'challenge_dislike'];
 
     const isWordClickable = wordRouteTypes.includes(type) && n.word_id;
-    const isChallengeClickable = challengeRouteTypes.includes(type) && n.challenge_id;
 
     if (isWordClickable) {
         div.style.cursor = 'pointer';
         div.addEventListener('click', () => {
             closeModal('notificationsModal', true);
             animateAndOpenCommentView(null, n.word_id, n.word_text, n.word_def || '', n.word_example || '', n.word_etymology || '', true);
-        });
-    } else if (isChallengeClickable) {
-        div.style.cursor = 'pointer';
-        div.addEventListener('click', () => {
-            closeModal('notificationsModal', true);
-            openChallengeDiscussion({
-                id: n.challenge_id,
-                foreign_word: n.challenge_foreign_word || '',
-                meaning: n.challenge_meaning || '',
-                timer_on: !!n.challenge_timer_on,
-                is_closed: !!n.challenge_is_closed,
-                time_remaining_seconds: n.challenge_time_remaining_seconds,
-            });
         });
     }
 
