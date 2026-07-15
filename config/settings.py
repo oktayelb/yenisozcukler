@@ -147,6 +147,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # üzerinden çözen yardımcı fonksiyonu kullan (dev'de REMOTE_ADDR'a düşer).
 RATELIMIT_IP_META_KEY = 'core.views.get_client_ip'
 
+# Yük testi için geçici kapatma: .env dosyasına RATELIMIT_ENABLE=FALSE yazıp
+# sunucuyu yeniden başlat. Test bitince satırı sil (varsayılan: açık).
+RATELIMIT_ENABLE = config('RATELIMIT_ENABLE', default=True, cast=bool)
+
 # REST FRAMEWORK AYARLARI
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

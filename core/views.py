@@ -190,6 +190,29 @@ def get_words(request):
     sort = request.GET.get('sort', 'date_desc')
     search_query = request.GET.get('search', '').strip()[:40]
 
+    # Anonim varsayılan akış yanıtı tüm ziyaretçiler için aynıdır; 45 sn
+    # önbelleğe alınır. Girişli kullanıcı yanıtı user_votes içerdiği için
+    # önbelleğe alınmaz. Anahtar uzayı bilinçli olarak dar tutuluyor
+    # (whitelist'li sort, sayfa 1-10, varsayılan limit): keyfi parametreler
+    # locmem önbelleğini şişirip sıcak girdileri düşüremesin.
+    try:
+        page_int = int(page_number)
+    except (ValueError, TypeError):
+        page_int = 0
+    feed_cacheable = (
+        not request.user.is_authenticated
+        and not search_query
+        and not tag_slug
+        and sort in ('date_desc', 'date_asc', 'score_desc', 'score_asc')
+        and limit == 20
+        and 1 <= page_int <= 10
+    )
+    if feed_cacheable:
+        feed_cache_key = f'words_feed:{page_int}:{sort}'
+        cached_payload = cache.get(feed_cache_key)
+        if cached_payload is not None:
+            return Response(cached_payload)
+
     words_queryset = Word.objects.filter(status='approved')\
         .annotate(comment_count=Count('comments'))\
         .select_related('user')\
@@ -247,11 +270,14 @@ def get_words(request):
 
     serializer = WordSerializer(words_page, many=True, context={'user_votes': user_votes})
 
-    return Response({
+    payload = {
         'status': 'full',
         'words': serializer.data,
         'total_count': total_count
-    })
+    }
+    if feed_cacheable:
+        cache.set(feed_cache_key, payload, 45)
+    return Response(payload)
 
 @ratelimit(key='ip', rate='1000/m', method='GET', block=False)
 @api_view(['GET'])
