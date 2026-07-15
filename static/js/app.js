@@ -7,7 +7,7 @@ import { state, isUserLoggedIn } from './modules/state.js';
 import { updateCount } from './modules/utils.js';
 import { setupTheme } from './modules/theme.js';
 import { setupSortBar } from './modules/sort.js';
-import { openModal, closeModal, closeAuthModal, showAboutInfo, closeAboutInfo, showKvkkInfo, closeKvkkInfo, closeProfileModal, closeEditProfileModal, closeMyWordsModal } from './modules/modal.js';
+import { openModal, closeModal, closeAuthModal, showAboutInfo, closeAboutInfo, showKvkkInfo, closeKvkkInfo, showContactInfo, closeContactInfo, closeProfileModal, closeEditProfileModal, closeMyWordsModal } from './modules/modal.js';
 import { toggleAuthMode, setupAuthTriggers, handleAuthSubmit, handleLogout, openAuthModal } from './modules/auth.js';
 import { fetchCategories } from './modules/categories.js';
 import { fetchWords, clearCategoryFilter, loadMoreWords, executeSearch, focusContributionForm } from './modules/feed.js';
@@ -58,6 +58,11 @@ function setupAllEventListeners() {
     document.getElementById('aboutModal')?.addEventListener('click', closeAboutInfo);
     document.getElementById('aboutCloseBtn')?.addEventListener('click', (e) => closeAboutInfo(e, true));
     document.getElementById('headerAboutBtn')?.addEventListener('click', showAboutInfo);
+
+    // Contact Modal
+    document.getElementById('contactModal')?.addEventListener('click', closeContactInfo);
+    document.getElementById('contactCloseBtn')?.addEventListener('click', (e) => closeContactInfo(e, true));
+    document.getElementById('headerContactBtn')?.addEventListener('click', showContactInfo);
 
     // KVKK Modal
     document.getElementById('kvkkModal')?.addEventListener('click', closeKvkkInfo);

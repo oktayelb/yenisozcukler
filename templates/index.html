@@ -27,6 +27,7 @@
                 <button class="header-btn auth-login-trigger">Giriş Yap</button>
             {% endif %}
             <button class="header-btn" id="headerAboutBtn">Bu site nedir?</button>
+            <button class="header-btn" id="headerContactBtn">İletişim</button>
         </div>
 
         {% include 'partials/header.html' %}
@@ -40,7 +41,7 @@
                 <div class="top-app-center">
                     <div class="sort-bar collapsed">
                         <button type="button" class="sort-toggle-btn">
-                            Sırala
+                            Sırala: <span class="sort-current-label">En Yeni</span>
                             <span class="sort-toggle-icon" style="margin-left: 5px;">▼</span>
                         </button>
                         <div class="sort-options">
@@ -182,7 +183,7 @@
 
             <div class="sort-bar collapsed" id="sortBar">
                 <button type="button" class="sort-toggle-btn">
-                    Sırala
+                    Sırala: <span class="sort-current-label">En Yeni</span>
                     <span class="sort-toggle-icon" style="margin-left: 5px;">▼</span>
                 </button>
                 <div class="sort-options">

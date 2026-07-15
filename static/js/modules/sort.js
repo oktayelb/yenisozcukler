@@ -41,12 +41,20 @@ function changeSort(sortVal) {
 
 function updateSortButtonsActive() {
     const buttons = document.querySelectorAll('.sort-btn');
+    let activeLabel = '';
     buttons.forEach(btn => {
         const sortVal = btn.getAttribute('data-sort');
         if (sortVal === state.currentSort) {
             btn.classList.add('active');
+            activeLabel = btn.textContent.trim();
         } else {
             btn.classList.remove('active');
         }
     });
+
+    if (activeLabel) {
+        document.querySelectorAll('.sort-current-label').forEach(el => {
+            el.textContent = activeLabel;
+        });
+    }
 }

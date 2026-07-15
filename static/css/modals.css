@@ -74,6 +74,9 @@
 .kvkk-box {
     max-width: 820px;
 }
+.contact-box {
+    max-width: 460px;
+}
 .kvkk-content {
     font-size: 0.95rem;
     line-height: 1.75;
