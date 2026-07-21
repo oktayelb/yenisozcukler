@@ -1,6 +1,9 @@
+import uuid
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.utils import timezone
 import re
 
 
@@ -246,3 +249,106 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.notification_type} -> {self.recipient.username}"
+
+
+class RequestLog(models.Model):
+    request_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True, editable=False)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='request_logs',
+        db_index=True,
+    )
+    username_snapshot = models.CharField(max_length=150, blank=True, default='')
+    is_authenticated = models.BooleanField(default=False, db_index=True)
+    session_key = models.CharField(max_length=40, blank=True, default='', db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True, db_index=True)
+
+    method = models.CharField(max_length=12, db_index=True)
+    path = models.CharField(max_length=2048)
+    route_name = models.CharField(max_length=150, blank=True, default='', db_index=True)
+    view_name = models.CharField(max_length=255, blank=True, default='', db_index=True)
+    query_params = models.JSONField(default=dict, blank=True)
+    request_data = models.JSONField(default=dict, blank=True)
+
+    user_agent = models.TextField(blank=True, default='')
+    referer = models.TextField(blank=True, default='')
+    status_code = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    response_bytes = models.PositiveIntegerField(null=True, blank=True)
+    duration_ms = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+    error_type = models.CharField(max_length=255, blank=True, default='')
+    error_message = models.TextField(blank=True, default='')
+
+    started_at = models.DateTimeField(default=timezone.now, db_index=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['user', '-started_at']),
+            models.Index(fields=['ip_address', '-started_at']),
+            models.Index(fields=['route_name', '-started_at']),
+            models.Index(fields=['status_code', '-started_at']),
+        ]
+
+    def __str__(self):
+        status = self.status_code if self.status_code is not None else '-'
+        return f'{self.method} {self.path} [{status}]'
+
+
+class FunctionCallLog(models.Model):
+    STATUS_SUCCESS = 'success'
+    STATUS_ERROR = 'error'
+    STATUS_CHOICES = [
+        (STATUS_SUCCESS, 'Success'),
+        (STATUS_ERROR, 'Error'),
+    ]
+
+    request_log = models.ForeignKey(
+        RequestLog,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='function_calls',
+        db_index=True,
+    )
+    request_id = models.UUIDField(null=True, blank=True, db_index=True)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='function_call_logs',
+        db_index=True,
+    )
+    username_snapshot = models.CharField(max_length=150, blank=True, default='')
+    is_authenticated = models.BooleanField(default=False, db_index=True)
+    session_key = models.CharField(max_length=40, blank=True, default='', db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True, db_index=True)
+
+    module = models.CharField(max_length=255, blank=True, default='', db_index=True)
+    function_name = models.CharField(max_length=255, db_index=True)
+    label = models.CharField(max_length=255, blank=True, default='', db_index=True)
+    arguments = models.JSONField(default=dict, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_SUCCESS, db_index=True)
+    duration_ms = models.PositiveIntegerField(null=True, blank=True, db_index=True)
+    error_type = models.CharField(max_length=255, blank=True, default='')
+    error_message = models.TextField(blank=True, default='')
+
+    started_at = models.DateTimeField(default=timezone.now, db_index=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['request_log', 'started_at']),
+            models.Index(fields=['function_name', '-started_at']),
+            models.Index(fields=['user', '-started_at']),
+            models.Index(fields=['status', '-started_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.function_name} [{self.status}]'

@@ -3,8 +3,13 @@ import logging
 import threading
 import time
 import urllib.request
+import uuid
+
 from django.http import HttpResponseForbidden
 from django.conf import settings
+from django.utils import timezone
+
+from . import audit
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +80,69 @@ class _CfIpCache:
 
 
 _cf_cache = _CfIpCache()
+
+
+def _is_cloudflare_ip(ip_str):
+    return _cf_cache.contains(ip_str)
+
+
+class AuditLoggingMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if not audit.should_log_request(request):
+            return self.get_response(request)
+
+        request_id = uuid.uuid4()
+        started_perf = time.perf_counter()
+        started_at = timezone.now()
+        request._audit_request_id = request_id
+        request_log = audit.start_request_log(request, request_id, started_at)
+        request._audit_request_log = request_log
+        context_tokens = audit.bind_audit_context(request, request_log)
+
+        response = None
+        caught_exception = None
+        try:
+            response = self.get_response(request)
+            return response
+        except Exception as exc:
+            caught_exception = exc
+            raise
+        finally:
+            duration_ms = audit.elapsed_ms(started_perf)
+            audit.finish_request_log(
+                request_log,
+                request,
+                response,
+                duration_ms,
+                exc=caught_exception,
+            )
+            audit.record_view_call(
+                request,
+                request_log,
+                duration_ms,
+                exc=caught_exception,
+            )
+            audit.reset_audit_context(context_tokens)
+
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        if not getattr(request, '_audit_request_id', None):
+            return None
+
+        audit.remember_actor_at_view(request)
+        view_info = audit.describe_view(request, view_func, view_args, view_kwargs)
+        request._audit_view_info = view_info
+        request._audit_route_name = view_info.get('route_name', '')
+        request._audit_view_name = view_info.get('view_name', '')
+
+        request_log = getattr(request, '_audit_request_log', None)
+        if request_log is not None:
+            request_log.route_name = request._audit_route_name
+            request_log.view_name = request._audit_view_name
+
+        return None
 
 
 class CloudflareSecurityMiddleware:

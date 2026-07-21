@@ -60,6 +60,7 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'core.middleware.AuditLoggingMiddleware',
     'core.middleware.CloudflareSecurityMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -150,6 +151,27 @@ RATELIMIT_IP_META_KEY = 'core.views.get_client_ip'
 # Yük testi için geçici kapatma: .env dosyasına RATELIMIT_ENABLE=FALSE yazıp
 # sunucuyu yeniden başlat. Test bitince satırı sil (varsayılan: açık).
 RATELIMIT_ENABLE = config('RATELIMIT_ENABLE', default=True, cast=bool)
+
+# Request/function audit logging. Body capture is intentionally bounded and
+# redacted in core.audit so login tokens/passwords are never stored in plaintext.
+AUDIT_LOG_ENABLED = config('AUDIT_LOG_ENABLED', default=True, cast=bool)
+AUDIT_LOG_CAPTURE_REQUEST_DATA = config('AUDIT_LOG_CAPTURE_REQUEST_DATA', default=True, cast=bool)
+AUDIT_LOG_MAX_BODY_BYTES = config('AUDIT_LOG_MAX_BODY_BYTES', default=8192, cast=int)
+AUDIT_LOG_EXCLUDE_PATH_PREFIXES = tuple(
+    prefix for prefix in config('AUDIT_LOG_EXCLUDE_PATH_PREFIXES', default='', cast=Csv())
+    if prefix
+)
+AUDIT_LOG_SENSITIVE_KEYS = {
+    'authorization',
+    'cf_turnstile_response',
+    'cookie',
+    'csrfmiddlewaretoken',
+    'new_password',
+    'password',
+    'secret',
+    'sessionid',
+    'token',
+}
 
 # REST FRAMEWORK AYARLARI
 REST_FRAMEWORK = {

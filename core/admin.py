@@ -3,7 +3,17 @@ from django.contrib import messages
 from django.http import HttpResponseRedirect, HttpResponse
 from django.template import Template, RequestContext
 from django.contrib.admin import helpers
-from .models import Word, Comment, WordVote, CommentVote, Category, Notification, REJECTION_REASONS
+from .models import (
+    Category,
+    Comment,
+    CommentVote,
+    FunctionCallLog,
+    Notification,
+    REJECTION_REASONS,
+    RequestLog,
+    Word,
+    WordVote,
+)
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin
 
@@ -213,6 +223,50 @@ class CommentVoteAdmin(admin.ModelAdmin):
     list_filter = ('value', 'timestamp')
     search_fields = ('comment__comment', 'user__username')
 
+class RequestLogAdmin(admin.ModelAdmin):
+    list_display = (
+        'started_at',
+        'method',
+        'path_short',
+        'status_code',
+        'username_snapshot',
+        'ip_address',
+        'duration_ms',
+        'route_name',
+    )
+    list_filter = ('method', 'status_code', 'is_authenticated', 'route_name', 'started_at')
+    search_fields = ('path', 'route_name', 'view_name', 'username_snapshot', '=ip_address', '=request_id')
+    readonly_fields = tuple(field.name for field in RequestLog._meta.fields)
+    date_hierarchy = 'started_at'
+    ordering = ('-started_at',)
+
+    def path_short(self, obj):
+        return obj.path[:90]
+    path_short.short_description = 'path'
+
+    def has_add_permission(self, request):
+        return False
+
+
+class FunctionCallLogAdmin(admin.ModelAdmin):
+    list_display = (
+        'started_at',
+        'function_name',
+        'label',
+        'status',
+        'username_snapshot',
+        'duration_ms',
+        'request_log',
+    )
+    list_filter = ('status', 'label', 'is_authenticated', 'started_at')
+    search_fields = ('function_name', 'module', 'label', 'username_snapshot', '=request_id')
+    readonly_fields = tuple(field.name for field in FunctionCallLog._meta.fields)
+    date_hierarchy = 'started_at'
+    ordering = ('-started_at',)
+
+    def has_add_permission(self, request):
+        return False
+
 class CustomUserAdmin(UserAdmin):
     list_display = ('id', 'username', 'email', 'first_name', 'last_name', 'is_staff', 'date_joined')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'date_joined')
@@ -228,3 +282,5 @@ admin.site.register(Word, WordAdmin)
 admin.site.register(Comment, CommentAdmin)
 admin.site.register(WordVote, WordVoteAdmin)
 admin.site.register(CommentVote, CommentVoteAdmin)
+admin.site.register(RequestLog, RequestLogAdmin)
+admin.site.register(FunctionCallLog, FunctionCallLogAdmin)

@@ -5,8 +5,9 @@ from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
+from .audit import log_function_call
 from .middleware import CloudflareSecurityMiddleware, _is_cloudflare_ip
-from .models import Category, Comment, CommentVote, Word, WordVote
+from .models import Category, Comment, CommentVote, FunctionCallLog, RequestLog, Word, WordVote
 from .serializers import AuthSerializer, CommentCreateSerializer, WordCreateSerializer
 
 
@@ -797,3 +798,60 @@ class CloudflareMiddlewareTests(TestCase):
         request.META['REMOTE_ADDR'] = '127.0.0.1'
         resp = self.middleware(request)
         self.assertIn('Permissions-Policy', resp)
+
+
+# ---------------------------------------------------------------------------
+# 12. Audit logging
+# ---------------------------------------------------------------------------
+
+@override_settings(RATELIMIT_ENABLE=False, AUDIT_LOG_ENABLED=True)
+class AuditLoggingTests(TestCase):
+
+    def test_anonymous_request_and_view_call_are_logged(self):
+        resp = self.client.get(
+            reverse('get_categories'),
+            {'source': 'test'},
+            HTTP_USER_AGENT='AuditTest/1.0',
+            REMOTE_ADDR='127.0.0.1',
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        log = RequestLog.objects.filter(path=reverse('get_categories')).latest('started_at')
+        self.assertEqual(log.method, 'GET')
+        self.assertEqual(log.status_code, 200)
+        self.assertFalse(log.is_authenticated)
+        self.assertEqual(log.ip_address, '127.0.0.1')
+        self.assertEqual(log.query_params, {'source': 'test'})
+        self.assertEqual(log.route_name, 'get_categories')
+
+        view_call = FunctionCallLog.objects.get(request_log=log, label='view')
+        self.assertEqual(view_call.status, FunctionCallLog.STATUS_SUCCESS)
+        self.assertEqual(view_call.metadata['kind'], 'view')
+
+    @patch('core.views.verify_turnstile', return_value=True)
+    def test_request_body_is_sanitized_before_storage(self, _mock):
+        User.objects.create_user(username='audituser', password='correct123')
+        resp = self.client.post(
+            reverse('login'),
+            data=json.dumps({'username': 'audituser', 'password': 'correct123', 'token': 'tok'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(resp.status_code, 200)
+        log = RequestLog.objects.filter(path=reverse('login')).latest('started_at')
+        self.assertEqual(log.request_data['username'], 'audituser')
+        self.assertEqual(log.request_data['password'], '[redacted]')
+        self.assertEqual(log.request_data['token'], '[redacted]')
+        self.assertTrue(log.is_authenticated)
+        self.assertEqual(log.username_snapshot, 'audituser')
+
+    def test_log_function_call_decorator_records_explicit_calls(self):
+        @log_function_call(label='unit', capture_args=True)
+        def sample_function(value):
+            return value + 1
+
+        self.assertEqual(sample_function(4), 5)
+        call = FunctionCallLog.objects.filter(label='unit').latest('started_at')
+        self.assertEqual(call.function_name, 'AuditLoggingTests.test_log_function_call_decorator_records_explicit_calls.<locals>.sample_function')
+        self.assertEqual(call.status, FunctionCallLog.STATUS_SUCCESS)
+        self.assertEqual(call.arguments['args'][0], 4)
