@@ -1,9 +1,11 @@
 from django.urls import path, re_path
+from django.views.generic import RedirectView
 from . import views
 
 urlpatterns = [
     # robots.txt
     path('robots.txt', views.robots_txt, name='robots_txt'),
+    path('favicon.ico', RedirectView.as_view(url='/static/favicon.ico', permanent=True), name='favicon_ico'),
 
     # Ana Sayfa (Bot-aware)
     path('', views.index_view, name='index'),
