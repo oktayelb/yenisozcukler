@@ -83,19 +83,87 @@ def login_username_key(group, request):
 # --- ROBOTS.TXT ---
 
 _ROBOTS_TXT = (
+    "User-agent: GPTBot\n"
+    "Disallow: /\n"
+    "\n"
+    "User-agent: OAI-SearchBot\n"
+    "Allow: /\n"
+    "Disallow: /api/\n"
+    "Disallow: /admin/\n"
+    "\n"
+    "User-agent: ChatGPT-User\n"
+    "Allow: /\n"
+    "Disallow: /api/\n"
+    "Disallow: /admin/\n"
+    "\n"
+    "User-agent: Googlebot\n"
+    "Allow: /\n"
+    "Disallow: /api/\n"
+    "Disallow: /admin/\n"
+    "\n"
+    "User-agent: Googlebot-Image\n"
+    "Allow: /\n"
+    "Disallow: /api/\n"
+    "Disallow: /admin/\n"
+    "\n"
+    "User-agent: Bingbot\n"
+    "Allow: /\n"
+    "Disallow: /api/\n"
+    "Disallow: /admin/\n"
+    "\n"
+    "User-agent: DuckDuckBot\n"
+    "Allow: /\n"
+    "Disallow: /api/\n"
+    "Disallow: /admin/\n"
+    "\n"
+    "User-agent: Applebot\n"
+    "Allow: /\n"
+    "Disallow: /api/\n"
+    "Disallow: /admin/\n"
+    "\n"
     "User-agent: *\n"
     "Allow: /\n"
     "Disallow: /api/\n"
     "Disallow: /admin/\n"
+    "\n"
+    "Sitemap: https://yenisozcukler.com/sitemap.xml\n"
 )
 
 def robots_txt(request):
     return HttpResponse(_ROBOTS_TXT, content_type='text/plain')
 
+def sitemap_xml(request):
+    words = (
+        Word.objects
+        .filter(status='approved', slug__isnull=False)
+        .exclude(slug='')
+        .only('slug', 'timestamp')
+        .order_by('-timestamp')
+    )
+    categories = (
+        Category.objects
+        .filter(is_active=True)
+        .only('slug')
+        .order_by('order', 'name')
+    )
+    latest_word = words.first()
+    return render(
+        request,
+        'sitemap.xml',
+        {
+            'words': words,
+            'categories': categories,
+            'latest_word': latest_word,
+        },
+        content_type='application/xml',
+    )
+
 # --- BOT DETECTION ---
 
 BOT_SPECIFIC = [
-    'googlebot', 'bingbot', 'yandexbot', 'duckduckbot', 'baiduspider',
+    'googlebot', 'googlebot-image', 'google-inspectiontool',
+    'oai-searchbot', 'chatgpt-user',
+    'bingbot', 'yandexbot', 'duckduckbot', 'baiduspider',
     'slurp', 'facebookexternalhit', 'linkedinbot',
     'whatsapp', 'telegrambot', 'discordbot', 'applebot',
 ]

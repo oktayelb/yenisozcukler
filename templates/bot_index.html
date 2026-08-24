@@ -35,7 +35,10 @@
             <li>
                 <article>
                     <h3><a href="/sozcuk/{{ word.slug }}/">{{ word.word }}</a></h3>
-                    <p>{{ word.definition|truncatechars:160 }}</p>
+                    <p><strong>Tanım:</strong> {{ word.definition }}</p>
+                    {% if word.etymology %}
+                    <p><strong>Köken:</strong> {{ word.etymology }}</p>
+                    {% endif %}
                 </article>
             </li>
             {% empty %}
