@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     # robots.txt
     path('robots.txt', views.robots_txt, name='robots_txt'),
+    path('sitemap.xml', views.sitemap_xml, name='sitemap_xml'),
     path('favicon.ico', RedirectView.as_view(url='/static/favicon.ico', permanent=True), name='favicon_ico'),
 
     # Ana Sayfa (Bot-aware)

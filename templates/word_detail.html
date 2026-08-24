@@ -28,7 +28,11 @@
     "@type": "DefinedTerm",
     "name": "{{ word.word|escapejs }}",
     "description": "{{ word.definition|escapejs }}"{% if word.etymology %},
-    "termCode": "{{ word.etymology|escapejs }}"{% endif %}
+    "additionalProperty": {
+        "@type": "PropertyValue",
+        "name": "Köken",
+        "value": "{{ word.etymology|escapejs }}"
+    }{% endif %}
 }
 </script>
 {% endblock %}
