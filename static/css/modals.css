@@ -695,7 +695,6 @@
 }
 .notif-item.notif-unread {
     background: var(--card-bg);
-    border-left: 3px solid var(--accent);
 }
 .notif-icon { flex-shrink: 0; margin-top: 2px; }
 .notif-content { flex: 1; min-width: 0; }

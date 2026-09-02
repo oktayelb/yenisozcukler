@@ -1002,7 +1002,6 @@ input:focus, textarea:focus {
     transform: translateX(100%) scale(0.9);
     transition: all var(--duration-slow) var(--ease-spring);
     pointer-events: auto;
-    border-left: 5px solid #ccc;
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     font-size: 0.95rem;
@@ -1011,8 +1010,6 @@ input:focus, textarea:focus {
     opacity: 1;
     transform: translateX(0) scale(1);
 }
-.custom-alert-success { border-color: var(--success-color); }
-.custom-alert-error { border-color: var(--error-color); }
 
 /* ========================================
    LOAD MORE
