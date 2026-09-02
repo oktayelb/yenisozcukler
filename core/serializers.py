@@ -1,24 +1,74 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Word, Comment, Category, Notification
-import re
+import unicodedata
 
 # --- YARDIMCI FONKSİYONLAR (HELPER FUNCTIONS) ---
+#
+# Karakter beyaz listesi tutmuyoruz: SQL enjeksiyonunu ORM'in parametreli
+# sorguları, XSS'i ise şablon autoescape'i ile frontend'deki escapeHTML() /
+# textContent engelliyor. Bu yüzden < > & gibi karakterler serbesttir.
+# Yalnızca görüntülenemeyen karakterler (kontrol, bidi, atanmamış) elenir.
+
+# Klavyelerin ürettiği tipografik karakterler -> ASCII karşılığı.
+_FOLD = str.maketrans({
+    '‘': "'", '’': "'", '′': "'", '´': "'",
+    '“': '"', '”': '"', '„': '"', '″': '"',
+    '–': '-', '—': '-', '−': '-', '…': '...',
+})
+_INVISIBLE = ('Cc', 'Cf', 'Cs', 'Co', 'Cn')
+_WORD_PUNCTUATION = " -'().,"
+# q, w, x Türk alfabesinde yok ama kullanıcı adlarında yaygın ('qzan').
+_USERNAME_CHARS = set('abcçdefgğhıijklmnoöprsştuüvyz' + 'qwx' + '0123456789_.')
+
+
+def turkish_lower(text):
+    """Türkçeye göre küçültür. Python'un .lower() metodu yanlıştır:
+    'I' -> 'i' (olması gereken 'ı'), 'İ' -> 'i' + U+0307 (birleşen nokta)."""
+    return text.replace('I', 'ı').replace('İ', 'i').lower() if text else ''
+
+
+def clean_text(value, label, max_length):
+    """Boşluk toparlar, tipografik karakterleri sadeleştirir, görünmezleri eler."""
+    value = ' '.join(unicodedata.normalize('NFKC', value or '').translate(_FOLD).split())
+    if not value:
+        raise serializers.ValidationError(f"{label} boş olamaz.")
+    if len(value) > max_length:
+        raise serializers.ValidationError(f"{label} {max_length} karakteri geçemez.")
+    bad = {c for c in value if unicodedata.category(c) in _INVISIBLE}
+    if bad:
+        names = ' '.join(sorted(unicodedata.name(c, f'U+{ord(c):04X}') for c in bad))
+        raise serializers.ValidationError(f"{label} görüntülenemeyen karakter içeriyor: {names}")
+    return value
+
+
+def clean_word(value, label, max_length, latin_only=True):
+    """Tek sözcük alanları: noktalama/simgeleri eler. `latin_only` görsel olarak
+    aynı görünen harflerle (Kiril 'о' vs Latin 'o') taklidi engeller."""
+    value = clean_text(value, label, max_length)
+    bad = {c for c in value if not c.isalnum() and c not in _WORD_PUNCTUATION}
+    if latin_only:
+        bad |= {c for c in value
+                if c.isalpha() and not unicodedata.name(c, '').startswith('LATIN')}
+    if bad:
+        raise serializers.ValidationError(f"{label} şu karakterleri içeremez: {' '.join(sorted(bad))}")
+    return value
+
+
+def clean_username(value):
+    """Her zaman Türkçe küçük harfe çevirir; harf, rakam, alt çizgi, nokta."""
+    value = turkish_lower(clean_text(value, "Kullanıcı adı", 30))
+    bad = {c for c in value if c not in _USERNAME_CHARS}
+    if bad:
+        raise serializers.ValidationError(
+            "Kullanıcı adı yalnızca harf, rakam, alt çizgi ve nokta içerebilir. "
+            f"Geçersiz: {' '.join(sorted(bad))}")
+    return value
+
 
 def validate_example_text(value):
     """Ortak örnek cümle doğrulama mantığı"""
-    value = value.strip()
-    if not value:
-        raise serializers.ValidationError("Örnek cümle boş olamaz.")
-    if len(value) > 200:
-         raise serializers.ValidationError("Örnek cümle 200 karakteri geçemez.")
-    
-    # Inverted regex: matches anything that is NOT in the allowed set
-    invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\'"?!:;\-+?#]', value))
-    if invalid_chars:
-        raise serializers.ValidationError(f"Örnek cümlede geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        
-    return value
+    return clean_text(value, "Örnek cümle", 200)
 
 
 # --- OKUMA (READ) SERIALIZERS ---
@@ -167,50 +217,22 @@ class WordCreateSerializer(serializers.ModelSerializer):
             
         return word
 
-    def turkish_lower(self, text):
-        if not text:
-            return ""
-        return text.replace('I', 'ı').replace('İ', 'i').lower()
-
     def validate_word(self, value):
-        value = value.strip()
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Sözcükte geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return self.turkish_lower(value)
+        return turkish_lower(clean_word(value, "Sözcük", 50))
 
     def validate_definition(self, value):
-        value = value.strip()
-        # Apostrophe added to the allowed inverted set
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Tanımda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return self.turkish_lower(value)
+        return turkish_lower(clean_text(value, "Tanım", 300))
 
     def validate_example(self, value):
         return validate_example_text(value)
         
     def validate_etymology(self, value):
-        if not value or not value.strip():
-            raise serializers.ValidationError("Köken bilgisi boş olamaz.")
-        
-        value = value.strip()
-        if len(value) > 200:
-            raise serializers.ValidationError("Köken bilgisi 200 karakteri geçemez.")
-            
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Köken bilgisinde geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return value
+        return clean_text(value, "Köken bilgisi", 200)
 
     def validate_nickname(self, value):
         if not value or not value.strip():
             return "Anonim"
-
-        value = value.strip()
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-]', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Takma adda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
+        value = clean_word(value, "Takma ad", 50)
 
         request = self.context.get('request')
         if not (request and request.user.is_authenticated) and User.objects.filter(username__iexact=value).exists():
@@ -226,15 +248,7 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         fields = ['word_id', 'comment']
 
     def validate_comment(self, value):
-        value = value.strip()
-        if len(value) > 200:
-            raise serializers.ValidationError("Yorum 200 karakteri geçemez.")
-        if not value:
-            raise serializers.ValidationError("Yorum boş olamaz.")
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\'"?!\-+#]', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Yorumda geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return value
+        return clean_text(value, "Yorum", 200)
     
 
 class AuthSerializer(serializers.Serializer):
@@ -245,14 +259,10 @@ class AuthSerializer(serializers.Serializer):
     password = serializers.CharField(min_length=6, max_length=60, write_only=True)
 
     def validate_username(self, value):
-        value = value.strip()
+        value = clean_username(value)
 
-        if value.lower() == 'anonim':
+        if value == 'anonim':
             raise serializers.ValidationError("Bu kullanıcı adı sistem tarafından ayrılmıştır, alınamaz.")
-
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ0-9_]', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Kullanıcı adında geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
 
         return value
 
@@ -260,20 +270,13 @@ class ChangeUsernameSerializer(serializers.Serializer):
     new_username = serializers.CharField(max_length=30, required=True)
 
     def validate_new_username(self, value):
-        value = value.strip()
+        value = clean_username(value)
         user = self.context['request'].user
 
-        if not value:
-            raise serializers.ValidationError("Kullanıcı adı boş olamaz.")
-
-        if value.lower() in ['anonim', 'admin', 'moderator']:
+        if value in ['anonim', 'admin', 'moderator']:
             raise serializers.ValidationError("Bu kullanıcı adı sistem tarafından ayrılmıştır.")
 
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ0-9_]', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Kullanıcı adında geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-
-        if User.objects.filter(username__iexact=value).exclude(id=user.id).exists():
+        if User.objects.filter(username=value).exclude(id=user.id).exists():
             raise serializers.ValidationError("Bu kullanıcı adı zaten kullanımda.")
 
         return value

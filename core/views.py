@@ -27,7 +27,7 @@ from .serializers import (
     WordCreateSerializer, CommentCreateSerializer,
     AuthSerializer, ChangeUsernameSerializer,
     WordAddExampleSerializer, CategorySerializer,
-    NotificationSerializer
+    NotificationSerializer, turkish_lower
 )
 
 logger = logging.getLogger(__name__)
@@ -702,7 +702,7 @@ def login_view(request):
     if not verify_turnstile(captcha_token):
         return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
 
-    username = request.data.get('username', '').strip()
+    username = turkish_lower(request.data.get('username', '').strip())
     password = request.data.get('password', '')
 
     if not username or not password:
@@ -739,10 +739,10 @@ def register_view(request):
 
     serializer = AuthSerializer(data=request.data)
     if serializer.is_valid():
-        username = serializer.validated_data['username'].lower()
+        username = serializer.validated_data['username']
         password = serializer.validated_data['password']
 
-        if User.objects.filter(username__iexact=username).exists():
+        if User.objects.filter(username=username).exists():
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
 
         try:
@@ -852,7 +852,7 @@ def change_username(request):
     serializer = ChangeUsernameSerializer(data=request.data, context={'request': request})
     
     if serializer.is_valid():
-        new_username = serializer.validated_data['new_username'].lower()
+        new_username = serializer.validated_data['new_username']
         user = request.user
 
         try:

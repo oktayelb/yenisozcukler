@@ -1,10 +1,7 @@
-import re
 from rest_framework import serializers
+
+from core.serializers import clean_text, clean_word
 from .models import TranslationChallenge, ChallengeComment
-
-
-TURKISH_SAFE_PATTERN = r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.;:,0-9()\-+?#\']'
-WORD_SAFE_PATTERN = r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s\-]'
 
 
 class TranslationChallengeSerializer(serializers.ModelSerializer):
@@ -55,22 +52,10 @@ class TranslationChallengeCreateSerializer(serializers.Serializer):
     meaning = serializers.CharField(max_length=300, required=True)
 
     def validate_foreign_word(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("Yabancı sözcük boş olamaz.")
-        invalid_chars = set(re.findall(r'[^a-zA-ZçÇğĞıIİöÖşŞüÜâîûÂÎÛ\s.,0-9()\-\']', value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Sözcükte geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return value
+        return clean_word(value, "Yabancı sözcük", 100, latin_only=False)
 
     def validate_meaning(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("Anlam açıklaması boş olamaz.")
-        invalid_chars = set(re.findall(TURKISH_SAFE_PATTERN, value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Anlam açıklamasında geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return value
+        return clean_text(value, "Anlam açıklaması", 300)
 
 
 class ChallengeCommentSerializer(serializers.ModelSerializer):
@@ -98,26 +83,12 @@ class ChallengeSuggestionCreateSerializer(serializers.Serializer):
     suggested_word = serializers.CharField(max_length=30, required=True)
     etymology = serializers.CharField(max_length=200, required=True)
     example_sentence = serializers.CharField(max_length=200, required=True)
-    def validate_suggested_word(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("Önerilen sözcük boş olamaz.")
-        invalid_chars = set(re.findall(WORD_SAFE_PATTERN, value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"Sözcükte geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return value
 
-    def _validate_text_field(self, value, field_name):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError(f"{field_name} boş olamaz.")
-        invalid_chars = set(re.findall(TURKISH_SAFE_PATTERN, value))
-        if invalid_chars:
-            raise serializers.ValidationError(f"{field_name} geçersiz karakterler bulundu: {' '.join(invalid_chars)}")
-        return value
+    def validate_suggested_word(self, value):
+        return clean_word(value, "Önerilen sözcük", 30)
 
     def validate_etymology(self, value):
-        return self._validate_text_field(value, "Köken bilgisinde")
+        return clean_text(value, "Köken bilgisi", 200)
 
     def validate_example_sentence(self, value):
-        return self._validate_text_field(value, "Örnek cümlede")
+        return clean_text(value, "Örnek cümle", 200)
