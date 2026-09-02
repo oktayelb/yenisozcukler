@@ -186,6 +186,10 @@
     --tag-text: #5d5c61;
     --tag-selected-bg: #8e7f7f;
     --tag-selected-text: #fffcf7;
+
+    /* SAYAÇ ROZETİ (yorum sayısı) */
+    --count-badge-bg: #7a6c6c;
+    --count-badge-text: #fffcf7;
 }
 
 /* DARK MODE */
@@ -235,4 +239,7 @@ body.dark-mode {
     --tag-text: #bbb;
     --tag-selected-bg: #c4b5b5;
     --tag-selected-text: #1a1a22;
+
+    --count-badge-bg: #c4b5b5;
+    --count-badge-text: #1a1a22;
 }

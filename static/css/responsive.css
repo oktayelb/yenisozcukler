@@ -117,6 +117,16 @@
         font-size: 1.5rem;
         padding-right: 90px;
     }
+    .click-hint {
+        font-size: 0.88rem;
+        padding: 6px 12px 6px 10px;
+        gap: 6px;
+    }
+    .click-hint .comment-count {
+        min-width: 22px;
+        height: 22px;
+        font-size: 0.85rem;
+    }
     .vote-container-floating {
         padding: 6px var(--spacing-sm);
         gap: 10px;

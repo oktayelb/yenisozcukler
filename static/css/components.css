@@ -115,19 +115,72 @@
     margin-right: 6px;
 }
 .click-hint {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    opacity: 0.6;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-main);
+    background: var(--tag-bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-pill);
+    padding: 7px 14px 7px 12px;
     cursor: pointer;
-    transition: all var(--duration-normal) var(--ease-out-expo);
-    display: flex;
+    transition: background var(--duration-normal) var(--ease-out-expo),
+                border-color var(--duration-normal) var(--ease-out-expo),
+                transform var(--duration-normal) var(--ease-out-expo);
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
+    line-height: 1;
 }
-.click-hint span {
+.click-hint-icon {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.75;
+}
+.comment-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: var(--radius-pill);
+    background: var(--count-badge-bg);
+    color: var(--count-badge-text);
+    font-size: 0.9rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+.click-hint-arrow {
     display: inline-block;
+    color: var(--text-muted);
     transition: transform var(--duration-normal) var(--ease-spring);
+}
+/* Henüz yorum yok: daha sakin bir görünüm */
+.click-hint.is-empty {
+    color: var(--text-muted);
+    background: transparent;
+}
+.click-hint.is-empty .comment-count {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-light);
+}
+@media (hover: hover) {
+    .click-hint:hover {
+        background: var(--tag-bg-hover);
+        border-color: rgba(var(--accent-rgb), 0.4);
+    }
+    .click-hint:hover .click-hint-arrow {
+        transform: translateX(4px);
+    }
 }
 /* ========================================
    TAGS & CATEGORIES
