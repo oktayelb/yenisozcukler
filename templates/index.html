@@ -11,7 +11,6 @@
 
         <div class="header-controls">
             <button class="header-btn" id="darkModeToggle">Karanlık Mod</button>
-            <button class="header-btn header-kvkk-btn" id="headerKvkkBtn">Yasal</button>
         </div>
 
         <div class="header-controls-right">
@@ -26,8 +25,17 @@
             {% else %}
                 <button class="header-btn auth-login-trigger">Giriş Yap</button>
             {% endif %}
-            <button class="header-btn" id="headerAboutBtn">Bu site nedir?</button>
-            <button class="header-btn" id="headerContactBtn">İletişim</button>
+            <div class="header-menu" id="aboutMenu">
+                <button class="header-btn header-menu-btn" id="aboutMenuBtn"
+                        aria-haspopup="true" aria-expanded="false" aria-controls="aboutMenuList">
+                    Hakkımızda <span class="header-menu-icon">▼</span>
+                </button>
+                <div class="header-menu-list" id="aboutMenuList" role="menu">
+                    <button class="header-menu-item" id="headerAboutBtn" role="menuitem">Bu site nedir?</button>
+                    <button class="header-menu-item" id="headerContactBtn" role="menuitem">İletişim</button>
+                    <button class="header-menu-item" id="headerKvkkBtn" role="menuitem">Yasal</button>
+                </div>
+            </div>
         </div>
 
         {% include 'partials/header.html' %}
