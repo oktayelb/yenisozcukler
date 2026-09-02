@@ -69,6 +69,7 @@
 
                 <div class="word-footer" style="margin-top:12px;">
                     <span>Yazar: {{ word.display_author }}</span>
+                    <time class="card-date" datetime="{{ word.timestamp|date:'c' }}">{{ word.timestamp|date:'j F Y' }}</time>
                 </div>
             </div>
 

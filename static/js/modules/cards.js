@@ -5,6 +5,7 @@ import { animateAndOpenCommentView } from './comments.js';
 import { openProfileModal } from './profile.js';
 import { openAddExampleModal } from './example.js';
 import { navigateTo } from './router.js';
+import { formatTimestamp } from './utils.js';
 
 export function createCardElement(item, isModalMode) {
     const card = document.createElement('div');
@@ -138,6 +139,14 @@ export function createCardElement(item, isModalMode) {
         authorSpan.appendChild(badge);
     } else {
         authorSpan.textContent = ' anonim';
+    }
+
+    const dateText = formatTimestamp(item.timestamp);
+    if (dateText) {
+        const dateSpan = document.createElement('span');
+        dateSpan.className = 'card-date';
+        dateSpan.innerText = dateText;
+        authorSpan.appendChild(dateSpan);
     }
 
     foot.appendChild(authorSpan);

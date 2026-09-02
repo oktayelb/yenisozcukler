@@ -92,3 +92,15 @@ export function updatePageMeta(title, description) {
     // Update Canonical URL
     updateMetaTag('link[rel="canonical"]', 'href', currentUrl);
 }
+export function formatTimestamp(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (isNaN(date)) return '';
+
+    const sameYear = date.getFullYear() === new Date().getFullYear();
+    return date.toLocaleDateString('tr-TR', {
+        day: 'numeric',
+        month: 'long',
+        year: sameYear ? undefined : 'numeric',
+    });
+}
