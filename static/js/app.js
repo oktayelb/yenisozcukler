@@ -8,6 +8,7 @@ import { updateCount } from './modules/utils.js';
 import { setupTheme } from './modules/theme.js';
 import { setupSortBar } from './modules/sort.js';
 import { setupHeaderMenu } from './modules/headerMenu.js';
+import { setupRandomWord } from './modules/randomWord.js';
 import { openModal, closeModal, closeAuthModal, showAboutInfo, closeAboutInfo, showKvkkInfo, closeKvkkInfo, showContactInfo, closeContactInfo, closeProfileModal, closeEditProfileModal, closeMyWordsModal } from './modules/modal.js';
 import { toggleAuthMode, setupAuthTriggers, handleAuthSubmit, handleLogout, openAuthModal } from './modules/auth.js';
 import { fetchCategories } from './modules/categories.js';
@@ -32,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSortBar();
     setupTheme();
     setupHeaderMenu();
+    setupRandomWord();
     initContributionDraft();
     initTopAppBar();
     initNotifications();

@@ -15,6 +15,7 @@ import { state } from './state.js';
 import { apiRequest, updatePageMeta } from './utils.js';
 import { fetchWords } from './feed.js';
 import { animateAndOpenCommentView, closeCommentView } from './comments.js';
+import { clearRandomMode } from './randomWord.js';
 
 /**
  * True while the router is dispatching a route handler.
@@ -104,6 +105,14 @@ function handleHomeRoute() {
     // Close word detail overlay if open
     if (state.activeCardClone) closeCommentView();
 
+    // Leaving random mode: the feed holds a single card, so re-fetch it
+    if (clearRandomMode() && !state.activeCategorySlug) {
+        state.currentPage = 1;
+        updatePageMeta();
+        fetchWords(state.currentPage);
+        return;
+    }
+
     // If we were filtering by category, clear it and re-fetch
     if (state.activeCategorySlug) {
         state.activeCategorySlug = null;
@@ -165,6 +174,7 @@ async function handleWordRoute(wordSlug) {
 
 function handleCategoryRoute(slug) {
     if (state.activeCardClone) closeCommentView();
+    clearRandomMode();
 
     // Already filtering this category
     if (state.activeCategorySlug === slug) return;

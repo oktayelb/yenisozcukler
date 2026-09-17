@@ -1,5 +1,6 @@
 # core/views.py
 import logging
+import random
 import requests as http_requests
 
 from django.conf import settings
@@ -438,6 +439,59 @@ def get_word_by_slug(request, word_slug):
             slug=word_slug
         )
         cache.set(cache_key, word, 60 * 60)
+
+    user_votes = {}
+    if request.user.is_authenticated:
+        vote = WordVote.objects.filter(user=request.user, word=word).values('value').first()
+        if vote:
+            user_votes[word.id] = vote['value']
+
+    serializer = WordSerializer(word, context={'user_votes': user_votes})
+    return Response({'success': True, 'word': serializer.data})
+
+
+
+@ratelimit(key='ip', rate='120/m', method='GET', block=False)
+@api_view(['GET'])
+@permission_classes([])
+def get_random_word(request):
+    """Rastgele onaylanmış bir sözcüğü döndürür (zar butonu)."""
+    if getattr(request, 'limited', False):
+        return Response({'error': 'Too many requests'}, status=429)
+
+    cache_key = 'approved_word_slugs'
+    exclude = request.GET.get('exclude', '')
+
+    # Havuz bayatsa (silinmiş/onayı kalkmış sözcük) bir kez yenileyip tekrar dene
+    for attempt in range(2):
+        slugs = cache.get(cache_key)
+        if slugs is None:
+            slugs = list(
+                Word.objects.filter(status='approved')
+                    .exclude(slug__isnull=True)
+                    .exclude(slug='')
+                    .values_list('slug', flat=True)
+            )
+            cache.set(cache_key, slugs, 60 * 5)
+
+        if not slugs:
+            return Response({'success': False, 'error': 'Sözcük bulunamadı.'}, status=404)
+
+        # Aynı sözcüğü art arda vermemek için mevcut olanı havuzdan çıkar
+        pool = [s for s in slugs if s != exclude] or slugs
+
+        word = (
+            Word.objects.filter(status='approved', slug=random.choice(pool))
+                .annotate(comment_count=Count('comments'))
+                .select_related('user')
+                .prefetch_related('categories')
+                .first()
+        )
+        if word:
+            break
+        cache.delete(cache_key)
+    else:
+        return Response({'success': False, 'error': 'Sözcük bulunamadı.'}, status=404)
 
     user_votes = {}
     if request.user.is_authenticated:

@@ -17,6 +17,8 @@ export const state = {
     wordIdForExample: null,
     currentSearchQuery: '',
     activeCategorySlug: null,
+    randomMode: false,
+    randomSlug: null,
     allCategories: [],
     selectedFormCategories: new Set(),
     currentSort: 'date_desc',

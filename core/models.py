@@ -103,12 +103,14 @@ class Word(models.Model):
             cache.delete(f'word_slug_{self.slug}')
         # Also clear the global approved words count so the feed stays accurate
         cache.delete('total_approved_words_count_all')
+        cache.delete('approved_word_slugs')
 
     def delete(self, *args, **kwargs):
         # Cache Invalidation: Clear cache when a word is deleted (e.g. by an admin)
         if self.slug:
             cache.delete(f'word_slug_{self.slug}')
         cache.delete('total_approved_words_count_all')
+        cache.delete('approved_word_slugs')
         
         super().delete(*args, **kwargs)
 
