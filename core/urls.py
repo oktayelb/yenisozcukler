@@ -1,18 +1,18 @@
 from django.urls import path, re_path
 from django.views.generic import RedirectView
-from . import views
+from . import views, seo
 
 urlpatterns = [
     # robots.txt
-    path('robots.txt', views.robots_txt, name='robots_txt'),
-    path('sitemap.xml', views.sitemap_xml, name='sitemap_xml'),
+    path('robots.txt', seo.robots_txt, name='robots_txt'),
+    path('sitemap.xml', seo.sitemap_xml, name='sitemap_xml'),
     path('favicon.ico', RedirectView.as_view(url='/static/favicon.ico', permanent=True), name='favicon_ico'),
 
     # Ana Sayfa (Bot-aware)
-    path('', views.index_view, name='index'),
+    path('', seo.index_view, name='index'),
 
     # SEO: Server-side rendered word detail (bots) / SPA shell (browsers)
-    path('sozcuk/<slug:word_slug>/', views.word_detail, name='word_detail'),
+    path('sozcuk/<slug:word_slug>/', seo.word_detail, name='word_detail'),
 
     # GET API
     path('api/words', views.get_words, name='get_words'),
@@ -43,8 +43,8 @@ urlpatterns = [
     path('api/notifications/mark-read', views.mark_notifications_read, name='mark_notifications_read'),
 
     # SPA catch-all (Bot-aware)
-    path('kategori/<slug:slug>/', views.category_view, name='spa_category'),
+    path('kategori/<slug:slug>/', seo.category_view, name='spa_category'),
 
     # Catch-all: serve SPA shell for any unmatched path (must be last)
-    re_path(r'^(?!api/).*$', views.spa_catchall, name='spa_catchall'),
+    re_path(r'^(?!api/).*$', seo.spa_catchall, name='spa_catchall'),
 ]
