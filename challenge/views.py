@@ -319,7 +319,7 @@ def vote_challenge_comment(request, comment_id):
 
     owner = comment.user if hasattr(comment, 'user') else None
     if owner and owner != user:
-        from core.models import Notification
+        from notifications.models import Notification
         from django.core.cache import cache
 
         like_type = 'challenge_like'

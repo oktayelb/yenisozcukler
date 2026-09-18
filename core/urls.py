@@ -1,6 +1,6 @@
 from django.urls import path, re_path
 from django.views.generic import RedirectView
-from . import views, seo
+from . import seo
 
 urlpatterns = [
     # robots.txt
@@ -13,11 +13,6 @@ urlpatterns = [
 
     # SEO: Server-side rendered word detail (bots) / SPA shell (browsers)
     path('sozcuk/<slug:word_slug>/', seo.word_detail, name='word_detail'),
-
-    # Notifications
-    path('api/notifications', views.get_notifications, name='get_notifications'),
-    path('api/notifications/unread-count', views.get_unread_count, name='get_unread_count'),
-    path('api/notifications/mark-read', views.mark_notifications_read, name='mark_notifications_read'),
 
     # SPA catch-all (Bot-aware)
     path('kategori/<slug:slug>/', seo.category_view, name='spa_category'),

@@ -8,6 +8,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'accounts',
     'words',
+    'notifications',
     'core',
     'challenge',
 ]

@@ -1,4 +1,4 @@
-# core/views.py
+# notifications/views.py
 import logging
 
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -16,12 +16,6 @@ from common.http import universal_rate_key
 
 logger = logging.getLogger(__name__)
 
-
-# --- OKUMA (READ) ENDPOINTLERİ ---
-
-# --- YAZMA (WRITE) ENDPOINTLERİ ---
-
-# --- BİLDİRİM (NOTIFICATION) ENDPOINTLERİ ---
 
 @ratelimit(key=universal_rate_key, rate='60/m', method='GET', block=False)
 @api_view(['GET'])

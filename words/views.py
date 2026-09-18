@@ -3,7 +3,8 @@
 
 Yorum bir sözcüğün parçası (zorunlu CASCADE FK), bu yüzden burada duruyor.
 `vote` uç noktası hem sözcüğe hem yoruma oy verir; ikisi de bu uygulamada
-olduğu için artık dışarıdan bir model import etmesi gerekmiyor.
+olduğu için artık dışarıdan bir model import etmesi gerekmiyor; yalnızca
+bildirim yazarken `notifications.Notification` kullanılır.
 """
 
 import logging
@@ -23,7 +24,7 @@ from django.db.models import Count, F, Q
 from django.db import transaction, DatabaseError, OperationalError, IntegrityError
 
 from common.http import verify_turnstile, get_client_ip, universal_rate_key
-from core.models import Notification
+from notifications.models import Notification
 from .models import Word, WordVote, Category, Comment, CommentVote
 from .serializers import (
     WordSerializer, WordCreateSerializer, WordAddExampleSerializer, CategorySerializer,

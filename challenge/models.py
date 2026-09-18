@@ -59,7 +59,7 @@ class TranslationChallenge(models.Model):
 
     def create_winner_word(self):
         from words.models import Word, WordVote
-        from core.models import Notification
+        from notifications.models import Notification
         from django.db import transaction, IntegrityError
 
         if not self.is_closed or self.winner_word_created:
