@@ -22,8 +22,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Sum
 from django.db import transaction, IntegrityError
 
-from words.models import Word
-from core.models import Comment
+from words.models import Word, Comment
 from common.text import turkish_lower
 from common.http import verify_turnstile, universal_rate_key, login_username_key
 from .serializers import AuthSerializer, ChangeUsernameSerializer

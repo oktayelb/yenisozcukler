@@ -14,13 +14,6 @@ urlpatterns = [
     # SEO: Server-side rendered word detail (bots) / SPA shell (browsers)
     path('sozcuk/<slug:word_slug>/', seo.word_detail, name='word_detail'),
 
-    # GET API
-    path('api/comments/<int:word_id>', views.get_comments, name='get_comments'),
-
-    # POST API
-    path('api/comment', views.add_comment, name='add_comment'),
-    path('api/vote/<str:entity_type>/<int:entity_id>', views.vote, name='vote'),
-
     # Notifications
     path('api/notifications', views.get_notifications, name='get_notifications'),
     path('api/notifications/unread-count', views.get_unread_count, name='get_unread_count'),

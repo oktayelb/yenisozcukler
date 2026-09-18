@@ -1,7 +1,6 @@
 from rest_framework import serializers
 
-from common.text import clean_text
-from .models import Comment, Notification
+from .models import Notification
 
 
 # --- OKUMA (READ) SERIALIZERS ---
@@ -70,34 +69,3 @@ class NotificationSerializer(serializers.ModelSerializer):
     def get_challenge_suggested_word(self, obj):
         cc = getattr(obj, 'challenge_comment', None)
         return cc.suggested_word if cc else None
-
-
-class CommentSerializer(serializers.ModelSerializer):
-    score = serializers.IntegerField(read_only=True)
-    user_vote = serializers.SerializerMethodField()
-    author = serializers.CharField(source='display_author', read_only=True)
-
-    class Meta:
-        model = Comment
-        fields = ['id', 'word', 'author', 'comment', 'timestamp', 'score', 'user_vote']
-
-    def get_user_vote(self, obj):
-        votes = self.context.get('user_votes', {})
-        vote_value = votes.get(obj.id)
-        
-        if vote_value == 1: return 'like'
-        if vote_value == -1: return 'dislike'
-        return None
-
-# --- YAZMA (WRITE) SERIALIZERS ---
-
-class CommentCreateSerializer(serializers.ModelSerializer):
-    word_id = serializers.IntegerField()
-
-    class Meta:
-        model = Comment
-        fields = ['word_id', 'comment']
-
-    def validate_comment(self, value):
-        return clean_text(value, "Yorum", 200)
-    

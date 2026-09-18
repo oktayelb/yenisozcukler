@@ -6,7 +6,7 @@ from django.contrib.admin import helpers
 from django.contrib.auth.models import User
 
 from core.models import Notification
-from .models import Word, WordVote, Category, REJECTION_REASONS
+from .models import Word, WordVote, Category, Comment, CommentVote, REJECTION_REASONS
 
 # --- Define Actions ---
 
@@ -205,7 +205,19 @@ class WordVoteAdmin(admin.ModelAdmin):
     search_fields = ('word__word', 'user__username')
 
 
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ('author', 'word', 'score', 'timestamp')
+    search_fields = ('comment', 'author')
+    list_filter = ('timestamp',)
+
+class CommentVoteAdmin(admin.ModelAdmin):
+    list_display = ('comment', 'user', 'value', 'timestamp')
+    list_filter = ('value', 'timestamp')
+    search_fields = ('comment__comment', 'user__username')
+
 # --- Register Models ---
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(Word, WordAdmin)
 admin.site.register(WordVote, WordVoteAdmin)
+admin.site.register(Comment, CommentAdmin)
+admin.site.register(CommentVote, CommentVoteAdmin)

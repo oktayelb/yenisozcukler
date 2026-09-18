@@ -13,4 +13,9 @@ urlpatterns = [
     # POST / PATCH
     path('api/word', views.add_word, name='add_word'),
     path('api/example', views.add_example, name='add_example'),
+
+    # Yorumlar ve oylama
+    path('api/comments/<int:word_id>', views.get_comments, name='get_comments'),
+    path('api/comment', views.add_comment, name='add_comment'),
+    path('api/vote/<str:entity_type>/<int:entity_id>', views.vote, name='vote'),
 ]

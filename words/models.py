@@ -132,3 +132,58 @@ class WordVote(models.Model):
 
     class Meta:
         unique_together = ('user', 'word')
+
+
+class Comment(models.Model):
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='comments',
+        db_index=True
+    )
+
+    word = models.ForeignKey(Word, on_delete=models.CASCADE, related_name='comments')
+    author = models.CharField(max_length=50, default='Anonim')
+    comment = models.CharField(max_length=200, blank=False)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    score = models.IntegerField(default=0, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['word', 'timestamp']),
+        ]
+
+    @property
+    def display_author(self):
+        if self.user:
+            return self.user.username
+        return self.author
+
+    def __str__(self):
+        return f"{self.display_author}: {self.comment[:20]}"
+
+
+class CommentVote(models.Model):
+    VALUE_CHOICES = [
+        (1, 'Like'),
+        (-1, 'Dislike')
+    ]
+    
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='comment_votes',
+        db_index=True
+    )
+
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='votes')
+    value = models.SmallIntegerField(choices=VALUE_CHOICES)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'comment')
