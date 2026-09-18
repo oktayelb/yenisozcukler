@@ -23,8 +23,8 @@ from django.db.models import Count, Sum
 from django.db import transaction, IntegrityError
 
 from words.models import Word, Comment
-from common.text import turkish_lower
-from common.http import verify_turnstile, universal_rate_key, login_username_key
+from core.text import turkish_lower
+from core.http import verify_turnstile, universal_rate_key, login_username_key
 from .serializers import AuthSerializer, ChangeUsernameSerializer
 
 logger = logging.getLogger(__name__)

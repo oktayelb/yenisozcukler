@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.cache import cache
 
-from common.text import turkish_to_ascii
+from core.text import turkish_to_ascii
 
 
 def generate_unique_slug(word_text, exclude_id=None):

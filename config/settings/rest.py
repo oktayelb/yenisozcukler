@@ -10,5 +10,5 @@ REST_FRAMEWORK = {
     ]
 }
 
-RATELIMIT_IP_META_KEY = 'common.http.get_client_ip'
+RATELIMIT_IP_META_KEY = 'core.http.get_client_ip'
 RATELIMIT_ENABLE = config('RATELIMIT_ENABLE', default=True, cast=bool)

@@ -4,7 +4,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 
-from common.text import clean_username
+from core.text import clean_username
 
 
 class AuthSerializer(serializers.Serializer):

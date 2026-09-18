@@ -12,7 +12,7 @@ from django.core.cache import cache
 
 from .models import Notification
 from .serializers import NotificationSerializer
-from common.http import universal_rate_key
+from core.http import universal_rate_key
 
 logger = logging.getLogger(__name__)
 

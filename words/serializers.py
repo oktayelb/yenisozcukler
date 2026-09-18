@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 
-from common.text import (
+from core.text import (
     turkish_lower, clean_text, clean_word, validate_example_text,
 )
 from .models import Word, Category, Comment
