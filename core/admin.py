@@ -5,7 +5,6 @@ from django.template import Template, RequestContext
 from django.contrib.admin import helpers
 from .models import Word, Comment, WordVote, CommentVote, Category, Notification, REJECTION_REASONS
 from django.contrib.auth.models import User
-from django.contrib.auth.admin import UserAdmin
 
 # --- Define Actions ---
 
@@ -213,16 +212,7 @@ class CommentVoteAdmin(admin.ModelAdmin):
     list_filter = ('value', 'timestamp')
     search_fields = ('comment__comment', 'user__username')
 
-class CustomUserAdmin(UserAdmin):
-    list_display = ('id', 'username', 'email', 'first_name', 'last_name', 'is_staff', 'date_joined')
-    list_filter = ('is_staff', 'is_superuser', 'is_active', 'date_joined')
-    search_fields = ('username', 'email', 'first_name', 'last_name')
-    ordering = ('-date_joined',)
-
 # --- Register Models ---
-admin.site.unregister(User)
-admin.site.register(User, CustomUserAdmin)
-
 admin.site.register(Category, CategoryAdmin)
 admin.site.register(Word, WordAdmin)
 admin.site.register(Comment, CommentAdmin)
