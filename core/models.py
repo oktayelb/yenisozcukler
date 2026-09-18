@@ -1,21 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.cache import cache
-import re
 
-
-TURKISH_CHAR_MAP = {
-    'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
-    'â': 'a', 'î': 'i', 'û': 'u',
-}
-
-
-def turkish_to_ascii(text):
-    text = text.lower()
-    for tr, en in TURKISH_CHAR_MAP.items():
-        text = text.replace(tr, en)
-    text = re.sub(r'[^a-z0-9]+', '-', text)
-    return text.strip('-')
+from common.text import turkish_to_ascii
 
 
 def generate_unique_slug(word_text, exclude_id=None):

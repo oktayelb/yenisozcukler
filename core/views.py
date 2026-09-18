@@ -1,10 +1,7 @@
 # core/views.py
 import logging
 import random
-import requests as http_requests
 
-from django.conf import settings
-from decouple import config
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -27,58 +24,14 @@ from .serializers import (
     WordCreateSerializer, CommentCreateSerializer,
     AuthSerializer, ChangeUsernameSerializer,
     WordAddExampleSerializer, CategorySerializer,
-    NotificationSerializer, turkish_lower
+    NotificationSerializer,
+)
+from common.text import turkish_lower
+from common.http import (
+    verify_turnstile, get_client_ip, universal_rate_key, login_username_key,
 )
 
 logger = logging.getLogger(__name__)
-
-# --- YARDIMCI FONKSİYONLAR ---
-
-def verify_turnstile(token):
-    if settings.DEBUG:
-        return True
-    if not token:
-        return False
-    try:
-        resp = http_requests.post(
-            'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-            data={'secret': config('CLOUDFLARE_SECRET_KEY'), 'response': token},
-            timeout=5,
-        )
-        result = resp.json()
-        if not result.get('success', False):
-            logger.warning('Turnstile rejected: %s', result.get('error-codes', []))
-        return result.get('success', False)
-    except http_requests.RequestException as e:
-        logger.error('Turnstile request failed: %s', e)
-        return False
-
-def get_client_ip(request):
-    cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
-    if cf_ip:
-        return cf_ip
-        
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        return x_forwarded_for.split(',')[0].strip()
-
-    return request.META.get('REMOTE_ADDR')
-
-def universal_rate_key(group, request):
-    if hasattr(request, 'user') and request.user.is_authenticated:
-        return f"user_{request.user.id}"
-    return f"ip_{get_client_ip(request)}"
-
-def login_username_key(group, request):
-    """Rate-limit key that reads username from JSON body (not request.POST)."""
-    import json
-    username = ''
-    try:
-        body = json.loads(request.body)
-        username = body.get('username', '').strip().lower()
-    except (json.JSONDecodeError, AttributeError, UnicodeDecodeError):
-        username = request.POST.get('username', '').strip().lower()
-    return username or get_client_ip(request)
 
 
 # --- OKUMA (READ) ENDPOINTLERİ ---
