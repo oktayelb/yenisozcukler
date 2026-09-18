@@ -9,11 +9,6 @@ from .middleware import CloudflareSecurityMiddleware, _is_cloudflare_ip
 from .models import Category, Comment, CommentVote, Word, WordVote
 from .serializers import AuthSerializer, CommentCreateSerializer, WordCreateSerializer
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _turnstile_ok(*args, **kwargs):
     mock = MagicMock()
     mock.json.return_value = {'success': True}
@@ -51,9 +46,6 @@ def _make_pending_word(user=None):
     )
 
 
-# ---------------------------------------------------------------------------
-# 1. Models — display_author property
-# ---------------------------------------------------------------------------
 
 class DisplayAuthorTests(TestCase):
 
@@ -300,10 +292,6 @@ class LoginViewTests(TestCase):
         self.assertEqual(resp.status_code, 400)
 
 
-# ---------------------------------------------------------------------------
-# 4. Voting
-# ---------------------------------------------------------------------------
-
 @override_settings(RATELIMIT_ENABLE=False)
 class VoteTests(TestCase):
 
@@ -376,10 +364,6 @@ class VoteTests(TestCase):
         )
         self.assertEqual(resp.status_code, 404)
 
-
-# ---------------------------------------------------------------------------
-# 5. add_word and add_comment
-# ---------------------------------------------------------------------------
 
 @override_settings(RATELIMIT_ENABLE=False)
 class AddWordTests(TestCase):
@@ -477,9 +461,6 @@ class AddCommentTests(TestCase):
         self.assertEqual(resp.status_code, 400)
 
 
-# ---------------------------------------------------------------------------
-# 6. add_example
-# ---------------------------------------------------------------------------
 
 @override_settings(RATELIMIT_ENABLE=False)
 class AddExampleTests(TestCase):
@@ -536,10 +517,6 @@ class AddExampleTests(TestCase):
         self.assertEqual(resp.status_code, 403)
 
 
-# ---------------------------------------------------------------------------
-# 7. change_password
-# ---------------------------------------------------------------------------
-
 @override_settings(RATELIMIT_ENABLE=False)
 class ChangePasswordTests(TestCase):
 
@@ -587,10 +564,6 @@ class ChangePasswordTests(TestCase):
         resp = self._patch('correct123', 'newpass456')
         self.assertEqual(resp.status_code, 403)
 
-
-# ---------------------------------------------------------------------------
-# 8. get_words — search, pagination, sort, invalid params
-# ---------------------------------------------------------------------------
 
 @override_settings(RATELIMIT_ENABLE=False)
 class GetWordsTests(TestCase):
@@ -644,10 +617,6 @@ class GetWordsTests(TestCase):
         self.assertEqual(resp.json()['words'], [])
 
 
-# ---------------------------------------------------------------------------
-# 9. get_user_profile
-# ---------------------------------------------------------------------------
-
 @override_settings(RATELIMIT_ENABLE=False)
 class UserProfileTests(TestCase):
 
@@ -678,10 +647,6 @@ class UserProfileTests(TestCase):
         self.assertEqual(resp.status_code, 404)
 
 
-# ---------------------------------------------------------------------------
-# 10. get_my_words
-# ---------------------------------------------------------------------------
-
 @override_settings(RATELIMIT_ENABLE=False)
 class GetMyWordsTests(TestCase):
 
@@ -704,11 +669,6 @@ class GetMyWordsTests(TestCase):
         resp = self.client.get(reverse('get_my_words'), {'username': 'myuser'})
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()['total_count'], 1)
-
-
-# ---------------------------------------------------------------------------
-# 11. Middleware — _is_cloudflare_ip unit tests
-# ---------------------------------------------------------------------------
 
 class CloudflareIPTests(TestCase):
 

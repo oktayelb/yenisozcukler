@@ -1,12 +1,3 @@
-# core/seo.py
-"""Arama motoru / bot tarafına bakan görünümler.
-
-Buradaki her şey HTML veya XML döndürür, JSON değil: robots.txt, sitemap,
-bot algılama ve bot ile tarayıcıya farklı şablon veren "dynamic rendering"
-görünümleri. Veritabanına yalnızca okuma amaçlı dokunur; API katmanıyla
-(core/views.py) ortak hiçbir durumu yoktur.
-"""
-
 from rest_framework.decorators import permission_classes
 
 from django.shortcuts import get_object_or_404, render
@@ -14,8 +5,6 @@ from django.http import HttpResponse, HttpResponseNotFound
 
 from words.models import Word, Category
 
-
-# --- ROBOTS.TXT ---
 
 _ROBOTS_TXT = (
     "User-agent: GPTBot\n"
@@ -108,7 +97,6 @@ def _is_bot(ua):
     ua = (ua or '').lower()
     return any(p in ua for p in BOT_SPECIFIC) or any(p in ua for p in BOT_GENERIC)
 
-# --- DYNAMIC RENDERING VIEWS ---
 
 @permission_classes([])
 def index_view(request):

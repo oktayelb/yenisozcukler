@@ -1,8 +1,3 @@
-"""İstek düzeyinde altyapı: istemci IP'si, hız sınırı anahtarları, CAPTCHA.
-
-Bu modül alan (domain) bilgisi taşımaz ve hiçbir modeli içe aktarmaz; böylece
-`core` ve `challenge` birbirini değil yalnızca burayı içe aktarır.
-"""
 
 import json
 import logging

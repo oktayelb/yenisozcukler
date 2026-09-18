@@ -1,23 +1,8 @@
-"""Türkçe metin normalleştirme ve doğrulama yardımcıları.
-
-Saf metin işlemleri; hiçbir model içe aktarmaz. `core` ve `challenge`
-serializer'ları buradaki `clean_*` fonksiyonlarını paylaşır.
-"""
-
 import re
 import unicodedata
 
 from rest_framework import serializers
 
-
-# --- YARDIMCI FONKSİYONLAR (HELPER FUNCTIONS) ---
-#
-# Karakter beyaz listesi tutmuyoruz: SQL enjeksiyonunu ORM'in parametreli
-# sorguları, XSS'i ise şablon autoescape'i ile frontend'deki escapeHTML() /
-# textContent engelliyor. Bu yüzden < > & gibi karakterler serbesttir.
-# Yalnızca görüntülenemeyen karakterler (kontrol, bidi, atanmamış) elenir.
-
-# Klavyelerin ürettiği tipografik karakterler -> ASCII karşılığı.
 _FOLD = str.maketrans({
     '‘': "'", '’': "'", '′': "'", '´': "'",
     '“': '"', '”': '"', '„': '"', '″': '"',
