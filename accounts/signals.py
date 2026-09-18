@@ -3,7 +3,8 @@
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from django.contrib.auth.models import User
-from core.models import Word, Comment
+from words.models import Word
+from core.models import Comment
 
 
 @receiver(post_save, sender=User)

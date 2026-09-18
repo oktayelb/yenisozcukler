@@ -12,7 +12,7 @@ from rest_framework.decorators import permission_classes
 from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse, HttpResponseNotFound
 
-from .models import Word, Category
+from words.models import Word, Category
 
 
 # --- ROBOTS.TXT ---
