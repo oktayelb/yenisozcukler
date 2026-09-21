@@ -24,6 +24,7 @@ from django.db.models import Count, F, Q
 from django.db import transaction, DatabaseError, OperationalError, IntegrityError
 
 from core.http import verify_turnstile, get_client_ip, universal_rate_key
+from core.logger import log_activity
 from notifications.models import Notification
 from .models import Word, WordVote, Category, Comment, CommentVote
 from .serializers import (
@@ -301,9 +302,11 @@ def add_word(request):
 
         cache.delete('total_approved_words_count_all')
         
+        log_activity(request, detail=f'"{word.word}" (#{word.id}) onay bekliyor')
         return Response({'success': True})
     else:
         first_error = next(iter(serializer.errors.values()))[0]
+        log_activity(request, detail=f'Reddedildi: {first_error}')
         return Response({'success': False, 'error': first_error}, status=400)
 
 @ratelimit(key='ip', rate='20/m', method='PATCH', block=False)
@@ -331,6 +334,7 @@ def add_example(request):
 
         word.example = new_example
         word.save(update_fields=['example'])
+        log_activity(request, detail=f'"{word.word}" (#{word.id})')
         return Response({'success': True, 'message': 'Örnek cümle başarıyla eklendi.'})
 
     first_error = next(iter(serializer.errors.values()))[0]
@@ -549,6 +553,10 @@ def vote(request, entity_type, entity_id):
             elif created:
                 cache.delete(f'notif_unread_{owner.id}')
 
+    log_activity(
+        request,
+        detail=f'{entity_type} #{entity_id} {action} -> {response_action}'
+    )
     return Response({
         'success': True,
         'new_score': obj.score,
@@ -598,8 +606,10 @@ def add_comment(request):
             )
             cache.delete(f'notif_unread_{word.user.id}')
 
+        log_activity(request, detail=f'"{word.word}" (#{word.id}): {new_comment.comment[:80]}')
         return Response({'success': True, 'comment': CommentSerializer(new_comment).data}, status=201)
     else:
         first_error = next(iter(serializer.errors.values()))[0]
+        log_activity(request, detail=f'Reddedildi: {first_error}')
         return Response({'success': False, 'error': first_error}, status=400)
     

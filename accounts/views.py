@@ -2,8 +2,8 @@
 """Kimlik doğrulama ve profil uçları.
 
 Kendi modeli yoktur; `django.contrib.auth.User` üzerine oturur. Sözcük/yorum
-sayaçları için `core.models`'i okur — bağımlılık tek yönlüdür
-(accounts -> core), `core` buraya hiç bakmaz.
+sayaçları için `words.models`'i okur — bağımlılık tek yönlüdür
+(accounts -> words/core), ikisi de buraya hiç bakmaz.
 """
 
 import logging
@@ -25,6 +25,7 @@ from django.db import transaction, IntegrityError
 from words.models import Word, Comment
 from core.text import turkish_lower
 from core.http import verify_turnstile, universal_rate_key, login_username_key
+from core.logger import log_activity
 from .serializers import AuthSerializer, ChangeUsernameSerializer
 
 logger = logging.getLogger(__name__)
@@ -42,12 +43,14 @@ def login_view(request):
 
     captcha_token = request.data.get('token')
     if not verify_turnstile(captcha_token):
+        log_activity(request, 'login_failed', detail='CAPTCHA doğrulanamadı')
         return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
 
     username = turkish_lower(request.data.get('username', '').strip())
     password = request.data.get('password', '')
 
     if not username or not password:
+        log_activity(request, 'login_failed', detail='Eksik veri', username=username)
         return Response({'success': False, 'error': 'Geçersiz veri.'}, status=400)
 
     try:
@@ -61,6 +64,8 @@ def login_view(request):
     user = authenticate(request, username=canonical_username, password=password)
 
     if user is None:
+        # user_login_failed sinyali eylemi zaten 'login_failed' yaptı.
+        log_activity(request, detail='Hatalı kullanıcı adı veya şifre', username=canonical_username)
         return Response({'success': False, 'error': 'Bu kullanıcı adı veya şifre hatalı.'}, status=400)
     
     login(request, user)    
@@ -77,6 +82,7 @@ def register_view(request):
 
     captcha_token = request.data.get('token')
     if not verify_turnstile(captcha_token):
+        log_activity(request, 'register_failed', detail='CAPTCHA doğrulanamadı')
         return Response({'success': False, 'error': 'Lütfen robot olmadığınızı doğrulayın.'}, status=400)
 
     serializer = AuthSerializer(data=request.data)
@@ -85,25 +91,32 @@ def register_view(request):
         password = serializer.validated_data['password']
 
         if User.objects.filter(username=username).exists():
+            log_activity(request, 'register_failed', detail='Kullanıcı adı alınmış', username=username)
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
 
         try:
             validate_password(password)
         except DjangoValidationError as e:
+            log_activity(request, 'register_failed', detail=e.messages[0], username=username)
             return Response({'success': False, 'error': e.messages[0]}, status=400)
 
         try:
             with transaction.atomic():
                 user = User.objects.create_user(username=username, password=password)
                 login(request, user)
+                # login() sinyali eylemi 'login' yaptı; kaydı 'register' olarak işaretle.
+                log_activity(request, 'register', username=user.username)
                 return Response({'success': True, 'username': user.username, 'message': 'Kayıt başarılı.'}, status=201)
         except IntegrityError:
+            log_activity(request, 'register_failed', detail='Kullanıcı adı alınmış', username=username)
             return Response({'success': False, 'error': 'Bu kullanıcı adı zaten alınmış.'}, status=400)
         except Exception as e:
             logger.error('register_view failed for username=%s: %s', username, e, exc_info=True)
+            log_activity(request, 'register_failed', detail='Sunucu hatası', username=username)
             return Response({'success': False, 'error': 'Kayıt oluşturulamadı.'}, status=500)
 
     first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Geçersiz veri."
+    log_activity(request, 'register_failed', detail=first_error)
     return Response({'success': False, 'error': first_error}, status=400)
 
 @ratelimit(key='ip', rate='10/m', method='POST', block=False)
@@ -155,6 +168,10 @@ def change_password(request):
     if getattr(request, 'limited', False):
         return Response({'success': False, 'error': 'İşlem limiti aşıldı.'}, status=429)
 
+    # authenticate() aşağıda user_login_failed sinyalini tetikleyebilir;
+    # eylemi şimdiden işaretleyip kaydın 'login_failed' olmasını engelliyoruz.
+    log_activity(request, 'password_change')
+
     user = request.user
     current_password = request.data.get('current_password')
     new_password = request.data.get('new_password')
@@ -165,6 +182,7 @@ def change_password(request):
         return Response({'success': False, 'error': 'Mevcut şifre hatalı.'}, status=400)
 
     if not authenticate(request, username=user.username, password=current_password):
+        log_activity(request, detail='Mevcut şifre hatalı')
         return Response({'success': False, 'error': 'Mevcut şifre hatalı.'}, status=400)
 
     if not new_password or len(new_password) < 6:
@@ -181,6 +199,7 @@ def change_password(request):
     user.save()
     update_session_auth_hash(request, user)
     
+    log_activity(request, detail='Şifre güncellendi')
     return Response({'success': True, 'message': 'Şifreniz başarıyla güncellendi.'})
 
 @ratelimit(key=universal_rate_key, rate='2/d', method='PATCH', block=False)
@@ -196,12 +215,14 @@ def change_username(request):
     if serializer.is_valid():
         new_username = serializer.validated_data['new_username']
         user = request.user
+        old_username = user.username
 
         try:
             with transaction.atomic():
                 user.username = new_username
                 user.save()
                 
+                log_activity(request, detail=f'{old_username} -> {new_username}', username=new_username)
                 return Response({'success': True, 'message': 'Kullanıcı adı başarıyla değiştirildi.'})
                 
         except Exception:

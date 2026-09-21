@@ -1,8 +1,11 @@
 # accounts/signals.py
 
 from django.db.models.signals import post_save, pre_delete
+from django.contrib.auth.signals import user_logged_in, user_logged_out, user_login_failed
 from django.dispatch import receiver
 from django.contrib.auth.models import User
+
+from core.logger import log_activity
 from words.models import Word, Comment
 
 
@@ -48,3 +51,29 @@ def anonymize_deleted_user_content(sender, instance, **kwargs):
 
     TranslationChallenge.objects.filter(user=instance).update(author=anonymous_label)
     ChallengeComment.objects.filter(user=instance).update(author=anonymous_label)
+
+
+# --- AKTİVİTE LOGU SİNYALLERİ ---
+# Bunlar sayesinde admin panelinden yapılan giriş/çıkışlar da API'dekilerle
+# aynı log satırlarına düşer. Sadece request üzerine etiket koyarlar;
+# satırı ActivityLogMiddleware yazar.
+
+@receiver(user_logged_in)
+def log_user_login(sender, request, user, **kwargs):
+    log_activity(request, 'login', username=user.get_username())
+
+
+@receiver(user_logged_out)
+def log_user_logout(sender, request, user, **kwargs):
+    if user is not None:
+        log_activity(request, 'logout', username=user.get_username())
+
+
+@receiver(user_login_failed)
+def log_user_login_failed(sender, credentials=None, request=None, **kwargs):
+    # authenticate() şifre değişikliği gibi başka akışlarda da çağrılır;
+    # o view'lar eylemi önceden işaretlediği için set_default=True kullanıyoruz.
+    if request is None:
+        return
+    username = (credentials or {}).get('username') or ''
+    log_activity(request, 'login_failed', username=username, set_default=True)
