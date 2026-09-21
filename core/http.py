@@ -56,3 +56,26 @@ def login_username_key(group, request):
     except (json.JSONDecodeError, AttributeError, UnicodeDecodeError):
         username = request.POST.get('username', '').strip().lower()
     return username or get_client_ip(request)
+
+
+# --- BOT TESPİTİ ---
+
+BOT_SPECIFIC = [
+    'googlebot', 'googlebot-image', 'google-inspectiontool',
+    'oai-searchbot', 'chatgpt-user',
+    'bingbot', 'yandexbot', 'duckduckbot', 'baiduspider',
+    'slurp', 'facebookexternalhit', 'linkedinbot',
+    'whatsapp', 'telegrambot', 'discordbot', 'applebot',
+]
+BOT_GENERIC = ['bot', 'crawler', 'spider', 'scraper', 'preview']
+
+
+def is_bot(ua):
+    """User-Agent'a bakarak tarayıcı mı bot mu ayırır.
+
+    `seo` (dinamik render) ve `logger` (aktivite logu) aynı kararı verdiği için
+    burada duruyor: `http.py` hiçbir model import etmez, ikisi de çekinmeden
+    import edebilir.
+    """
+    ua = (ua or '').lower()
+    return any(p in ua for p in BOT_SPECIFIC) or any(p in ua for p in BOT_GENERIC)
