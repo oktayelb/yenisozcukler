@@ -3,8 +3,11 @@ import logging
 import threading
 import time
 import urllib.request
+from django.core.exceptions import MiddlewareNotUsed
 from django.http import HttpResponseForbidden
 from django.conf import settings
+
+from .logger import is_enabled, log_activity, record_request, setting
 
 logger = logging.getLogger(__name__)
 
@@ -94,12 +97,18 @@ class CloudflareSecurityMiddleware:
 
         cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
         if not cf_ip:
-            return HttpResponseForbidden("Erişim Engellendi.")
+            return self._blocked(request)
 
         if not _cf_cache.contains(remote_addr):
-            return HttpResponseForbidden("Erişim Engellendi.")
+            return self._blocked(request)
 
         return self._add_security_headers(self.get_response(request))
+
+    @staticmethod
+    def _blocked(request):
+        # Aktivite logunda 'blocked' olarak görünsün.
+        log_activity(request, 'blocked', detail='Cloudflare dışı istek')
+        return HttpResponseForbidden("Erişim Engellendi.")
 
     @staticmethod
     def _add_security_headers(response):
@@ -107,4 +116,37 @@ class CloudflareSecurityMiddleware:
             'Permissions-Policy',
             'geolocation=(), microphone=(), camera=(), payment=(), usb=()'
         )
+        return response
+
+
+class ActivityLogMiddleware:
+    """Her isteği `core.logger` kuyruğuna bırakır.
+
+    İstek thread'inde yapılan iş: bir zaman ölçümü + bir dict + kuyruğa put.
+    Veritabanı yazımı arka plandaki writer thread'inde toplu yapılır.
+
+    MIDDLEWARE listesinde olabildiğince dışta durur; böylece Cloudflare
+    engellemeleri, CSRF hataları ve 404'ler de loglanır.
+    """
+
+    def __init__(self, get_response):
+        if not is_enabled():
+            raise MiddlewareNotUsed
+
+        self.get_response = get_response
+        self.exclude = tuple(setting('ACTIVITY_LOG_EXCLUDE_PREFIXES'))
+
+    def __call__(self, request):
+        if request.path.startswith(self.exclude):
+            return self.get_response(request)
+
+        start = time.perf_counter()
+        response = self.get_response(request)
+        duration_ms = int((time.perf_counter() - start) * 1000)
+
+        try:
+            record_request(request, response, duration_ms)
+        except Exception:
+            logger.warning('activity log kaydı başarısız', exc_info=True)
+
         return response
