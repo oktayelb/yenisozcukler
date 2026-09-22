@@ -60,13 +60,15 @@ def anonymize_deleted_user_content(sender, instance, **kwargs):
 
 @receiver(user_logged_in)
 def log_user_login(sender, request, user, **kwargs):
-    log_activity(request, 'login', username=user.get_username())
+    log_activity(request, 'login', username=user.get_username(), user=user)
 
 
 @receiver(user_logged_out)
 def log_user_logout(sender, request, user, **kwargs):
+    # `user`'ı açıkça geçiyoruz: bu sinyalden hemen sonra `logout()`
+    # request.user'ı AnonymousUser yapıyor ve satır sahipsiz kalıyordu.
     if user is not None:
-        log_activity(request, 'logout', username=user.get_username())
+        log_activity(request, 'logout', username=user.get_username(), user=user)
 
 
 @receiver(user_login_failed)

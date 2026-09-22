@@ -12,6 +12,7 @@ from decouple import config
 from django.conf import settings
 from django.db import close_old_connections
 from django.utils import timezone
+from django.utils.functional import empty
 
 from .http import get_client_ip, is_bot
 
@@ -90,12 +91,17 @@ def is_enabled():
 
 # --- View'lardan çağrılan yardımcı -------------------------------------------
 
-def log_activity(request, action=None, detail=None, username=None, set_default=False):
+def log_activity(request, action=None, detail=None, username=None, user=None,
+                 set_default=False):
     """İstek üzerine ek bağlam işaretler; asıl satırı middleware yazar.
 
     DB'ye dokunmaz, sadece request nesnesine attribute koyar.
     `set_default=True` ise eylem yalnızca henüz belirlenmemişse yazılır
     (sinyallerden gelen genel bilgiler için).
+
+    `user`: kaydın hangi hesaba ait olduğunu açıkça belirtir. Çıkışta
+    `logout()` `request.user`'ı AnonymousUser yaptığı için satır sahipsiz
+    kalıyordu; sinyaller kullanıcıyı buradan geçiriyor.
     """
     # DRF Request ise alttaki HttpRequest'e yaz — middleware onu görür.
     req = getattr(request, '_request', request)
@@ -108,6 +114,12 @@ def log_activity(request, action=None, detail=None, username=None, set_default=F
         req._activity_detail = str(detail)[:200]
     if username is not None:
         req._activity_username = str(username)[:150]
+    if user is not None:
+        pk = getattr(user, 'pk', None)
+        if pk is not None:
+            req._activity_user_id = pk
+            if not getattr(req, '_activity_username', ''):
+                req._activity_username = str(user)[:150]
 
 
 # --- URL adı -> eylem eşlemesi ------------------------------------------------
@@ -168,21 +180,51 @@ def _clean_ip(value):
 
 # --- Middleware'in çağırdığı kayıt fonksiyonu ---------------------------------
 
+def _resolve_user(request):
+    """(user_id, username) döndürür; anonim ziyaretçide (None, '').
+
+    İki kaynağa bakar:
+
+    1. `log_activity(..., user=...)` ile açıkça işaretlenen kullanıcı.
+    2. `request.user`.
+
+    (2) için ekstra bir session/user sorgusu açmamaya dikkat ediyoruz.
+    `AuthenticationMiddleware` `request.user`'ı tembel bir nesne olarak
+    bırakır; view zaten okuduysa çözülmüştür ve bakmak bedavadır. Çözülmemişse
+    yalnızca oturum çerezi varken zorluyoruz — çerez yoksa ziyaretçi kesinlikle
+    anonimdir.
+
+    Çözülmüş nesneye bakmak şart: `login()` `request.user`'a gerçek kullanıcıyı
+    atar ama çerez daha yanıtla gönderileceği için `request.COOKIES`'te yoktur.
+    Sadece çereze bakan eski sürüm bu yüzden giriş ve kayıt satırlarını
+    sahipsiz (user_id = NULL) yazıyordu.
+    """
+    user_id = getattr(request, '_activity_user_id', None)
+    username = getattr(request, '_activity_username', '') or ''
+    if user_id is not None and username:
+        return user_id, username
+
+    user = getattr(request, 'user', None)
+    if user is None:
+        return user_id, username
+
+    resolved = getattr(user, '_wrapped', None) is not empty
+    if not resolved and settings.SESSION_COOKIE_NAME not in request.COOKIES:
+        return user_id, username
+
+    if user.is_authenticated:
+        if user_id is None:
+            user_id = user.pk
+        if not username:
+            username = user.get_username()
+    return user_id, username
+
+
 def record_request(request, response, duration_ms):
     if not is_enabled():
         return
     try:
-        username = getattr(request, '_activity_username', '')
-        user_id = None
-        # Oturum çerezi yoksa ziyaretçi kesinlikle anonimdir: request.user'a
-        # dokunmayıp gereksiz session sorgusundan kaçınıyoruz.
-        if settings.SESSION_COOKIE_NAME in request.COOKIES:
-            user = getattr(request, 'user', None)
-            if user is not None and user.is_authenticated:
-                user_id = user.pk
-                if not username:
-                    username = user.get_username()
-
+        user_id, username = _resolve_user(request)
         ua = request.META.get('HTTP_USER_AGENT', '') or ''
         path = request.path
 

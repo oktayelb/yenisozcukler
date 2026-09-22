@@ -7,6 +7,8 @@ TransactionTestCase kullanılıyor: kayıtları arka plandaki writer thread
 kendi bağlantısından yazdığı için satırların gerçekten commit edilmesi gerekir.
 """
 
+from unittest import mock
+
 from django.contrib.auth.models import User
 from django.test import TransactionTestCase, override_settings
 from django.urls import reverse
@@ -230,3 +232,118 @@ class ActivityLogRobustnessTests(TransactionTestCase):
         logger.enqueue(self._payload(path='/saglam'))
         logger.flush_now()
         self.assertEqual(logger._pause_seconds, logger._PAUSE_MIN_SECONDS)
+
+
+@override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
+class ActivityLogAttributionTests(TransactionTestCase):
+    """Kaydın kime ait olduğu: misafir, kayıtlı kullanıcı, giriş/çıkış anı."""
+
+    PASSWORD = 'Cok-Gizli-1234'
+
+    def setUp(self):
+        ActivityLog.objects.all().delete()
+
+    def tearDown(self):
+        logger.flush_now()
+        ActivityLog.objects.all().delete()
+
+    def _row(self, path):
+        logger.flush_now()
+        return ActivityLog.objects.filter(path=path).first()
+
+    def test_anonymous_visitor_has_no_user(self):
+        self.client.get('/')
+        row = self._row('/')
+        self.assertIsNone(row.user_id)
+        self.assertEqual(row.username, '')
+        self.assertEqual(row.display_user, 'Misafir')
+
+    def test_anonymous_api_call_has_no_user(self):
+        self.client.get('/api/words')
+        row = self._row('/api/words')
+        self.assertIsNone(row.user_id)
+        self.assertEqual(row.username, '')
+
+    def test_login_row_is_attributed_to_the_user(self):
+        """Giriş anında oturum çerezi daha isteğe gelmemiştir.
+
+        Sadece `request.COOKIES`'e bakan sürüm bu satırı sahipsiz yazıyordu.
+        """
+        user = User.objects.create_user(username='girisci', password=self.PASSWORD)
+
+        # DEBUG testlerde kapalı olduğu için Turnstile gerçekten çağrılırdı.
+        with mock.patch('accounts.views.verify_turnstile', return_value=True):
+            response = self.client.post(
+                '/api/login',
+                data={'username': 'girisci', 'password': self.PASSWORD},
+                content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 200)
+
+        row = self._row('/api/login')
+        self.assertEqual(row.action, 'login')
+        self.assertEqual(row.user_id, user.pk)
+        self.assertEqual(row.username, 'girisci')
+
+    def test_register_row_is_attributed_to_the_new_user(self):
+        with mock.patch('accounts.views.verify_turnstile', return_value=True):
+            response = self.client.post(
+                '/api/register',
+                data={'username': 'yenikullanici', 'password': self.PASSWORD},
+                content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 201)
+
+        row = self._row('/api/register')
+        self.assertEqual(row.action, 'register')
+        self.assertEqual(row.username, 'yenikullanici')
+        self.assertEqual(row.user_id, User.objects.get(username='yenikullanici').pk)
+
+    def test_logout_row_keeps_the_user_id(self):
+        """`logout()` request.user'ı AnonymousUser yapar; FK sinyalden gelir."""
+        user = User.objects.create_user(username='cikisci', password=self.PASSWORD)
+        self.client.force_login(user)
+        self.client.post('/api/logout')
+
+        row = self._row('/api/logout')
+        self.assertEqual(row.action, 'logout')
+        self.assertEqual(row.user_id, user.pk)
+        self.assertEqual(row.username, 'cikisci')
+
+    def test_password_change_is_not_mislabelled_as_failed_login(self):
+        """Yanlış mevcut şifre `user_login_failed` sinyalini tetikler."""
+        user = User.objects.create_user(username='sifreci', password=self.PASSWORD)
+        self.client.force_login(user)
+
+        self.client.patch(
+            '/api/password',
+            data={'current_password': 'yanlis', 'new_password': 'Baska-Gizli-9876'},
+            content_type='application/json',
+        )
+
+        row = self._row('/api/password')
+        self.assertEqual(row.action, 'password_change')
+        self.assertEqual(row.user_id, user.pk)
+
+    def test_admin_login_is_logged_through_the_auth_signal(self):
+        User.objects.create_superuser(username='patron2', email='', password=self.PASSWORD)
+
+        self.client.post(
+            '/admin/login/',
+            {'username': 'patron2', 'password': self.PASSWORD, 'next': '/admin/'},
+        )
+
+        row = self._row('/admin/login/')
+        self.assertEqual(row.action, 'login')
+        self.assertEqual(row.username, 'patron2')
+
+    def test_admin_page_view_is_labelled_admin(self):
+        admin_user = User.objects.create_superuser(
+            username='patron3', email='', password=self.PASSWORD
+        )
+        self.client.force_login(admin_user)
+        self.client.get('/admin/')
+
+        row = self._row('/admin/')
+        self.assertEqual(row.action, 'admin')
+        self.assertEqual(row.user_id, admin_user.pk)
