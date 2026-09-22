@@ -350,26 +350,122 @@ class ActivityLogAttributionTests(TransactionTestCase):
 
 
 @override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
-class ActivityLogExceptionTests(TransactionTestCase):
+class ActivityLogWriterTests(TransactionTestCase):
+    """Writer thread'i öldürebilecek durumlar."""
+
+    def setUp(self):
+        logger._paused_until = 0.0
+        logger._consecutive_failures = 0
+        ActivityLog.objects.all().delete()
 
     def tearDown(self):
         logger.flush_now()
+        logger._paused_until = 0.0
+        logger._consecutive_failures = 0
         ActivityLog.objects.all().delete()
 
+    @staticmethod
+    def _payload(**over):
+        from django.utils import timezone
+        payload = dict(
+            timestamp=timezone.now(), action='page_view', user_id=None, username='',
+            ip='1.2.3.4', method='GET', path='/x', query='', status_code=200,
+            duration_ms=1, detail='', user_agent='',
+        )
+        payload.update(over)
+        return payload
+
+    def test_malformed_payload_does_not_kill_the_writer(self):
+        logger.enqueue({'boyle_bir_alan_yok': 1})
+        logger.enqueue(self._payload(path='/saglam'))
+        logger.flush_now()
+
+        self.assertTrue(ActivityLog.objects.filter(path='/saglam').exists())
+
+    def test_rows_queued_behind_the_sentinel_are_still_written(self):
+        """flush_now sentinel'i koyar; arkasında kalanlar kaybolmamalı."""
+        q = logger._ensure_worker()
+        for i in range(20):
+            q.put_nowait(self._payload(path=f'/kuyruk{i}'))
+        logger.flush_now()
+
+        self.assertEqual(ActivityLog.objects.filter(path__startswith='/kuyruk').count(), 20)
+
+    def test_flush_now_restarts_a_dead_writer_to_drain_the_queue(self):
+        logger.flush_now()  # thread sentinel'i görüp duruyor
+        q = logger._queue
+        q.put_nowait(self._payload(path='/oksuz'))
+        logger.flush_now()
+
+        self.assertTrue(ActivityLog.objects.filter(path='/oksuz').exists())
+
+    def test_transient_db_error_retries_the_whole_batch(self):
+        """Kilit hatası partiye değil veritabanına aittir: bölünmemeli.
+
+        Eski sürüm her hatada partiyi ikiye bölüyordu; SQLite'ta yazma kilidi
+        yüzünden gelen bir hatada bu 32 kata kadar boşuna deneme demekti.
+        """
+        from django.db import OperationalError
+
+        real_bulk_create = ActivityLog.objects.bulk_create
+        batch_sizes = []
+
+        def flaky(objs, **kwargs):
+            objs = list(objs)
+            batch_sizes.append(len(objs))
+            if len(batch_sizes) == 1:
+                raise OperationalError('database is locked')
+            return real_bulk_create(objs, **kwargs)
+
+        for i in range(8):
+            logger.enqueue(self._payload(path=f'/kilit{i}'))
+
+        with mock.patch.object(ActivityLog.objects, 'bulk_create', flaky), \
+                mock.patch.object(logger, '_RETRY_SECONDS', 0.01):
+            logger.flush_now()
+
+        self.assertEqual(ActivityLog.objects.filter(path__startswith='/kilit').count(), 8)
+        # İki deneme, ikisi de tam parti: hiç bölünmemiş.
+        self.assertEqual(batch_sizes, [8, 8])
+
+    def test_row_level_error_still_splits_the_batch(self):
+        """Satıra özgü hatada bölme davranışı korunmalı."""
+        for i in range(4):
+            logger.enqueue(self._payload(path=f'/iyi{i}'))
+        logger.enqueue(self._payload(path='/kotu', user_id=999999))
+        logger.flush_now()
+
+        self.assertEqual(ActivityLog.objects.filter(path__startswith='/iyi').count(), 4)
+        self.assertFalse(ActivityLog.objects.filter(path='/kotu').exists())
+
+    def test_bot_flag_is_computed_by_the_writer(self):
+        logger.enqueue(self._payload(path='/bot', user_agent='Mozilla/5.0 (compatible; bingbot/2.0)'))
+        logger.enqueue(self._payload(path='/insan', user_agent='Mozilla/5.0 (X11; Linux x86_64)'))
+        logger.flush_now()
+
+        self.assertTrue(ActivityLog.objects.get(path='/bot').is_bot)
+        self.assertFalse(ActivityLog.objects.get(path='/insan').is_bot)
+
     def test_view_exception_is_logged_as_server_error(self):
-        from django.test import RequestFactory
         from core.middleware import ActivityLogMiddleware
 
         def boom(request):
             raise RuntimeError('patladı')
 
         mw = ActivityLogMiddleware(boom)
+        request = self._request('/patlak')
 
         with self.assertRaises(RuntimeError):
-            mw(RequestFactory().get('/patlak'))
+            mw(request)
         logger.flush_now()
 
-        self.assertEqual(ActivityLog.objects.get(path='/patlak').status_code, 500)
+        row = ActivityLog.objects.get(path='/patlak')
+        self.assertEqual(row.status_code, 500)
+
+    @staticmethod
+    def _request(path):
+        from django.test import RequestFactory
+        return RequestFactory().get(path)
 
     def test_middleware_survives_a_write_failure_pause(self):
         """Mola geçici; middleware kurulumu buna bakmamalı."""

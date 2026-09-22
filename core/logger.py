@@ -10,7 +10,10 @@ from datetime import timedelta
 
 from decouple import config
 from django.conf import settings
-from django.db import close_old_connections
+from django.db import (
+    DataError, InterfaceError, IntegrityError, OperationalError,
+    close_old_connections,
+)
 from django.utils import timezone
 from django.utils.functional import empty
 
@@ -18,21 +21,35 @@ from .http import get_client_ip, is_bot
 
 logger = logging.getLogger(__name__)
 
+
+def _env(name, default, cast):
+    """`.env`'den oku; değer bozuksa varsayılana dön.
+
+    Bunlar isteğe bağlı ayar düğmeleri: yanlış yazılmış bir satır yüzünden
+    proje hiç açılmasın istemiyoruz.
+    """
+    try:
+        return config(name, default=default, cast=cast)
+    except Exception:
+        logger.warning('%s okunamadı, varsayılan kullanılıyor: %r', name, default)
+        return default
+
+
 # --- Ayarlar ------------------------------------------------------------------
 # Aktivite logunun tüm yapılandırması burada durur; settings.py'ye dağılmaz.
 # Değerler .env'den okunur, testler `override_settings` ile ezebilir
 # (bkz. `setting`).
 _DEFAULTS = {
     # Kill switch: kapalıysa ne middleware ne writer thread çalışır.
-    'ACTIVITY_LOG_ENABLED': config('ACTIVITY_LOG_ENABLED', default=True, cast=bool),
+    'ACTIVITY_LOG_ENABLED': _env('ACTIVITY_LOG_ENABLED', True, bool),
     # Kuyruk dolarsa kayıtlar düşürülür — istek asla bloklanmaz.
-    'ACTIVITY_LOG_QUEUE_SIZE': config('ACTIVITY_LOG_QUEUE_SIZE', default=5000, cast=int),
+    'ACTIVITY_LOG_QUEUE_SIZE': _env('ACTIVITY_LOG_QUEUE_SIZE', 5000, int),
     # Kaç kayıt birikince tek INSERT ile yazılsın.
-    'ACTIVITY_LOG_BATCH_SIZE': config('ACTIVITY_LOG_BATCH_SIZE', default=100, cast=int),
+    'ACTIVITY_LOG_BATCH_SIZE': _env('ACTIVITY_LOG_BATCH_SIZE', 100, int),
     # Batch dolmasa da en geç bu kadar saniyede bir yaz.
-    'ACTIVITY_LOG_FLUSH_SECONDS': config('ACTIVITY_LOG_FLUSH_SECONDS', default=2.0, cast=float),
+    'ACTIVITY_LOG_FLUSH_SECONDS': _env('ACTIVITY_LOG_FLUSH_SECONDS', 2.0, float),
     # Bu günden eski kayıtlar otomatik silinir (0 = hiç silme).
-    'ACTIVITY_LOG_RETENTION_DAYS': config('ACTIVITY_LOG_RETENTION_DAYS', default=30, cast=int),
+    'ACTIVITY_LOG_RETENTION_DAYS': _env('ACTIVITY_LOG_RETENTION_DAYS', 30, int),
     # Saklama süresi kontrolünün writer thread'inde tekrarlanma aralığı.
     'ACTIVITY_LOG_PRUNE_SECONDS': 3600,
     # Bu ön ekle başlayan yollar hiç loglanmaz.
@@ -46,6 +63,7 @@ _queue = None
 _worker = None
 _worker_pid = None
 _lock = threading.Lock()
+_atexit_registered = False
 
 # Kuyruk dolduğunda düşürülen kayıt sayısı (uyarı log'u için)
 _dropped = 0
@@ -66,6 +84,16 @@ _pause_seconds = _PAUSE_MIN_SECONDS
 # boşuna uğraşmasın diye hem deneme hem süre sınırı var.
 _SALVAGE_MAX_ATTEMPTS = 32
 _SALVAGE_SECONDS = 5.0
+
+# Bölmek yalnızca hata *bir satıra* aitse işe yarar: bozuk FK, alana sığmayan
+# değer, yanlış tip. Kilit / kopmuş bağlantı / eksik tablo partinin tamamını
+# ilgilendirir; bölmek 32 kat daha fazla beklemekten başka işe yaramaz.
+_ROW_LEVEL_ERRORS = (IntegrityError, DataError, ValueError, TypeError)
+# Geçici olabilecek hatalar: parti bozulmadığı için kısa bir aradan sonra
+# olduğu gibi yeniden denenir (SQLite'ta eşzamanlı yazma kilidi yaygın).
+_TRANSIENT_ERRORS = (OperationalError, InterfaceError)
+_RETRY_SECONDS = 0.5
+_MAX_WRITE_ATTEMPTS = 3
 
 # GenericIPAddressField 39 karaktere kadar saklar.
 _IP_MAX_LENGTH = 39
@@ -235,7 +263,6 @@ def record_request(request, response, duration_ms):
         return
     try:
         user_id, username = _resolve_user(request)
-        ua = request.META.get('HTTP_USER_AGENT', '') or ''
         path = request.path
 
         payload = {
@@ -254,8 +281,9 @@ def record_request(request, response, duration_ms):
             'status_code': (getattr(response, 'status_code', 0) or 0) if response is not None else 500,
             'duration_ms': max(0, duration_ms),
             'detail': getattr(request, '_activity_detail', '')[:200],
-            'user_agent': ua[:200],
-            'is_bot': is_bot(ua),
+            # `is_bot` User-Agent içinde 20+ alt dize arar; `_clean_ip` gibi
+            # bu da istek thread'inde değil, _flush içinde hesaplanır.
+            'user_agent': (request.META.get('HTTP_USER_AGENT', '') or '')[:200],
         }
     except Exception:
         logger.warning('activity log payload build failed', exc_info=True)
@@ -282,7 +310,7 @@ def enqueue(payload):
 # --- Writer thread ------------------------------------------------------------
 
 def _ensure_worker():
-    global _queue, _worker, _worker_pid
+    global _queue, _worker, _worker_pid, _atexit_registered
     pid = os.getpid()
     worker = _worker
     if worker is not None and _worker_pid == pid and worker.is_alive():
@@ -294,7 +322,10 @@ def _ensure_worker():
         if _queue is None or _worker_pid != pid:
             # Fork sonrası miras alınan kuyruk tutarsız olabilir; yenisini kur.
             _queue = queue.Queue(maxsize=setting('ACTIVITY_LOG_QUEUE_SIZE'))
+        if not _atexit_registered:
+            # Kuyruk yeniden kurulsa da tek kayıt yeter.
             atexit.register(_shutdown)
+            _atexit_registered = True
         _worker_pid = pid
         _worker = threading.Thread(
             target=_run, args=(_queue,), name='activity-log-writer', daemon=True
@@ -303,44 +334,69 @@ def _ensure_worker():
         return _queue
 
 
+def _drain(q, batch):
+    """Kuyrukta bekleyen her şeyi batch'e al (sentinel'ler atlanır)."""
+    while True:
+        try:
+            item = q.get_nowait()
+        except queue.Empty:
+            return
+        if item is not _SENTINEL:
+            batch.append(item)
+
+
 def _run(q):
-    batch_size = setting('ACTIVITY_LOG_BATCH_SIZE')
-    flush_seconds = setting('ACTIVITY_LOG_FLUSH_SECONDS')
     batch = []
     deadline = None
     next_prune = time.monotonic() + random.uniform(60, 300)
 
     while True:
-        # Boşta beklerken de saklama süresi kontrolü yapılabilsin diye
-        # timeout hiçbir zaman sonsuz değil.
-        if deadline is None:
-            timeout = 60.0
-        else:
-            timeout = max(0.0, deadline - time.monotonic())
-
         try:
-            item = q.get(timeout=timeout)
-        except queue.Empty:
-            item = None
+            # Ayarlar her turda okunur (getattr, bedava): testlerdeki
+            # override_settings thread yeniden başlatmadan etkili olsun.
+            batch_size = setting('ACTIVITY_LOG_BATCH_SIZE')
+            flush_seconds = setting('ACTIVITY_LOG_FLUSH_SECONDS')
 
-        if item is _SENTINEL:
-            _flush(batch)
-            return
-
-        if item is None:
-            _flush(batch)
-            deadline = None
-        else:
-            batch.append(item)
+            # Boşta beklerken de saklama süresi kontrolü yapılabilsin diye
+            # timeout hiçbir zaman sonsuz değil.
             if deadline is None:
-                deadline = time.monotonic() + flush_seconds
-            if len(batch) >= batch_size:
+                timeout = 60.0
+            else:
+                timeout = max(0.0, deadline - time.monotonic())
+
+            try:
+                item = q.get(timeout=timeout)
+            except queue.Empty:
+                item = None
+
+            if item is _SENTINEL:
+                # Sentinel'in arkasında kalanlar da yazılsın: yoksa kapanışta
+                # (atexit) ya da flush_now sırasında sessizce kaybolurlardı.
+                _drain(q, batch)
+                _flush(batch)
+                return
+
+            if item is None:
                 _flush(batch)
                 deadline = None
+            else:
+                batch.append(item)
+                if deadline is None:
+                    deadline = time.monotonic() + flush_seconds
+                if len(batch) >= batch_size:
+                    _flush(batch)
+                    deadline = None
 
-        if time.monotonic() >= next_prune:
-            next_prune = time.monotonic() + setting('ACTIVITY_LOG_PRUNE_SECONDS')
-            _prune()
+            if time.monotonic() >= next_prune:
+                next_prune = time.monotonic() + setting('ACTIVITY_LOG_PRUNE_SECONDS')
+                _prune()
+        except Exception:
+            # Thread ölmesin: ölürse elindeki parti kaybolur ve bir sonraki
+            # isteğe kadar hiçbir şey yazılmaz.
+            logger.warning('activity log writer döngüsü hata verdi', exc_info=True)
+            del batch[:]
+            deadline = None
+            time.sleep(1.0)
 
 
 def _on_write_success():
@@ -391,6 +447,9 @@ def _insert(rows, budget):
         if len(rows) == 1:
             logger.warning('activity log satırı yazılamadı, düşürüldü: %s', exc)
             return 0, 1
+        if not isinstance(exc, _ROW_LEVEL_ERRORS):
+            # Suçlu satır değil veritabanı; bölmek sadece zaman kaybı.
+            return 0, len(rows)
         # DB tamamen kapalıysa bölmenin faydası yok: sınırı aşınca vazgeç.
         if budget['attempts'] >= _SALVAGE_MAX_ATTEMPTS or \
                 time.monotonic() >= budget['deadline']:
@@ -402,30 +461,62 @@ def _insert(rows, budget):
     return ok_a + ok_b, bad_a + bad_b
 
 
+def _build_row(item):
+    """Kuyruktaki dict'ten ActivityLog nesnesi kurar; kuramazsa None döner.
+
+    Bozuk tek bir payload (ör. `enqueue` doğrudan yanlış anahtarla çağrılmış)
+    yüzünden writer thread'i öldürüp elindeki partiyi kaybetmemek için ayrı
+    fonksiyon ve ayrı try/except.
+    """
+    from .models import ActivityLog
+
+    try:
+        item['ip'] = _clean_ip(item.get('ip'))
+        if 'is_bot' not in item:
+            item['is_bot'] = is_bot(item.get('user_agent', ''))
+        return ActivityLog(**item)
+    except Exception as exc:
+        logger.warning('activity log payload kurulamadı, düşürüldü: %s', exc)
+        return None
+
+
 def _flush(batch):
     if not batch:
         return
 
-    from .models import ActivityLog
-
     rows = []
     for item in batch:
-        item['ip'] = _clean_ip(item['ip'])
-        rows.append(ActivityLog(**item))
-    batch.clear()
-    budget = {
-        'attempts': 0,
-        'deadline': time.monotonic() + _SALVAGE_SECONDS,
-        'error': None,
-    }
+        row = _build_row(item)
+        if row is not None:
+            rows.append(row)
+    del batch[:]
+    if not rows:
+        return
     try:
-        written, dropped = _insert(rows, budget)
+        written = dropped = 0
+        error = None
+        for attempt in range(_MAX_WRITE_ATTEMPTS):
+            budget = {
+                'attempts': 0,
+                'deadline': time.monotonic() + _SALVAGE_SECONDS,
+                'error': None,
+            }
+            written, dropped = _insert(rows, budget)
+            error = budget['error']
+            if written or not isinstance(error, _TRANSIENT_ERRORS):
+                break
+            if attempt + 1 < _MAX_WRITE_ATTEMPTS:
+                # Parti bölünmediği için `rows` bozulmadan duruyor: kilit
+                # kalkmış olabilir, olduğu gibi tekrar dene.
+                close_old_connections()
+                time.sleep(_RETRY_SECONDS)
+
         if dropped:
             logger.warning('activity log: %d satır kurtarılamadı', dropped)
         if written:
             _on_write_success()
-        elif budget['error'] is not None:
-            _on_write_failure(budget['error'])
+        elif error is not None:
+            _on_write_failure(error)
     except Exception as exc:
         # _insert dışında beklenmedik bir hata (ör. model import'u).
         _on_write_failure(exc)
@@ -462,12 +553,26 @@ def _prune():
 
 def _shutdown(timeout=5):
     """Process kapanırken kuyrukta kalanları yaz."""
-    q, worker = _queue, _worker
-    if q is None or worker is None or not worker.is_alive():
+    q = _queue
+    if q is None:
         return
+
+    worker = _worker
+    if worker is None or not worker.is_alive():
+        if q.empty():
+            return
+        # Thread ölmüş ama kuyrukta kayıt var: yazacak birini geri getir.
+        q = _ensure_worker()
+        worker = _worker
+        if worker is None or not worker.is_alive():
+            return
+
     try:
         q.put_nowait(_SENTINEL)
     except queue.Full:
+        # Kuyruk tıka basa dolu; sentinel'e yer yok. Thread zaten yazıyor,
+        # boşalmasını bekleyip çıkmak yeterli.
+        worker.join(timeout=timeout)
         return
     worker.join(timeout=timeout)
 
