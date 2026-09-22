@@ -404,6 +404,118 @@ class ActivityLogAttributionTests(TransactionTestCase):
 
 
 @override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
+class ActivityLogCoverageTests(TransactionTestCase):
+    """Hiçbir view loglanmadan geçmemeli."""
+
+    def setUp(self):
+        ActivityLog.objects.all().delete()
+
+    def tearDown(self):
+        logger.flush_now()
+        ActivityLog.objects.all().delete()
+
+    @staticmethod
+    def _routed_paths():
+        """URLconf'taki her uca gidecek somut bir yol üretir.
+
+        Catch-all ve admin'in yüzlerce alt yolu dışarıda: onlar ayrı
+        testlerde. Amaç, elle tutulan bir liste tutmadan yeni bir uç
+        eklendiğinde bu testin onu kendiliğinden kapsaması.
+        """
+        return [
+            ('get', '/'),
+            ('get', '/robots.txt'),
+            ('get', '/sitemap.xml'),
+            ('get', '/sozcuk/olmayan-sozcuk/'),
+            ('get', '/kategori/olmayan-kategori/'),
+            ('get', '/rastgele-bir-sayfa'),          # SPA catch-all
+            ('get', '/api/words'),
+            ('get', '/api/word/999999'),
+            ('get', '/api/word-by-slug/olmayan'),
+            ('get', '/api/categories'),
+            ('get', '/api/my-words'),
+            ('get', '/api/random-word'),
+            ('get', '/api/comments/999999'),
+            ('get', '/api/profile'),
+            ('get', '/api/notifications'),
+            ('get', '/api/notifications/unread-count'),
+            ('get', '/api/olmayan-uc'),              # 404
+            ('post', '/api/word'),
+            ('post', '/api/comment'),
+            ('post', '/api/vote/word/999999'),
+            ('post', '/api/login'),
+            ('post', '/api/register'),
+            ('post', '/api/logout'),
+            ('post', '/api/notifications/mark-read'),
+            ('patch', '/api/password'),
+            ('patch', '/api/username'),
+            ('patch', '/api/example'),
+        ]
+
+    def _hit_all(self):
+        for method, path in self._routed_paths():
+            getattr(self.client, method)(path, data={}, content_type='application/json')
+        logger.flush_now()
+
+    def test_every_route_is_logged_for_anonymous_visitors(self):
+        self._hit_all()
+        logged = set(ActivityLog.objects.values_list('path', flat=True))
+        for _, path in self._routed_paths():
+            self.assertIn(path, logged, f'{path} loglanmadı')
+
+    def test_every_route_is_logged_for_registered_users(self):
+        user = User.objects.create_user(username='uye', password='Cok-Gizli-1234')
+        self.client.force_login(user)
+
+        self._hit_all()
+
+        rows = list(ActivityLog.objects.all())
+        logged = {row.path for row in rows}
+        for _, path in self._routed_paths():
+            self.assertIn(path, logged, f'{path} loglanmadı')
+
+        # Çıkış öncesi istekler kullanıcıya bağlanmış olmalı.
+        profile = ActivityLog.objects.filter(path='/api/profile').first()
+        self.assertEqual(profile.user_id, user.pk)
+        self.assertEqual(profile.username, 'uye')
+
+    def test_urlconf_has_no_unmapped_write_endpoint(self):
+        """Yeni bir POST/PATCH ucu eklenirse eylem eşlemesi de eklensin.
+
+        Aksi hâlde satır genel 'api' kovasına düşer ve admin'deki eylem
+        filtresinde görünmez.
+        """
+        from django.urls import get_resolver
+
+        read_only = {
+            'get_words', 'get_word', 'get_word_by_slug', 'get_categories',
+            'get_my_words', 'get_random_word', 'get_comments',
+            'get_user_profile', 'get_notifications', 'get_unread_count',
+            'robots_txt', 'sitemap_xml', 'favicon_ico', 'index',
+            'word_detail', 'spa_category', 'spa_catchall',
+        }
+        names = {
+            key for key in get_resolver().reverse_dict.keys()
+            if isinstance(key, str)
+        }
+        unmapped = names - read_only - set(logger.URL_ACTION_MAP)
+        self.assertEqual(
+            unmapped, set(),
+            f'Eylem eşlemesi olmayan uç(lar): {sorted(unmapped)} '
+            '— core/logger.py:URL_ACTION_MAP ve ActivityLog.ACTION_CHOICES güncellenmeli.',
+        )
+
+    def test_every_producible_action_is_a_declared_choice(self):
+        """Admin'de ham slug görünmesin: her eylem ACTION_CHOICES'ta olmalı."""
+        declared = {value for value, _ in ActivityLog.ACTION_CHOICES}
+        produced = set(logger.URL_ACTION_MAP.values()) | {
+            'page_view', 'api', 'admin', 'blocked',
+            'login_failed', 'register_failed', 'admin_word_action',
+        }
+        self.assertEqual(produced - declared, set())
+
+
+@override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
 class ActivityLogWriterTests(TransactionTestCase):
     """Writer thread'i öldürebilecek durumlar."""
 
