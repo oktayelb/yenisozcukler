@@ -1,4 +1,5 @@
 
+import ipaddress
 import json
 import logging
 
@@ -29,16 +30,57 @@ def verify_turnstile(token):
         return False
 
 
+# GenericIPAddressField 39 karaktere kadar saklar.
+IP_MAX_LENGTH = 39
+
+
+def clean_ip(value):
+    """Gerçek bir IP ise normalleştirilmiş hâlini, değilse None döndürür.
+
+    `CF-Connecting-IP` ve `X-Forwarded-For` istemci kontrolündedir. Ham hâlde
+    kullanılırsa:
+
+    * django-ratelimit `ipaddress.ip_network(f'{ip}/{mask}')` çağırır ve
+      ValueError fırlatır — tek bir bozuk başlık, oran sınırı olan her uçtan
+      (yani neredeyse hepsinden) 500 döndürür;
+    * `ip_address` alanları GenericIPAddressField'dır, Postgres'te `inet`
+      sütununa çöp yazmak DataError verir.
+    """
+    if not value:
+        return None
+    try:
+        cleaned = str(ipaddress.ip_address(value.strip()))
+    except (ValueError, AttributeError):
+        return None
+    return cleaned if len(cleaned) <= IP_MAX_LENGTH else None
+
+
 def get_client_ip(request):
-    cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
-    if cf_ip:
-        return cf_ip
+    """İstemcinin doğrulanmış IP'si; hiçbiri geçerli değilse None.
 
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        return x_forwarded_for.split(',')[0].strip()
+    Sonuç istek nesnesinde saklanır: aynı istekte hem oran sınırı anahtarı,
+    hem view, hem de aktivite logu bunu çağırıyor.
+    """
+    req = getattr(request, '_request', request)
+    cached = getattr(req, '_client_ip_cache', False)
+    if cached is not False:
+        return cached
 
-    return request.META.get('REMOTE_ADDR')
+    ip = clean_ip(req.META.get('HTTP_CF_CONNECTING_IP'))
+    if ip is None:
+        forwarded = req.META.get('HTTP_X_FORWARDED_FOR') or ''
+        for candidate in forwarded.split(','):
+            ip = clean_ip(candidate)
+            if ip is not None:
+                break
+    if ip is None:
+        ip = clean_ip(req.META.get('REMOTE_ADDR'))
+
+    try:
+        req._client_ip_cache = ip
+    except AttributeError:      # pragma: no cover - alışılmadık request nesnesi
+        pass
+    return ip
 
 
 def universal_rate_key(group, request):

@@ -1,5 +1,4 @@
 import atexit
-import ipaddress
 import logging
 import os
 import queue
@@ -17,7 +16,7 @@ from django.db import (
 from django.utils import timezone
 from django.utils.functional import empty
 
-from .http import get_client_ip, is_bot
+from .http import clean_ip as _clean_ip, get_client_ip, is_bot
 
 logger = logging.getLogger(__name__)
 
@@ -95,8 +94,6 @@ _TRANSIENT_ERRORS = (OperationalError, InterfaceError)
 _RETRY_SECONDS = 0.5
 _MAX_WRITE_ATTEMPTS = 3
 
-# GenericIPAddressField 39 karaktere kadar saklar.
-_IP_MAX_LENGTH = 39
 # ActivityLog.action alanının max_length'i.
 _ACTION_MAX_LENGTH = 24
 
@@ -195,27 +192,6 @@ def _resolve_action(request, path):
     return 'page_view'
 
 
-def _clean_ip(value):
-    """Başlıktan gelen IP'yi doğrular. Writer thread'inde çalışır.
-
-    `get_client_ip` CF-Connecting-IP / X-Forwarded-For başlıklarını olduğu gibi
-    döndürür ve bu başlıklar istemci kontrolündedir (ActivityLogMiddleware
-    Cloudflare kontrolünün de dışında olduğu için engellenen istekler de buraya
-    düşer). Doğrulanmadan yazılırsa SQLite'ta çöp veri, Postgres'te ise `inet`
-    sütunu DataError verip partinin tamamını düşürür.
-
-    `ipaddress` ayrıştırması istek başına birkaç mikrosaniye tuttuğu için
-    istek thread'inde değil, arka plandaki `_flush` içinde yapılır.
-    """
-    if not value:
-        return None
-    try:
-        cleaned = str(ipaddress.ip_address(value.strip()))
-    except (ValueError, AttributeError):
-        return None
-    return cleaned if len(cleaned) <= _IP_MAX_LENGTH else None
-
-
 # --- Middleware'in çağırdığı kayıt fonksiyonu ---------------------------------
 
 def _resolve_user(request):
@@ -270,9 +246,8 @@ def record_request(request, response, duration_ms):
             'action': _resolve_action(request, path),
             'user_id': user_id,
             'username': (username or '')[:150],
-            # Doğrulama writer thread'inde (_flush -> _clean_ip); burada
-            # sadece kuyruğun şişmemesi için ham değer kısaltılır.
-            'ip': (get_client_ip(request) or '')[:64],
+            # `get_client_ip` doğrulanmış adres ya da None döndürür.
+            'ip': get_client_ip(request),
             'method': request.method[:8] if request.method else '',
             'path': path[:300],
             'query': request.META.get('QUERY_STRING', '')[:200],

@@ -165,13 +165,67 @@ class ActivityLogRobustnessTests(TransactionTestCase):
         payload.update(over)
         return payload
 
+    def test_forged_ip_header_does_not_crash_rate_limited_views(self):
+        """Bozuk CF-Connecting-IP her uçtan 500 döndürüyordu.
+
+        django-ratelimit anahtarı kurarken `ipaddress.ip_network(f'{ip}/{mask}')`
+        çağırır; `get_client_ip` başlığı ham döndürdüğü için ValueError
+        fırlatıyordu. Oran sınırı olmayan uç neredeyse yok, yani tek bir
+        başlıkla bütün site 500'e düşüyordu.
+        """
+        for forged in ('not-an-ip', '<script>alert(1)</script>', '999.999.999.999',
+                       'a' * 300, '1.2.3.4, 5.6.7.8'):
+            with self.subTest(forged=forged):
+                response = self.client.get(
+                    '/api/categories', headers={'cf-connecting-ip': forged}
+                )
+                self.assertLess(response.status_code, 500, forged)
+
+    def test_client_ip_falls_back_when_the_header_is_forged(self):
+        from django.test import RequestFactory
+        from core.http import get_client_ip
+
+        request = RequestFactory().get(
+            '/', HTTP_CF_CONNECTING_IP='cop-deger', REMOTE_ADDR='203.0.113.9'
+        )
+        self.assertEqual(get_client_ip(request), '203.0.113.9')
+
+    def test_client_ip_skips_invalid_entries_in_forwarded_chain(self):
+        from django.test import RequestFactory
+        from core.http import get_client_ip
+
+        request = RequestFactory().get(
+            '/', HTTP_X_FORWARDED_FOR='cop, 198.51.100.4', REMOTE_ADDR='203.0.113.9'
+        )
+        self.assertEqual(get_client_ip(request), '198.51.100.4')
+
     def test_forged_ip_header_is_rejected(self):
-        """CF-Connecting-IP istemci kontrolünde; IP olmayan değer yazılmamalı."""
-        self.client.get('/', headers={'cf-connecting-ip': 'NOT-AN-IP-' + 'x' * 200})
+        """CF-Connecting-IP istemci kontrolünde; IP olmayan değer yazılmamalı.
+
+        Uydurma değerin yerine gerçek TCP karşı tarafı (REMOTE_ADDR) yazılır —
+        NULL yazmaktan daha kullanışlı.
+        """
+        forged = 'NOT-AN-IP-' + 'x' * 200
+        self.client.get('/', headers={'cf-connecting-ip': forged})
         logger.flush_now()
 
         log = ActivityLog.objects.get()
-        self.assertIsNone(log.ip)
+        self.assertNotIn('NOT-AN-IP', log.ip or '')
+        self.assertEqual(log.ip, '127.0.0.1')
+
+    def test_ip_is_null_when_no_source_is_valid(self):
+        self.client.get(
+            '/', headers={'cf-connecting-ip': 'cop'}, REMOTE_ADDR='de-cop',
+        )
+        logger.flush_now()
+
+        self.assertIsNone(ActivityLog.objects.get().ip)
+
+    def test_valid_forwarded_ip_is_kept(self):
+        self.client.get('/', headers={'cf-connecting-ip': '198.51.100.7'})
+        logger.flush_now()
+
+        self.assertEqual(ActivityLog.objects.get().ip, '198.51.100.7')
 
     def test_valid_forwarded_ip_is_kept(self):
         self.client.get('/', headers={'cf-connecting-ip': '198.51.100.7'})
