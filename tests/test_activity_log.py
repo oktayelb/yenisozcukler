@@ -1,7 +1,6 @@
 """Aktivite loglama testleri.
 
-`manage.py test core.tests_activity` ile çalıştırılır (core/tests.py bu
-değişiklikten bağımsız olarak zaten bozuk, o yüzden ayrı modül).
+`manage.py test tests.test_activity_log` ile tek başına çalıştırılabilir.
 
 TransactionTestCase kullanılıyor: kayıtları arka plandaki writer thread
 kendi bağlantısından yazdığı için satırların gerçekten commit edilmesi gerekir.
@@ -220,12 +219,6 @@ class ActivityLogRobustnessTests(TransactionTestCase):
         logger.flush_now()
 
         self.assertIsNone(ActivityLog.objects.get().ip)
-
-    def test_valid_forwarded_ip_is_kept(self):
-        self.client.get('/', headers={'cf-connecting-ip': '198.51.100.7'})
-        logger.flush_now()
-
-        self.assertEqual(ActivityLog.objects.get().ip, '198.51.100.7')
 
     def test_valid_forwarded_ip_is_kept(self):
         self.client.get('/', headers={'cf-connecting-ip': '198.51.100.7'})

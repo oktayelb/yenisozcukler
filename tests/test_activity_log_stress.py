@@ -1,7 +1,7 @@
 """Yük altında kayıt kaybı olmadığını doğrular.
 
-Ayrı modül: `core.tests_activity` hızlı kalsın, bu birkaç saniye sürüyor.
-`manage.py test core.tests_activity_stress` ile çalıştırılır.
+Ayrı modül: `tests.test_activity_log` hızlı kalsın diye ayrıldı.
+`manage.py test tests.test_activity_log_stress` ile çalıştırılır.
 """
 
 import threading
