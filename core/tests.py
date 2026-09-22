@@ -5,9 +5,11 @@ from django.contrib.auth.models import User
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
-from .middleware import CloudflareSecurityMiddleware, _is_cloudflare_ip
-from .models import Category, Comment, CommentVote, Word, WordVote
-from .serializers import AuthSerializer, CommentCreateSerializer, WordCreateSerializer
+from accounts.serializers import AuthSerializer
+from words.models import Category, Comment, Word
+from words.serializers import CommentCreateSerializer, WordCreateSerializer
+
+from .middleware import CloudflareSecurityMiddleware, _cf_cache
 
 def _turnstile_ok(*args, **kwargs):
     mock = MagicMock()
@@ -105,8 +107,14 @@ class WordCreateSerializerTests(TestCase):
         self.assertFalse(s.is_valid())
         self.assertIn('word', s.errors)
 
-    def test_invalid_char_in_definition(self):
-        s = WordCreateSerializer(data=self._valid_data(definition='tanım@!'))
+    def test_punctuation_allowed_in_definition(self):
+        # Tanım `clean_text`ten geçer: noktalama serbesttir, yalnızca
+        # görünmeyen karakterler ve uzunluk sınırı reddedilir.
+        s = WordCreateSerializer(data=self._valid_data(definition='tanım (mecazi), bkz. şu.'))
+        self.assertTrue(s.is_valid(), s.errors)
+
+    def test_invisible_char_in_definition_rejected(self):
+        s = WordCreateSerializer(data=self._valid_data(definition='tanım\u200bgizli'))
         self.assertFalse(s.is_valid())
         self.assertIn('definition', s.errors)
 
@@ -160,52 +168,42 @@ class CommentCreateSerializerTests(TestCase):
         self.assertTrue(s.is_valid(), s.errors)
 
 
-@override_settings(RATELIMIT_ENABLE=False)
 class AuthSerializerTests(TestCase):
+    """Turnstile burada doğrulanmaz (bkz. accounts/serializers.py):
+    tek kullanımlık token view'da harcanır. CAPTCHA reddi
+    RegisterViewTests.test_register_captcha_failure ile kapsanıyor."""
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
-    def test_valid_data(self, _mock):
+    def test_valid_data(self):
         s = AuthSerializer(data={'username': 'alice', 'password': 'pass123', 'token': 'tok'})
         self.assertTrue(s.is_valid(), s.errors)
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
-    def test_password_too_short(self, _mock):
+    def test_password_too_short(self):
         s = AuthSerializer(data={'username': 'alice', 'password': '123', 'token': 'tok'})
         self.assertFalse(s.is_valid())
         self.assertIn('password', s.errors)
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
-    def test_password_too_long(self, _mock):
+    def test_password_too_long(self):
         s = AuthSerializer(data={'username': 'alice', 'password': 'a' * 61, 'token': 'tok'})
         self.assertFalse(s.is_valid())
         self.assertIn('password', s.errors)
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
-    def test_password_exactly_60_chars(self, _mock):
+    def test_password_exactly_60_chars(self):
         s = AuthSerializer(data={'username': 'alice', 'password': 'a' * 60, 'token': 'tok'})
         self.assertTrue(s.is_valid(), s.errors)
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
-    def test_username_too_long(self, _mock):
+    def test_username_too_long(self):
         s = AuthSerializer(data={'username': 'a' * 31, 'password': 'pass123', 'token': 'tok'})
         self.assertFalse(s.is_valid())
         self.assertIn('username', s.errors)
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
-    def test_username_anonim_blocked(self, _mock):
+    def test_username_anonim_blocked(self):
         s = AuthSerializer(data={'username': 'anonim', 'password': 'pass123', 'token': 'tok'})
         self.assertFalse(s.is_valid())
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
-    def test_username_invalid_chars(self, _mock):
+    def test_username_invalid_chars(self):
         s = AuthSerializer(data={'username': 'ali ce!', 'password': 'pass123', 'token': 'tok'})
         self.assertFalse(s.is_valid())
         self.assertIn('username', s.errors)
-
-    @patch('core.serializers.requests.post', side_effect=_turnstile_fail)
-    def test_turnstile_fail_rejected(self, _mock):
-        s = AuthSerializer(data={'username': 'alice', 'password': 'pass123', 'token': 'bad'})
-        self.assertFalse(s.is_valid())
 
 
 # ---------------------------------------------------------------------------
@@ -215,17 +213,17 @@ class AuthSerializerTests(TestCase):
 @override_settings(RATELIMIT_ENABLE=False)
 class RegisterViewTests(TestCase):
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
+    @patch('core.http.http_requests.post', side_effect=_turnstile_ok)
     def test_register_creates_user_and_logs_in(self, _mock):
         resp = self.client.post(
             reverse('register'),
-            data=json.dumps({'username': 'newuser', 'password': 'pass123', 'token': 'tok'}),
+            data=json.dumps({'username': 'newuser', 'password': 'Gecerli-Parola-42', 'token': 'tok'}),
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 201)
         self.assertTrue(User.objects.filter(username='newuser').exists())
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
+    @patch('core.http.http_requests.post', side_effect=_turnstile_ok)
     def test_register_duplicate_username(self, _mock):
         User.objects.create_user(username='existing', password='pass123')
         resp = self.client.post(
@@ -235,7 +233,7 @@ class RegisterViewTests(TestCase):
         )
         self.assertEqual(resp.status_code, 400)
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
+    @patch('core.http.http_requests.post', side_effect=_turnstile_ok)
     def test_register_duplicate_username_case_insensitive(self, _mock):
         User.objects.create_user(username='Alice', password='pass123')
         resp = self.client.post(
@@ -245,7 +243,7 @@ class RegisterViewTests(TestCase):
         )
         self.assertEqual(resp.status_code, 400)
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_fail)
+    @patch('core.http.http_requests.post', side_effect=_turnstile_fail)
     def test_register_captcha_failure(self, _mock):
         resp = self.client.post(
             reverse('register'),
@@ -262,7 +260,7 @@ class LoginViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='loginuser', password='correct123')
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
+    @patch('core.http.http_requests.post', side_effect=_turnstile_ok)
     def test_login_success(self, _mock):
         resp = self.client.post(
             reverse('login'),
@@ -272,7 +270,7 @@ class LoginViewTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(resp.json()['success'])
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
+    @patch('core.http.http_requests.post', side_effect=_turnstile_ok)
     def test_login_wrong_password(self, _mock):
         resp = self.client.post(
             reverse('login'),
@@ -282,7 +280,7 @@ class LoginViewTests(TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertFalse(resp.json()['success'])
 
-    @patch('core.serializers.requests.post', side_effect=_turnstile_ok)
+    @patch('core.http.http_requests.post', side_effect=_turnstile_ok)
     def test_login_nonexistent_user(self, _mock):
         resp = self.client.post(
             reverse('login'),
@@ -374,11 +372,15 @@ class AddWordTests(TestCase):
             'definition': 'yeni bir kelime',
             'example': 'bu yeni bir kelimedir.',
             'etymology': 'Türkçe',
+            # add_word da Turnstile istiyor (alan adı 'token' değil); yoksa
+            # istek doğrulamaya gitmeden 400 döner.
+            'cf_turnstile_response': 'tok',
         }
         data.update(overrides)
         return data
 
-    def test_anonymous_can_submit_word(self):
+    @patch('core.http.http_requests.post', side_effect=_turnstile_ok)
+    def test_anonymous_can_submit_word(self, _mock):
         resp = self.client.post(
             reverse('add_word'),
             data=json.dumps(self._valid_payload()),
@@ -388,7 +390,8 @@ class AddWordTests(TestCase):
         self.assertTrue(resp.json()['success'])
         self.assertEqual(Word.objects.filter(word='yenikelime').count(), 1)
 
-    def test_submitted_word_is_pending(self):
+    @patch('core.http.http_requests.post', side_effect=_turnstile_ok)
+    def test_submitted_word_is_pending(self, _mock):
         self.client.post(
             reverse('add_word'),
             data=json.dumps(self._valid_payload()),
@@ -397,7 +400,8 @@ class AddWordTests(TestCase):
         word = Word.objects.get(word='yenikelime')
         self.assertEqual(word.status, 'pending')
 
-    def test_authenticated_word_linked_to_user(self):
+    @patch('core.http.http_requests.post', side_effect=_turnstile_ok)
+    def test_authenticated_word_linked_to_user(self, _mock):
         user = User.objects.create_user(username='writer', password='pass123')
         self.client.force_login(user)
         self.client.post(
@@ -408,7 +412,8 @@ class AddWordTests(TestCase):
         word = Word.objects.get(word='yenikelime')
         self.assertEqual(word.user, user)
 
-    def test_invalid_word_rejected(self):
+    @patch('core.http.http_requests.post', side_effect=_turnstile_ok)
+    def test_invalid_word_rejected(self, _mock):
         resp = self.client.post(
             reverse('add_word'),
             data=json.dumps(self._valid_payload(word='bad@word!')),
@@ -674,27 +679,27 @@ class CloudflareIPTests(TestCase):
 
     def test_known_cloudflare_ipv4_accepted(self):
         # 104.16.0.1 is inside 104.16.0.0/13
-        self.assertTrue(_is_cloudflare_ip('104.16.0.1'))
+        self.assertTrue(_cf_cache.contains('104.16.0.1'))
 
     def test_known_cloudflare_ipv4_another_range(self):
         # 173.245.48.1 is inside 173.245.48.0/20
-        self.assertTrue(_is_cloudflare_ip('173.245.48.1'))
+        self.assertTrue(_cf_cache.contains('173.245.48.1'))
 
     def test_non_cloudflare_ipv4_rejected(self):
-        self.assertFalse(_is_cloudflare_ip('1.2.3.4'))
+        self.assertFalse(_cf_cache.contains('1.2.3.4'))
 
     def test_known_cloudflare_ipv6_accepted(self):
         # 2606:4700::1 is inside 2606:4700::/32
-        self.assertTrue(_is_cloudflare_ip('2606:4700::1'))
+        self.assertTrue(_cf_cache.contains('2606:4700::1'))
 
     def test_non_cloudflare_ipv6_rejected(self):
-        self.assertFalse(_is_cloudflare_ip('2001:db8::1'))
+        self.assertFalse(_cf_cache.contains('2001:db8::1'))
 
     def test_invalid_ip_string_returns_false(self):
-        self.assertFalse(_is_cloudflare_ip('not-an-ip'))
+        self.assertFalse(_cf_cache.contains('not-an-ip'))
 
     def test_loopback_not_cloudflare(self):
-        self.assertFalse(_is_cloudflare_ip('127.0.0.1'))
+        self.assertFalse(_cf_cache.contains('127.0.0.1'))
 
 
 class CloudflareMiddlewareTests(TestCase):
