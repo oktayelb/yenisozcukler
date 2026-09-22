@@ -30,30 +30,52 @@ _FALLBACK_RANGES = [
 ]
 
 
+def _split_by_version(ranges):
+    """Ağları IPv4/IPv6 diye ayırır: `contains` yalnızca ilgili yarıyı tarar."""
+    by_version = {4: [], 6: []}
+    for item in ranges:
+        try:
+            net = ipaddress.ip_network(item)
+        except ValueError:
+            logger.warning('Cloudflare aralığı ayrıştırılamadı, atlandı: %r', item)
+            continue
+        by_version[net.version].append(net)
+    return by_version
+
+
 class _CfIpCache:
     """Holds Cloudflare IP networks, refreshed daily in a background thread."""
 
     def __init__(self):
-        self._networks = [ipaddress.ip_network(r) for r in _FALLBACK_RANGES]
+        self._by_version = _split_by_version(_FALLBACK_RANGES)
         self._lock = threading.Lock()
-        self._last_refreshed = 0.0
+        # None = hiç denenmedi. 0.0 olsaydı `monotonic()` makine açılışından
+        # sayıldığı için ilk yenileme ancak 24 saatlik uptime'dan sonra olurdu.
+        self._last_attempt = None
         self._refresh_in_progress = False
 
     def contains(self, ip_str):
         self._maybe_refresh()
         try:
             ip = ipaddress.ip_address(ip_str)
-            with self._lock:
-                return any(ip in net for net in self._networks)
         except ValueError:
             return False
+        with self._lock:
+            networks = self._by_version[ip.version]
+        # Liste atomik olarak değiştirildiği için tarama kilit dışında:
+        # her istekte tutulan kilit gereksiz bir darboğaz olurdu.
+        return any(ip in net for net in networks)
 
     def _maybe_refresh(self):
-        if time.monotonic() - self._last_refreshed < _CF_REFRESH_SECONDS:
+        last = self._last_attempt
+        if last is not None and time.monotonic() - last < _CF_REFRESH_SECONDS:
             return
         if self._refresh_in_progress:
             return
         self._refresh_in_progress = True
+        # Deneme anını hemen işaretle: aksi hâlde Cloudflare'a ulaşılamadığında
+        # her istek yeni bir thread açar (başarısızlıkta thread yağmuru).
+        self._last_attempt = time.monotonic()
         t = threading.Thread(target=self._do_refresh, daemon=True)
         t.start()
 
@@ -66,11 +88,16 @@ class _CfIpCache:
                     ranges.extend(
                         line.strip() for line in body.splitlines() if line.strip()
                     )
-            networks = [ipaddress.ip_network(r) for r in ranges]
+            by_version = _split_by_version(ranges)
+            if not by_version[4]:
+                # Boş/bozuk yanıt tüm siteyi kilitler; eldekini koru.
+                raise ValueError('Cloudflare listesi boş döndü')
             with self._lock:
-                self._networks = networks
-                self._last_refreshed = time.monotonic()
-            logger.debug('Cloudflare IP list refreshed (%d networks)', len(networks))
+                self._by_version = by_version
+            logger.debug(
+                'Cloudflare IP list refreshed (%d v4, %d v6)',
+                len(by_version[4]), len(by_version[6]),
+            )
         except Exception as exc:
             logger.warning('Could not refresh Cloudflare IP list, keeping previous: %s', exc)
         finally:
