@@ -7,7 +7,7 @@ from django.core.exceptions import MiddlewareNotUsed
 from django.http import HttpResponseForbidden
 from django.conf import settings
 
-from .logger import is_enabled, log_activity, record_request, setting
+from .logger import is_configured, log_activity, record_request, setting
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,10 @@ class ActivityLogMiddleware:
     """
 
     def __init__(self, get_response):
-        if not is_enabled():
+        # Kill switch'e bakılır, `is_enabled()`e değil: ikincisi yazma hatası
+        # molasında da False döner ve middleware bir kez kaldırılırsa mola
+        # bitince geri gelmezdi.
+        if not is_configured():
             raise MiddlewareNotUsed
 
         self.get_response = get_response
@@ -141,12 +144,16 @@ class ActivityLogMiddleware:
             return self.get_response(request)
 
         start = time.perf_counter()
-        response = self.get_response(request)
-        duration_ms = int((time.perf_counter() - start) * 1000)
-
+        response = None
         try:
-            record_request(request, response, duration_ms)
-        except Exception:
-            logger.warning('activity log kaydı başarısız', exc_info=True)
-
-        return response
+            response = self.get_response(request)
+            return response
+        finally:
+            # try/finally: `get_response` istisna fırlatsa bile satır yazılır.
+            # Django istisnaları normalde 500'e çevirir, ama çeviricinin de
+            # patladığı hâlde sessizce kayıt kaybetmeyelim.
+            duration_ms = int((time.perf_counter() - start) * 1000)
+            try:
+                record_request(request, response, duration_ms)
+            except Exception:
+                logger.warning('activity log kaydı başarısız', exc_info=True)

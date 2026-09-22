@@ -347,3 +347,38 @@ class ActivityLogAttributionTests(TransactionTestCase):
         row = self._row('/admin/')
         self.assertEqual(row.action, 'admin')
         self.assertEqual(row.user_id, admin_user.pk)
+
+
+@override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
+class ActivityLogExceptionTests(TransactionTestCase):
+
+    def tearDown(self):
+        logger.flush_now()
+        ActivityLog.objects.all().delete()
+
+    def test_view_exception_is_logged_as_server_error(self):
+        from django.test import RequestFactory
+        from core.middleware import ActivityLogMiddleware
+
+        def boom(request):
+            raise RuntimeError('patladı')
+
+        mw = ActivityLogMiddleware(boom)
+
+        with self.assertRaises(RuntimeError):
+            mw(RequestFactory().get('/patlak'))
+        logger.flush_now()
+
+        self.assertEqual(ActivityLog.objects.get(path='/patlak').status_code, 500)
+
+    def test_middleware_survives_a_write_failure_pause(self):
+        """Mola geçici; middleware kurulumu buna bakmamalı."""
+        from core.middleware import ActivityLogMiddleware
+
+        logger._paused_until = logger.time.monotonic() + 3600
+        try:
+            self.assertFalse(logger.is_enabled())
+            self.assertTrue(logger.is_configured())
+            ActivityLogMiddleware(lambda r: None)   # MiddlewareNotUsed atmamalı
+        finally:
+            logger._paused_until = 0.0

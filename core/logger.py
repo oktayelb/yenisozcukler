@@ -82,8 +82,18 @@ def setting(name):
     return getattr(settings, name, _DEFAULTS[name])
 
 
+def is_configured():
+    """Kill switch. Middleware kurulurken bakılan tek şey budur.
+
+    `is_enabled` ile farkı: buradaki karar process ömrü boyunca sabittir.
+    Yazma hatası molası geçici olduğu için middleware'i kaldırmamalı —
+    kaldırsaydı mola bittiğinde loglama bir daha hiç başlamazdı.
+    """
+    return bool(setting('ACTIVITY_LOG_ENABLED'))
+
+
 def is_enabled():
-    if not setting('ACTIVITY_LOG_ENABLED'):
+    if not is_configured():
         return False
     # Yazma hataları yüzünden verilen ara dolduysa kendiliğinden devam eder.
     return _paused_until <= time.monotonic()
@@ -239,8 +249,10 @@ def record_request(request, response, duration_ms):
             'method': request.method[:8] if request.method else '',
             'path': path[:300],
             'query': request.META.get('QUERY_STRING', '')[:200],
-            'status_code': getattr(response, 'status_code', 0) or 0,
-            'duration_ms': duration_ms,
+            # response None ise `get_response` istisna fırlatmış demektir;
+            # Django bunu 500'e çevirir, biz de öyle kaydediyoruz.
+            'status_code': (getattr(response, 'status_code', 0) or 0) if response is not None else 500,
+            'duration_ms': max(0, duration_ms),
             'detail': getattr(request, '_activity_detail', '')[:200],
             'user_agent': ua[:200],
             'is_bot': is_bot(ua),
