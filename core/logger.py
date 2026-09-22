@@ -500,26 +500,44 @@ def _flush(batch):
         close_old_connections()
 
 
-def _prune():
-    """Saklama süresini aşan kayıtları parça parça siler."""
-    days = setting('ACTIVITY_LOG_RETENTION_DAYS')
+# Tek seferde silinecek satır sayısı: uzun bir DELETE ile SQLite'ı kilitlemeyelim.
+_PRUNE_CHUNK = 2000
+
+
+def prune_logs(days=None, chunk=_PRUNE_CHUNK):
+    """Saklama süresini aşan kayıtları parça parça siler, silinen sayıyı döner.
+
+    Üç yerden çağrılır: writer thread (saatlik), `prune_activity_logs` komutu
+    ve admin'deki toplu işlem. Tek bir dev DELETE yerine parçalı silmek
+    SQLite'ın yazma kilidini uzun süre tutmasını engeller.
+    """
+    if days is None:
+        days = setting('ACTIVITY_LOG_RETENTION_DAYS')
     if not days:
-        return
+        return 0
 
     from .models import ActivityLog
 
     cutoff = timezone.now() - timedelta(days=days)
+    deleted = 0
+    while True:
+        ids = list(
+            ActivityLog.objects.filter(timestamp__lt=cutoff)
+            .values_list('id', flat=True)[:chunk]
+        )
+        if not ids:
+            break
+        count, _ = ActivityLog.objects.filter(id__in=ids).delete()
+        deleted += count
+        if len(ids) < chunk:
+            break
+    return deleted
+
+
+def _prune():
+    """Writer thread'in saatlik çağırdığı sarmalayıcı."""
     try:
-        while True:
-            ids = list(
-                ActivityLog.objects.filter(timestamp__lt=cutoff)
-                .values_list('id', flat=True)[:2000]
-            )
-            if not ids:
-                break
-            ActivityLog.objects.filter(id__in=ids).delete()
-            if len(ids) < 2000:
-                break
+        prune_logs()
     except Exception as exc:
         logger.warning('activity log prune failed: %s', exc)
     finally:

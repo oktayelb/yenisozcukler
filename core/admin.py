@@ -135,10 +135,12 @@ class ActivityLogAdmin(admin.ModelAdmin):
 
     @admin.action(description='Saklama süresini aşan tüm logları sil')
     def prune_old_logs(self, request, queryset):
-        from .logger import setting
+        # Seçimden bağımsız çalışır: eylemin adı da bunu söylüyor.
+        # Silme `prune_logs` ile parça parça yapılır — tek bir dev DELETE
+        # SQLite'ın yazma kilidini dakikalarca tutabilirdi.
+        from .logger import prune_logs, setting
         days = setting('ACTIVITY_LOG_RETENTION_DAYS') or 30
-        cutoff = timezone.now() - timedelta(days=days)
-        deleted, _ = ActivityLog.objects.filter(timestamp__lt=cutoff).delete()
+        deleted = prune_logs(days)
         self.message_user(request, f'{days} günden eski {deleted} log silindi.')
 
     def changelist_view(self, request, extra_context=None):

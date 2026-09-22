@@ -11,11 +11,8 @@ from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from core.logger import setting
+from core.logger import prune_logs, setting
 from core.models import ActivityLog
-
-# Tek seferde silinecek satır sayısı: uzun bir DELETE ile SQLite'ı kilitlemeyelim.
-_CHUNK = 2000
 
 
 class Command(BaseCommand):
@@ -53,15 +50,7 @@ class Command(BaseCommand):
                 self.stdout.write(f'{days} günden eski {old.count()} kayıt silinecekti.')
             return
 
-        deleted = 0
-        while True:
-            ids = list(old.values_list('id', flat=True)[:_CHUNK])
-            if not ids:
-                break
-            count, _ = ActivityLog.objects.filter(id__in=ids).delete()
-            deleted += count
-            if len(ids) < _CHUNK:
-                break
+        deleted = prune_logs(days)
 
         if verbose:
             self.stdout.write(self.style.SUCCESS(
