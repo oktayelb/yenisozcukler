@@ -24,7 +24,7 @@ from django.db.models import Count, F, Q
 from django.db import transaction, DatabaseError, OperationalError, IntegrityError
 
 from core.http import verify_turnstile, get_client_ip, universal_rate_key
-from core.logger import log_activity
+from logs.logger import log_activity
 from notifications.models import Notification
 from .models import Word, WordVote, Category, Comment, CommentVote
 from .serializers import (

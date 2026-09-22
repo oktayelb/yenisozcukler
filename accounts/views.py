@@ -25,7 +25,7 @@ from django.db import transaction, IntegrityError
 from words.models import Word, Comment
 from core.text import turkish_lower
 from core.http import verify_turnstile, universal_rate_key, login_username_key
-from core.logger import log_activity
+from logs.logger import log_activity
 from .serializers import AuthSerializer, ChangeUsernameSerializer
 
 logger = logging.getLogger(__name__)

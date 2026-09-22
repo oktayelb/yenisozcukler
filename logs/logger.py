@@ -16,7 +16,7 @@ from django.db import (
 from django.utils import timezone
 from django.utils.functional import empty
 
-from .http import clean_ip as _clean_ip, get_client_ip, is_bot
+from core.http import clean_ip as _clean_ip, get_client_ip, is_bot
 
 logger = logging.getLogger(__name__)
 

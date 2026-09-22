@@ -11,8 +11,8 @@ from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from core.logger import prune_logs, setting
-from core.models import ActivityLog
+from logs.logger import prune_logs, setting
+from logs.models import ActivityLog
 
 
 class Command(BaseCommand):

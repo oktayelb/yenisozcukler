@@ -1,9 +1,9 @@
-# core/models.py
+# logs/models.py
 """Aktivite logu.
 
-`core` alan modeli tutmaz; buradaki tek model altyapıya ait telemetridir:
-her HTTP isteği için bir satır. Yazma işi `core.logger` içindeki arka plan
-kuyruğundan toplu (bulk) yapılır, istek thread'i veritabanına dokunmaz.
+Bu uygulamanın tek modeli: her HTTP isteği için bir satır. Yazma işi
+`logs.logger` içindeki arka plan kuyruğundan toplu (bulk) yapılır, istek
+thread'i veritabanına dokunmaz.
 """
 
 from django.contrib.auth.models import User

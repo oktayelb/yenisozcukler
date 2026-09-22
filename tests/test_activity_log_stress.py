@@ -10,8 +10,8 @@ import time
 from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 
-from core import logger
-from core.models import ActivityLog
+from logs import logger
+from logs.models import ActivityLog
 
 
 def _payload(path):

@@ -5,9 +5,17 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    """ActivityLog'un ilk ve tek migration'ı.
+
+    Model bir süre `core`'da durdu ama o migration (core.0029) hiçbir yerde
+    uygulanmadı — bu dal henüz birleştirilmedi ve main'de ActivityLog yok.
+    Bu yüzden `SeparateDatabaseAndState` + `AlterModelTable` ikilisine gerek
+    kalmadı: tablo doğrudan `logs_activitylog` adıyla kuruluyor.
+    """
+
+    initial = True
 
     dependencies = [
-        ('core', '0028_remove_notification_core_notifi_recipie_b7a566_idx_and_more'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

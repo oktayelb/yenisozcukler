@@ -5,7 +5,7 @@ from django.template import Template, RequestContext
 from django.contrib.admin import helpers
 from django.contrib.auth.models import User
 
-from core.logger import log_activity
+from logs.logger import log_activity
 from notifications.models import Notification
 from .models import Word, WordVote, Category, Comment, CommentVote, REJECTION_REASONS
 

@@ -5,7 +5,7 @@ from django.contrib.auth.signals import user_logged_in, user_logged_out, user_lo
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 
-from core.logger import log_activity
+from logs.logger import log_activity
 from words.models import Word, Comment
 
 

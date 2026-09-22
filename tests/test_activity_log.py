@@ -12,8 +12,8 @@ from django.contrib.auth.models import User
 from django.test import TransactionTestCase, override_settings
 from django.urls import reverse
 
-from core import logger
-from core.models import ActivityLog
+from logs import logger
+from logs.models import ActivityLog
 
 
 @override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
@@ -53,7 +53,7 @@ class ActivityLogTests(TransactionTestCase):
     def test_excluded_prefixes_are_not_logged(self):
         with override_settings(ACTIVITY_LOG_EXCLUDE_PREFIXES=('/api/',)):
             # Middleware ön ekleri __init__'te okur; yeni bir örnek kur.
-            from core.middleware import ActivityLogMiddleware
+            from logs.middleware import ActivityLogMiddleware
             mw = ActivityLogMiddleware(lambda r: None)
             self.assertEqual(mw.exclude, ('/api/',))
 
@@ -118,7 +118,7 @@ class ActivityLogTests(TransactionTestCase):
         self.client.get('/')  # listede gösterilecek en az bir kayıt
         self.drain()
 
-        response = self.client.get(reverse('admin:core_activitylog_changelist'))
+        response = self.client.get(reverse('admin:logs_activitylog_changelist'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Son 24 saat')
 
@@ -606,7 +606,7 @@ class ActivityLogWriterTests(TransactionTestCase):
         self.assertFalse(ActivityLog.objects.get(path='/insan').is_bot)
 
     def test_view_exception_is_logged_as_server_error(self):
-        from core.middleware import ActivityLogMiddleware
+        from logs.middleware import ActivityLogMiddleware
 
         def boom(request):
             raise RuntimeError('patladı')
@@ -628,7 +628,7 @@ class ActivityLogWriterTests(TransactionTestCase):
 
     def test_middleware_survives_a_write_failure_pause(self):
         """Mola geçici; middleware kurulumu buna bakmamalı."""
-        from core.middleware import ActivityLogMiddleware
+        from logs.middleware import ActivityLogMiddleware
 
         logger._paused_until = logger.time.monotonic() + 3600
         try:

@@ -1,8 +1,7 @@
-# core/admin.py
+# logs/admin.py
 """Aktivite logu admin'i.
 
-`core`'un tek modeli ActivityLog olduğu için burada başka bir şey yok;
-sözcük/yorum admin'leri `words.admin`, kullanıcı admin'i `accounts.admin`.
+Sözcük/yorum admin'leri `words.admin`, kullanıcı admin'i `accounts.admin`.
 """
 
 from datetime import timedelta
