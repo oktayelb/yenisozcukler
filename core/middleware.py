@@ -92,16 +92,10 @@ class CloudflareSecurityMiddleware:
         if settings.DEBUG:
             return self._add_security_headers(self.get_response(request))
 
-        # Production: enforce Cloudflare proxying
-
-        # 1. CF-Connecting-IP header must be present
         cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
         if not cf_ip:
             return HttpResponseForbidden("Erişim Engellendi.")
 
-        # 2. The actual TCP connection must originate from a real Cloudflare server.
-        #    Without this check an attacker who knows the origin IP can bypass rate
-        #    limits by forging a fake CF-Connecting-IP header.
         if not _cf_cache.contains(remote_addr):
             return HttpResponseForbidden("Erişim Engellendi.")
 
@@ -109,9 +103,6 @@ class CloudflareSecurityMiddleware:
 
     @staticmethod
     def _add_security_headers(response):
-        # Disable access to sensitive browser features not needed by this site.
-        # Django's built-in middleware covers X-Frame-Options, X-Content-Type-Options,
-        # and HSTS — no need to duplicate those here.
         response.setdefault(
             'Permissions-Policy',
             'geolocation=(), microphone=(), camera=(), payment=(), usb=()'

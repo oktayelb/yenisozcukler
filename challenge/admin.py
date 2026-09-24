@@ -5,7 +5,8 @@ from django.template import Template, RequestContext
 from django.contrib.admin import helpers
 from django.utils import timezone
 from .models import TranslationChallenge, ChallengeComment, ChallengeCommentVote
-from core.models import Notification, REJECTION_REASONS
+from notifications.models import Notification
+from words.models import REJECTION_REASONS
 
 
 @admin.action(description='Mark selected challenges as Approved')

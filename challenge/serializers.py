@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from core.serializers import clean_text, clean_word
+from core.text import clean_text, clean_word
 from .models import TranslationChallenge, ChallengeComment
 
 

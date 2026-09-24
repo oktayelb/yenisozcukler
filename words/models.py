@@ -1,21 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.cache import cache
-import re
 
-
-TURKISH_CHAR_MAP = {
-    'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
-    'â': 'a', 'î': 'i', 'û': 'u',
-}
-
-
-def turkish_to_ascii(text):
-    text = text.lower()
-    for tr, en in TURKISH_CHAR_MAP.items():
-        text = text.replace(tr, en)
-    text = re.sub(r'[^a-z0-9]+', '-', text)
-    return text.strip('-')
+from core.text import turkish_to_ascii
 
 
 def generate_unique_slug(word_text, exclude_id=None):
@@ -123,6 +110,30 @@ class Word(models.Model):
     def __str__(self):
         return self.word
 
+
+class WordVote(models.Model):
+    VALUE_CHOICES = [
+        (1, 'Like'),
+        (-1, 'Dislike')
+    ]
+    
+    user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='word_votes',
+        db_index=True
+    )
+
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    
+    word = models.ForeignKey(Word, on_delete=models.CASCADE, related_name='votes')
+    value = models.SmallIntegerField(choices=VALUE_CHOICES)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'word')
+
+
 class Comment(models.Model):
     user = models.ForeignKey(
         User, 
@@ -155,30 +166,6 @@ class Comment(models.Model):
         return f"{self.display_author}: {self.comment[:20]}"
 
 
-# --- VOTE MODELS ---
-
-class WordVote(models.Model):
-    VALUE_CHOICES = [
-        (1, 'Like'),
-        (-1, 'Dislike')
-    ]
-    
-    user = models.ForeignKey(
-        User, 
-        on_delete=models.CASCADE, 
-        related_name='word_votes',
-        db_index=True
-    )
-
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-    
-    word = models.ForeignKey(Word, on_delete=models.CASCADE, related_name='votes')
-    value = models.SmallIntegerField(choices=VALUE_CHOICES)
-    timestamp = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ('user', 'word')
-
 class CommentVote(models.Model):
     VALUE_CHOICES = [
         (1, 'Like'),
@@ -200,51 +187,3 @@ class CommentVote(models.Model):
 
     class Meta:
         unique_together = ('user', 'comment')
-
-
-class Notification(models.Model):
-    TYPE_CHOICES = [
-        ('word_like', 'Word Like'),
-        ('word_dislike', 'Word Dislike'),
-        ('comment_like', 'Comment Like'),
-        ('comment_dislike', 'Comment Dislike'),
-        ('challenge_like', 'Challenge Like'),
-        ('challenge_dislike', 'Challenge Dislike'),
-        ('new_comment', 'New Comment'),
-        ('challenge_win', 'Challenge Win'),
-        ('word_rejected', 'Word Rejected'),
-        ('challenge_rejected', 'Challenge Rejected'),
-    ]
-
-    recipient = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='notifications',
-        db_index=True
-    )
-    actor = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='+'
-    )
-    notification_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
-
-    word = models.ForeignKey(Word, on_delete=models.CASCADE, null=True, blank=True)
-    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, null=True, blank=True)
-    challenge_comment = models.ForeignKey('challenge.ChallengeComment', on_delete=models.CASCADE, null=True, blank=True)
-
-    message = models.CharField(max_length=300, blank=True, default='')
-    is_read = models.BooleanField(default=False, db_index=True)
-    is_active = models.BooleanField(default=True, db_index=True)  # <-- NEW FIELD
-    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
-
-    class Meta:
-        ordering = ['-timestamp']
-        indexes = [
-            models.Index(fields=['recipient','is_active', 'is_read', '-timestamp']),
-        ]
-
-    def __str__(self):
-        return f"{self.notification_type} -> {self.recipient.username}"

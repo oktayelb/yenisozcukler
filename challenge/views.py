@@ -10,7 +10,7 @@ from django.db.models import Count, F, Prefetch, Case, When, Value, BooleanField
 from django.db import transaction, DatabaseError, OperationalError, IntegrityError
 from django.utils import timezone
 
-from core.views import get_client_ip, universal_rate_key
+from core.http import get_client_ip, universal_rate_key
 from .models import TranslationChallenge, ChallengeComment, ChallengeCommentVote
 from .serializers import (
     TranslationChallengeSerializer, TranslationChallengeCreateSerializer,
@@ -319,7 +319,7 @@ def vote_challenge_comment(request, comment_id):
 
     owner = comment.user if hasattr(comment, 'user') else None
     if owner and owner != user:
-        from core.models import Notification
+        from notifications.models import Notification
         from django.core.cache import cache
 
         like_type = 'challenge_like'
