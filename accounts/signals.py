@@ -27,18 +27,6 @@ def claim_guest_content(sender, instance, created, **kwargs):
             user__isnull=True
         ).update(user=instance)
 
-        from challenge.models import TranslationChallenge, ChallengeComment
-
-        TranslationChallenge.objects.filter(
-            author__iexact=nickname,
-            user__isnull=True
-        ).update(user=instance)
-
-        ChallengeComment.objects.filter(
-            author__iexact=nickname,
-            user__isnull=True
-        ).update(user=instance)
-
 
 @receiver(pre_delete, sender=User)
 def anonymize_deleted_user_content(sender, instance, **kwargs):
@@ -46,11 +34,6 @@ def anonymize_deleted_user_content(sender, instance, **kwargs):
 
     Word.objects.filter(user=instance).update(author=anonymous_label)
     Comment.objects.filter(user=instance).update(author=anonymous_label)
-
-    from challenge.models import TranslationChallenge, ChallengeComment
-
-    TranslationChallenge.objects.filter(user=instance).update(author=anonymous_label)
-    ChallengeComment.objects.filter(user=instance).update(author=anonymous_label)
 
 
 # --- AKTİVİTE LOGU SİNYALLERİ ---
