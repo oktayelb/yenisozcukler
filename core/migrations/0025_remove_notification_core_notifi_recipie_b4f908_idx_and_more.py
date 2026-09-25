@@ -7,7 +7,6 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('challenge', '0008_rename_challenge_cc_challenge_score_idx_core_challe_challen_ff213f_idx'),
         ('core', '0024_rename_core_commen_word_id_timestamp_idx_core_commen_word_id_1d0a38_idx_and_more'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
