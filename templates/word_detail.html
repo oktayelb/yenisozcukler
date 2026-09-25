@@ -25,14 +25,48 @@
 <script type="application/ld+json">
 {
     "@context": "https://schema.org",
-    "@type": "DefinedTerm",
-    "name": "{{ word.word|escapejs }}",
-    "description": "{{ word.definition|escapejs }}"{% if word.etymology %},
-    "additionalProperty": {
-        "@type": "PropertyValue",
-        "name": "Köken",
-        "value": "{{ word.etymology|escapejs }}"
-    }{% endif %}
+    "@graph": [
+        {
+            "@type": "DefinedTerm",
+            "name": "{{ word.word|escapejs }}",
+            "description": "{{ word.definition|escapejs }}"{% if word.etymology %},
+            "additionalProperty": {
+                "@type": "PropertyValue",
+                "name": "Köken",
+                "value": "{{ word.etymology|escapejs }}"
+            }{% endif %},
+            "inDefinedTermSet": "https://yenisozcukler.com/"
+        },
+        {
+            "@type": "FAQPage",
+            "mainEntity": [
+                {
+                    "@type": "Question",
+                    "name": "{{ word.word|escapejs }} ne demek?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "{{ word.definition|escapejs }}"
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "{{ word.word|escapejs }} kelimesi ne anlama geliyor?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "{{ word.definition|escapejs }}"
+                    }
+                },
+                {
+                    "@type": "Question",
+                    "name": "{{ word.word|escapejs }} sözcüğü nedir?",
+                    "acceptedAnswer": {
+                        "@type": "Answer",
+                        "text": "{{ word.definition|escapejs }}"
+                    }
+                }
+            ]
+        }
+    ]
 }
 </script>
 {% endblock %}
@@ -72,6 +106,23 @@
                     <time class="card-date" datetime="{{ word.timestamp|date:'c' }}">{{ word.timestamp|date:'j F Y' }}</time>
                 </div>
             </div>
+
+            <section style="max-width:640px; margin:20px auto;">
+                <h2 style="font-size:1.05rem; color:var(--text-muted);">Sıkça Sorulan Sorular</h2>
+                <dl>
+                    <dt><strong>{{ word.word }} ne demek?</strong></dt>
+                    <dd>{{ word.definition }}</dd>
+
+                    <dt><strong>{{ word.word }} kelimesi ne anlama geliyor?</strong></dt>
+                    <dd>{{ word.definition }}</dd>
+
+                    <dt><strong>{{ word.word }} sözcüğü nedir?</strong></dt>
+                    <dd>{{ word.definition }}{% if word.etymology %} (Köken: {{ word.etymology }}){% endif %}</dd>
+                </dl>
+                <p style="font-size:0.85rem; color:var(--text-muted);">
+                    "{{ word.word }}" kelimesinin anlamını ve örnek kullanımını Yeni Sözcükler'de (yenisozcukler.com) bulabilirsiniz.
+                </p>
+            </section>
 
             <div style="text-align:center; margin:30px 0;">
                 <a href="/" style="color:var(--accent); font-size:1rem;">Tüm sözcüklere göz at</a>
