@@ -10,5 +10,6 @@ INSTALLED_APPS = [
     'words',
     'notifications',
     'core',
+    'logs',
     'challenge',
 ]

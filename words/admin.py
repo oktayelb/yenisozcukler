@@ -5,6 +5,7 @@ from django.template import Template, RequestContext
 from django.contrib.admin import helpers
 from django.contrib.auth.models import User
 
+from logs.logger import log_activity
 from notifications.models import Notification
 from .models import Word, WordVote, Category, Comment, CommentVote, REJECTION_REASONS
 
@@ -12,12 +13,16 @@ from .models import Word, WordVote, Category, Comment, CommentVote, REJECTION_RE
 
 @admin.action(description='Mark selected words as Approved')
 def make_approved(modeladmin, request, queryset):
+    words = ', '.join(queryset.values_list('word', flat=True)[:5])
     updated_count = queryset.update(status='approved')
+    log_activity(request, 'admin_word_action', detail=f'Onaylandı ({updated_count}): {words}')
     modeladmin.message_user(request, f"{updated_count} words marked as Approved.")
 
 @admin.action(description='Mark selected words as Pending')
 def make_pending(modeladmin, request, queryset):
+    words = ', '.join(queryset.values_list('word', flat=True)[:5])
     updated_count = queryset.update(status='pending')
+    log_activity(request, 'admin_word_action', detail=f'Beklemeye alındı ({updated_count}): {words}')
     modeladmin.message_user(request, f"{updated_count} words marked as Pending.")
 
 @admin.action(description='Reject selected words (with reason)')
@@ -46,6 +51,7 @@ def reject_words(modeladmin, request, queryset):
         if notifications:
             Notification.objects.bulk_create(notifications)
 
+        log_activity(request, 'admin_word_action', detail=f'Reddedildi ({queryset.count()}): {final_reason}')
         modeladmin.message_user(request, f"{queryset.count()} word(s) rejected.")
         return HttpResponseRedirect(request.get_full_path())
 
@@ -124,6 +130,7 @@ def change_author(modeladmin, request, queryset):
             else:
                 msg += " (No registered user found; set as string only)."
                 
+            log_activity(request, 'admin_word_action', detail=f'Yazar değişti ({updated_count}): {new_author_name}')
             modeladmin.message_user(request, msg)
             return HttpResponseRedirect(request.get_full_path())
         else:

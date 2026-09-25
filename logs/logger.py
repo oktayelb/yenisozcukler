@@ -1,0 +1,579 @@
+import atexit
+import logging
+import os
+import queue
+import random
+import threading
+import time
+from datetime import timedelta
+
+from decouple import config
+from django.conf import settings
+from django.db import (
+    DataError, InterfaceError, IntegrityError, OperationalError,
+    close_old_connections,
+)
+from django.utils import timezone
+from django.utils.functional import empty
+
+from core.http import clean_ip as _clean_ip, get_client_ip, is_bot
+
+logger = logging.getLogger(__name__)
+
+
+def _env(name, default, cast):
+    """`.env`'den oku; değer bozuksa varsayılana dön.
+
+    Bunlar isteğe bağlı ayar düğmeleri: yanlış yazılmış bir satır yüzünden
+    proje hiç açılmasın istemiyoruz.
+    """
+    try:
+        return config(name, default=default, cast=cast)
+    except Exception:
+        logger.warning('%s okunamadı, varsayılan kullanılıyor: %r', name, default)
+        return default
+
+
+# --- Ayarlar ------------------------------------------------------------------
+# Aktivite logunun tüm yapılandırması burada durur; settings.py'ye dağılmaz.
+# Değerler .env'den okunur, testler `override_settings` ile ezebilir
+# (bkz. `setting`).
+_DEFAULTS = {
+    # Kill switch: kapalıysa ne middleware ne writer thread çalışır.
+    'ACTIVITY_LOG_ENABLED': _env('ACTIVITY_LOG_ENABLED', True, bool),
+    # Kuyruk dolarsa kayıtlar düşürülür — istek asla bloklanmaz.
+    'ACTIVITY_LOG_QUEUE_SIZE': _env('ACTIVITY_LOG_QUEUE_SIZE', 5000, int),
+    # Kaç kayıt birikince tek INSERT ile yazılsın.
+    'ACTIVITY_LOG_BATCH_SIZE': _env('ACTIVITY_LOG_BATCH_SIZE', 100, int),
+    # Batch dolmasa da en geç bu kadar saniyede bir yaz.
+    'ACTIVITY_LOG_FLUSH_SECONDS': _env('ACTIVITY_LOG_FLUSH_SECONDS', 2.0, float),
+    # Bu günden eski kayıtlar otomatik silinir (0 = hiç silme).
+    'ACTIVITY_LOG_RETENTION_DAYS': _env('ACTIVITY_LOG_RETENTION_DAYS', 30, int),
+    # Saklama süresi kontrolünün writer thread'inde tekrarlanma aralığı.
+    'ACTIVITY_LOG_PRUNE_SECONDS': 3600,
+    # Bu ön ekle başlayan yollar hiç loglanmaz.
+    'ACTIVITY_LOG_EXCLUDE_PREFIXES': ('/static/', '/favicon.ico'),
+}
+
+_SENTINEL = object()
+
+# Kuyruk + writer thread durumu (process başına)
+_queue = None
+_worker = None
+_worker_pid = None
+_lock = threading.Lock()
+_atexit_registered = False
+
+# Kuyruk dolduğunda düşürülen kayıt sayısı (uyarı log'u için)
+_dropped = 0
+_last_drop_warning = 0.0
+
+# Art arda yazma hatası olursa loglamaya ara ver (ör. tablo henüz yoksa,
+# DB kilitli, bakım vs.). Kalıcı kapatma yok: her aradan sonra yeniden denenir,
+# bekleme süresi hata devam ettikçe ikiye katlanır.
+_consecutive_failures = 0
+_MAX_CONSECUTIVE_FAILURES = 5
+_PAUSE_MIN_SECONDS = 60.0
+_PAUSE_MAX_SECONDS = 3600.0
+_paused_until = 0.0
+_pause_seconds = _PAUSE_MIN_SECONDS
+
+# Bozuk bir satır yüzünden partinin tamamı kaybolmasın diye hata durumunda
+# parti ikiye bölünerek yeniden denenir. DB tamamen kapalıysa bu kurtarma
+# boşuna uğraşmasın diye hem deneme hem süre sınırı var.
+_SALVAGE_MAX_ATTEMPTS = 32
+_SALVAGE_SECONDS = 5.0
+
+# Bölmek yalnızca hata *bir satıra* aitse işe yarar: bozuk FK, alana sığmayan
+# değer, yanlış tip. Kilit / kopmuş bağlantı / eksik tablo partinin tamamını
+# ilgilendirir; bölmek 32 kat daha fazla beklemekten başka işe yaramaz.
+_ROW_LEVEL_ERRORS = (IntegrityError, DataError, ValueError, TypeError)
+# Geçici olabilecek hatalar: parti bozulmadığı için kısa bir aradan sonra
+# olduğu gibi yeniden denenir (SQLite'ta eşzamanlı yazma kilidi yaygın).
+_TRANSIENT_ERRORS = (OperationalError, InterfaceError)
+_RETRY_SECONDS = 0.5
+_MAX_WRITE_ATTEMPTS = 3
+
+# ActivityLog.action alanının max_length'i.
+_ACTION_MAX_LENGTH = 24
+
+
+def setting(name):
+    """Ayarı döndürür: varsa Django ayarı, yoksa buradaki varsayılan.
+
+    settings.py'de bu isimler tanımlı değil; getattr yalnızca testlerdeki
+    `override_settings` için var.
+    """
+    return getattr(settings, name, _DEFAULTS[name])
+
+
+def is_configured():
+    """Kill switch. Middleware kurulurken bakılan tek şey budur.
+
+    `is_enabled` ile farkı: buradaki karar process ömrü boyunca sabittir.
+    Yazma hatası molası geçici olduğu için middleware'i kaldırmamalı —
+    kaldırsaydı mola bittiğinde loglama bir daha hiç başlamazdı.
+    """
+    return bool(setting('ACTIVITY_LOG_ENABLED'))
+
+
+def is_enabled():
+    if not is_configured():
+        return False
+    # Yazma hataları yüzünden verilen ara dolduysa kendiliğinden devam eder.
+    return _paused_until <= time.monotonic()
+
+
+# --- View'lardan çağrılan yardımcı -------------------------------------------
+
+def log_activity(request, action=None, detail=None, username=None, user=None,
+                 set_default=False):
+    """İstek üzerine ek bağlam işaretler; asıl satırı middleware yazar.
+
+    DB'ye dokunmaz, sadece request nesnesine attribute koyar.
+    `set_default=True` ise eylem yalnızca henüz belirlenmemişse yazılır
+    (sinyallerden gelen genel bilgiler için).
+
+    `user`: kaydın hangi hesaba ait olduğunu açıkça belirtir. Çıkışta
+    `logout()` `request.user`'ı AnonymousUser yaptığı için satır sahipsiz
+    kalıyordu; sinyaller kullanıcıyı buradan geçiriyor.
+    """
+    # DRF Request ise alttaki HttpRequest'e yaz — middleware onu görür.
+    req = getattr(request, '_request', request)
+    if req is None:
+        return
+    if action is not None:
+        if not (set_default and getattr(req, '_activity_action', None)):
+            req._activity_action = str(action)[:_ACTION_MAX_LENGTH]
+    if detail is not None:
+        req._activity_detail = str(detail)[:200]
+    if username is not None:
+        req._activity_username = str(username)[:150]
+    if user is not None:
+        pk = getattr(user, 'pk', None)
+        if pk is not None:
+            req._activity_user_id = pk
+            if not getattr(req, '_activity_username', ''):
+                req._activity_username = str(user)[:150]
+
+
+# --- URL adı -> eylem eşlemesi ------------------------------------------------
+
+URL_ACTION_MAP = {
+    'login': 'login',
+    'register': 'register',
+    'logout': 'logout',
+    'add_word': 'word_add',
+    'add_comment': 'comment_add',
+    'vote': 'vote',
+    'add_example': 'example_add',
+    'change_password': 'password_change',
+    'change_username': 'username_change',
+    'mark_notifications_read': 'notifications_read',
+}
+
+
+def _resolve_action(request, path):
+    explicit = getattr(request, '_activity_action', None)
+    if explicit:
+        return str(explicit)[:_ACTION_MAX_LENGTH]
+
+    match = getattr(request, 'resolver_match', None)
+    if match is not None:
+        mapped = URL_ACTION_MAP.get(match.url_name)
+        if mapped:
+            return mapped
+        if (match.app_names and 'admin' in match.app_names) or \
+                (match.namespaces and 'admin' in match.namespaces):
+            return 'admin'
+
+    if path.startswith('/api/'):
+        return 'api'
+    return 'page_view'
+
+
+# --- Middleware'in çağırdığı kayıt fonksiyonu ---------------------------------
+
+def _resolve_user(request):
+    """(user_id, username) döndürür; anonim ziyaretçide (None, '').
+
+    İki kaynağa bakar:
+
+    1. `log_activity(..., user=...)` ile açıkça işaretlenen kullanıcı.
+    2. `request.user`.
+
+    (2) için ekstra bir session/user sorgusu açmamaya dikkat ediyoruz.
+    `AuthenticationMiddleware` `request.user`'ı tembel bir nesne olarak
+    bırakır; view zaten okuduysa çözülmüştür ve bakmak bedavadır. Çözülmemişse
+    yalnızca oturum çerezi varken zorluyoruz — çerez yoksa ziyaretçi kesinlikle
+    anonimdir.
+
+    Çözülmüş nesneye bakmak şart: `login()` `request.user`'a gerçek kullanıcıyı
+    atar ama çerez daha yanıtla gönderileceği için `request.COOKIES`'te yoktur.
+    Sadece çereze bakan eski sürüm bu yüzden giriş ve kayıt satırlarını
+    sahipsiz (user_id = NULL) yazıyordu.
+    """
+    user_id = getattr(request, '_activity_user_id', None)
+    username = getattr(request, '_activity_username', '') or ''
+    if user_id is not None and username:
+        return user_id, username
+
+    user = getattr(request, 'user', None)
+    if user is None:
+        return user_id, username
+
+    resolved = getattr(user, '_wrapped', None) is not empty
+    if not resolved and settings.SESSION_COOKIE_NAME not in request.COOKIES:
+        return user_id, username
+
+    if user.is_authenticated:
+        if user_id is None:
+            user_id = user.pk
+        if not username:
+            username = user.get_username()
+    return user_id, username
+
+
+def record_request(request, response, duration_ms):
+    if not is_enabled():
+        return
+    try:
+        user_id, username = _resolve_user(request)
+        path = request.path
+
+        payload = {
+            'timestamp': timezone.now(),
+            'action': _resolve_action(request, path),
+            'user_id': user_id,
+            'username': (username or '')[:150],
+            # `get_client_ip` doğrulanmış adres ya da None döndürür.
+            'ip': get_client_ip(request),
+            'method': request.method[:8] if request.method else '',
+            'path': path[:300],
+            'query': request.META.get('QUERY_STRING', '')[:200],
+            # response None ise `get_response` istisna fırlatmış demektir;
+            # Django bunu 500'e çevirir, biz de öyle kaydediyoruz.
+            'status_code': (getattr(response, 'status_code', 0) or 0) if response is not None else 500,
+            'duration_ms': max(0, duration_ms),
+            'detail': getattr(request, '_activity_detail', '')[:200],
+            # `is_bot` User-Agent içinde 20+ alt dize arar; `_clean_ip` gibi
+            # bu da istek thread'inde değil, _flush içinde hesaplanır.
+            'user_agent': (request.META.get('HTTP_USER_AGENT', '') or '')[:200],
+        }
+    except Exception:
+        logger.warning('activity log payload build failed', exc_info=True)
+        return
+
+    enqueue(payload)
+
+
+def enqueue(payload):
+    global _dropped, _last_drop_warning
+    try:
+        q = _ensure_worker()
+        q.put_nowait(payload)
+    except queue.Full:
+        _dropped += 1
+        now = time.monotonic()
+        if now - _last_drop_warning > 60:
+            _last_drop_warning = now
+            logger.warning('activity log queue full, %d kayıt düşürüldü', _dropped)
+    except Exception:
+        logger.warning('activity log enqueue failed', exc_info=True)
+
+
+# --- Writer thread ------------------------------------------------------------
+
+def _ensure_worker():
+    global _queue, _worker, _worker_pid, _atexit_registered
+    pid = os.getpid()
+    worker = _worker
+    if worker is not None and _worker_pid == pid and worker.is_alive():
+        return _queue
+
+    with _lock:
+        if _worker is not None and _worker_pid == pid and _worker.is_alive():
+            return _queue
+        if _queue is None or _worker_pid != pid:
+            # Fork sonrası miras alınan kuyruk tutarsız olabilir; yenisini kur.
+            _queue = queue.Queue(maxsize=setting('ACTIVITY_LOG_QUEUE_SIZE'))
+        if not _atexit_registered:
+            # Kuyruk yeniden kurulsa da tek kayıt yeter.
+            atexit.register(_shutdown)
+            _atexit_registered = True
+        _worker_pid = pid
+        _worker = threading.Thread(
+            target=_run, args=(_queue,), name='activity-log-writer', daemon=True
+        )
+        _worker.start()
+        return _queue
+
+
+def _drain(q, batch):
+    """Kuyrukta bekleyen her şeyi batch'e al (sentinel'ler atlanır)."""
+    while True:
+        try:
+            item = q.get_nowait()
+        except queue.Empty:
+            return
+        if item is not _SENTINEL:
+            batch.append(item)
+
+
+def _run(q):
+    batch = []
+    deadline = None
+    next_prune = time.monotonic() + random.uniform(60, 300)
+
+    while True:
+        try:
+            # Ayarlar her turda okunur (getattr, bedava): testlerdeki
+            # override_settings thread yeniden başlatmadan etkili olsun.
+            batch_size = setting('ACTIVITY_LOG_BATCH_SIZE')
+            flush_seconds = setting('ACTIVITY_LOG_FLUSH_SECONDS')
+
+            # Boşta beklerken de saklama süresi kontrolü yapılabilsin diye
+            # timeout hiçbir zaman sonsuz değil.
+            if deadline is None:
+                timeout = 60.0
+            else:
+                timeout = max(0.0, deadline - time.monotonic())
+
+            try:
+                item = q.get(timeout=timeout)
+            except queue.Empty:
+                item = None
+
+            if item is _SENTINEL:
+                # Sentinel'in arkasında kalanlar da yazılsın: yoksa kapanışta
+                # (atexit) ya da flush_now sırasında sessizce kaybolurlardı.
+                _drain(q, batch)
+                _flush(batch)
+                return
+
+            if item is None:
+                _flush(batch)
+                deadline = None
+            else:
+                batch.append(item)
+                if deadline is None:
+                    deadline = time.monotonic() + flush_seconds
+                if len(batch) >= batch_size:
+                    _flush(batch)
+                    deadline = None
+
+            if time.monotonic() >= next_prune:
+                next_prune = time.monotonic() + setting('ACTIVITY_LOG_PRUNE_SECONDS')
+                _prune()
+        except Exception:
+            # Thread ölmesin: ölürse elindeki parti kaybolur ve bir sonraki
+            # isteğe kadar hiçbir şey yazılmaz.
+            logger.warning('activity log writer döngüsü hata verdi', exc_info=True)
+            del batch[:]
+            deadline = None
+            time.sleep(1.0)
+
+
+def _on_write_success():
+    """En az bir satır yazıldı: DB ayakta, sayaç ve bekleme süresi sıfırlanır."""
+    global _consecutive_failures, _pause_seconds
+    _consecutive_failures = 0
+    _pause_seconds = _PAUSE_MIN_SECONDS
+
+
+def _on_write_failure(exc):
+    """Hiçbir satır yazılamadı; üst üste yeterince olursa loglamaya ara ver."""
+    global _consecutive_failures, _paused_until, _pause_seconds
+    _consecutive_failures += 1
+    logger.warning('activity log flush failed (%d): %s', _consecutive_failures, exc)
+    if _consecutive_failures < _MAX_CONSECUTIVE_FAILURES:
+        return
+    _paused_until = time.monotonic() + _pause_seconds
+    logger.error(
+        'activity log %.0f saniye duraklatıldı (art arda %d yazma hatası)',
+        _pause_seconds, _consecutive_failures,
+    )
+    # Hata sürerse bekleme ikiye katlanır; düzelirse _on_write_success sıfırlar.
+    _pause_seconds = min(_pause_seconds * 2, _PAUSE_MAX_SECONDS)
+    _consecutive_failures = 0
+
+
+def _insert(rows, budget):
+    """Satırları yazar; hata olursa partiyi ikiye bölerek yeniden dener.
+
+    Tek bir bozuk satır (ör. silinmiş kullanıcıya FK) yüzünden partinin tamamı
+    kaybolmasın diye. DB tamamen kapalıysa boşuna uğraşmamak için `budget`
+    hem deneme sayısını hem geçen süreyi sınırlar; sınır dolunca kalan satırlar
+    düşürülür.
+
+    Dönüş: (yazılan, düşürülen).
+    """
+    from .models import ActivityLog
+
+    if not rows:
+        return 0, 0
+
+    budget['attempts'] += 1
+    try:
+        ActivityLog.objects.bulk_create(rows, batch_size=200)
+        return len(rows), 0
+    except Exception as exc:
+        budget['error'] = exc
+        if len(rows) == 1:
+            logger.warning('activity log satırı yazılamadı, düşürüldü: %s', exc)
+            return 0, 1
+        if not isinstance(exc, _ROW_LEVEL_ERRORS):
+            # Suçlu satır değil veritabanı; bölmek sadece zaman kaybı.
+            return 0, len(rows)
+        # DB tamamen kapalıysa bölmenin faydası yok: sınırı aşınca vazgeç.
+        if budget['attempts'] >= _SALVAGE_MAX_ATTEMPTS or \
+                time.monotonic() >= budget['deadline']:
+            return 0, len(rows)
+
+    mid = len(rows) // 2
+    ok_a, bad_a = _insert(rows[:mid], budget)
+    ok_b, bad_b = _insert(rows[mid:], budget)
+    return ok_a + ok_b, bad_a + bad_b
+
+
+def _build_row(item):
+    """Kuyruktaki dict'ten ActivityLog nesnesi kurar; kuramazsa None döner.
+
+    Bozuk tek bir payload (ör. `enqueue` doğrudan yanlış anahtarla çağrılmış)
+    yüzünden writer thread'i öldürüp elindeki partiyi kaybetmemek için ayrı
+    fonksiyon ve ayrı try/except.
+    """
+    from .models import ActivityLog
+
+    try:
+        item['ip'] = _clean_ip(item.get('ip'))
+        if 'is_bot' not in item:
+            item['is_bot'] = is_bot(item.get('user_agent', ''))
+        return ActivityLog(**item)
+    except Exception as exc:
+        logger.warning('activity log payload kurulamadı, düşürüldü: %s', exc)
+        return None
+
+
+def _flush(batch):
+    if not batch:
+        return
+
+    rows = []
+    for item in batch:
+        row = _build_row(item)
+        if row is not None:
+            rows.append(row)
+    del batch[:]
+    if not rows:
+        return
+    try:
+        written = dropped = 0
+        error = None
+        for attempt in range(_MAX_WRITE_ATTEMPTS):
+            budget = {
+                'attempts': 0,
+                'deadline': time.monotonic() + _SALVAGE_SECONDS,
+                'error': None,
+            }
+            written, dropped = _insert(rows, budget)
+            error = budget['error']
+            if written or not isinstance(error, _TRANSIENT_ERRORS):
+                break
+            if attempt + 1 < _MAX_WRITE_ATTEMPTS:
+                # Parti bölünmediği için `rows` bozulmadan duruyor: kilit
+                # kalkmış olabilir, olduğu gibi tekrar dene.
+                close_old_connections()
+                time.sleep(_RETRY_SECONDS)
+
+        if dropped:
+            logger.warning('activity log: %d satır kurtarılamadı', dropped)
+        if written:
+            _on_write_success()
+        elif error is not None:
+            _on_write_failure(error)
+    except Exception as exc:
+        # _insert dışında beklenmedik bir hata (ör. model import'u).
+        _on_write_failure(exc)
+    finally:
+        # CONN_MAX_AGE'e uy: bu thread'in SQLite bağlantısını boşta tutma.
+        close_old_connections()
+
+
+# Tek seferde silinecek satır sayısı: uzun bir DELETE ile SQLite'ı kilitlemeyelim.
+_PRUNE_CHUNK = 2000
+
+
+def prune_logs(days=None, chunk=_PRUNE_CHUNK):
+    """Saklama süresini aşan kayıtları parça parça siler, silinen sayıyı döner.
+
+    Üç yerden çağrılır: writer thread (saatlik), `prune_activity_logs` komutu
+    ve admin'deki toplu işlem. Tek bir dev DELETE yerine parçalı silmek
+    SQLite'ın yazma kilidini uzun süre tutmasını engeller.
+    """
+    if days is None:
+        days = setting('ACTIVITY_LOG_RETENTION_DAYS')
+    if not days:
+        return 0
+
+    from .models import ActivityLog
+
+    cutoff = timezone.now() - timedelta(days=days)
+    deleted = 0
+    while True:
+        ids = list(
+            ActivityLog.objects.filter(timestamp__lt=cutoff)
+            .values_list('id', flat=True)[:chunk]
+        )
+        if not ids:
+            break
+        count, _ = ActivityLog.objects.filter(id__in=ids).delete()
+        deleted += count
+        if len(ids) < chunk:
+            break
+    return deleted
+
+
+def _prune():
+    """Writer thread'in saatlik çağırdığı sarmalayıcı."""
+    try:
+        prune_logs()
+    except Exception as exc:
+        logger.warning('activity log prune failed: %s', exc)
+    finally:
+        close_old_connections()
+
+
+def _shutdown(timeout=5):
+    """Process kapanırken kuyrukta kalanları yaz."""
+    q = _queue
+    if q is None:
+        return
+
+    worker = _worker
+    if worker is None or not worker.is_alive():
+        if q.empty():
+            return
+        # Thread ölmüş ama kuyrukta kayıt var: yazacak birini geri getir.
+        q = _ensure_worker()
+        worker = _worker
+        if worker is None or not worker.is_alive():
+            return
+
+    try:
+        q.put_nowait(_SENTINEL)
+    except queue.Full:
+        # Kuyruk tıka basa dolu; sentinel'e yer yok. Thread zaten yazıyor,
+        # boşalmasını bekleyip çıkmak yeterli.
+        worker.join(timeout=timeout)
+        return
+    worker.join(timeout=timeout)
+
+
+def flush_now(timeout=5):
+    """Testler/komutlar için: kuyruğu boşalt.
+
+    Writer thread sentinel'i görüp durur; bir sonraki `enqueue` onu
+    `_ensure_worker` üzerinden yeniden başlatır.
+    """
+    _shutdown(timeout)

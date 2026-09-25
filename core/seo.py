@@ -5,6 +5,8 @@ from django.http import HttpResponse, HttpResponseNotFound
 
 from words.models import Word, Category
 
+from .http import is_bot
+
 
 _ROBOTS_TXT = (
     "User-agent: GPTBot\n"
@@ -82,25 +84,11 @@ def sitemap_xml(request):
         content_type='application/xml',
     )
 
-# --- BOT DETECTION ---
-
-BOT_SPECIFIC = [
-    'googlebot', 'googlebot-image', 'google-inspectiontool',
-    'oai-searchbot', 'chatgpt-user',
-    'bingbot', 'yandexbot', 'duckduckbot', 'baiduspider',
-    'slurp', 'facebookexternalhit', 'linkedinbot',
-    'whatsapp', 'telegrambot', 'discordbot', 'applebot',
-]
-BOT_GENERIC = ['bot', 'crawler', 'spider', 'scraper', 'preview']
-
-def _is_bot(ua):
-    ua = (ua or '').lower()
-    return any(p in ua for p in BOT_SPECIFIC) or any(p in ua for p in BOT_GENERIC)
 
 
 @permission_classes([])
 def index_view(request):
-    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+    if is_bot(request.META.get('HTTP_USER_AGENT')):
         words = Word.objects.filter(status='approved').select_related('user').order_by('-timestamp')[:50]
         response = render(request, 'bot_index.html', {'words': words})
     else:
@@ -111,7 +99,7 @@ def index_view(request):
 
 @permission_classes([])
 def category_view(request, slug):
-    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+    if is_bot(request.META.get('HTTP_USER_AGENT')):
         category = get_object_or_404(Category, slug=slug)
         words = Word.objects.filter(status='approved', categories=category).select_related('user').order_by('-timestamp')[:50]
         response = render(request, 'bot_category.html', {'category': category, 'words': words})
@@ -123,7 +111,7 @@ def category_view(request, slug):
 
 @permission_classes([])
 def word_detail(request, word_slug):
-    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+    if is_bot(request.META.get('HTTP_USER_AGENT')):
         word = get_object_or_404(
             Word.objects.select_related('user').prefetch_related('categories'),
             slug=word_slug,
@@ -138,6 +126,6 @@ def word_detail(request, word_slug):
 
 @permission_classes([])
 def spa_catchall(request, *args, **kwargs):
-    if _is_bot(request.META.get('HTTP_USER_AGENT')):
+    if is_bot(request.META.get('HTTP_USER_AGENT')):
         return HttpResponseNotFound()
     return render(request, 'index.html')

@@ -19,5 +19,11 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        # Aktivite logunun writer thread'i buradan uyarı basıyor.
+        'logs': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
