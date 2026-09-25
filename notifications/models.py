@@ -8,12 +8,8 @@ class Notification(models.Model):
         ('word_dislike', 'Word Dislike'),
         ('comment_like', 'Comment Like'),
         ('comment_dislike', 'Comment Dislike'),
-        ('challenge_like', 'Challenge Like'),
-        ('challenge_dislike', 'Challenge Dislike'),
         ('new_comment', 'New Comment'),
-        ('challenge_win', 'Challenge Win'),
         ('word_rejected', 'Word Rejected'),
-        ('challenge_rejected', 'Challenge Rejected'),
     ]
 
     recipient = models.ForeignKey(
@@ -33,7 +29,6 @@ class Notification(models.Model):
 
     word = models.ForeignKey('words.Word', on_delete=models.CASCADE, null=True, blank=True)
     comment = models.ForeignKey('words.Comment', on_delete=models.CASCADE, null=True, blank=True)
-    challenge_comment = models.ForeignKey('challenge.ChallengeComment', on_delete=models.CASCADE, null=True, blank=True)
 
     message = models.CharField(max_length=300, blank=True, default='')
     is_read = models.BooleanField(default=False, db_index=True)
