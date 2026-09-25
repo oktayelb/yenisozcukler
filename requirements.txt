@@ -4,6 +4,7 @@ charset-normalizer==3.4.7
 django==6.0.5
 django-ratelimit==4.1.0
 djangorestframework==3.17.1
+gunicorn==23.0.0
 idna==3.17
 python-decouple==3.8
 requests==2.34.2
