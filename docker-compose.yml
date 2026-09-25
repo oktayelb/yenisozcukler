@@ -8,5 +8,5 @@ services:
     environment:
       DB_PATH: /data/sozluk.db
     volumes:
-      - ./data:/data:z
+      - ${DATA_DIR:-./data}:/data:z
     restart: unless-stopped
