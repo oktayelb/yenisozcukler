@@ -10,7 +10,6 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('challenge', '0008_rename_challenge_cc_challenge_score_idx_core_challe_challen_ff213f_idx'),
         ('words', '0004_rename_comment_tables'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
@@ -24,13 +23,12 @@ class Migration(migrations.Migration):
                 name='Notification',
                 fields=[
                     ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                    ('notification_type', models.CharField(choices=[('word_like', 'Word Like'), ('word_dislike', 'Word Dislike'), ('comment_like', 'Comment Like'), ('comment_dislike', 'Comment Dislike'), ('challenge_like', 'Challenge Like'), ('challenge_dislike', 'Challenge Dislike'), ('new_comment', 'New Comment'), ('challenge_win', 'Challenge Win'), ('word_rejected', 'Word Rejected'), ('challenge_rejected', 'Challenge Rejected')], max_length=20)),
+                    ('notification_type', models.CharField(choices=[('word_like', 'Word Like'), ('word_dislike', 'Word Dislike'), ('comment_like', 'Comment Like'), ('comment_dislike', 'Comment Dislike'), ('new_comment', 'New Comment'), ('word_rejected', 'Word Rejected')], max_length=20)),
                     ('message', models.CharField(blank=True, default='', max_length=300)),
                     ('is_read', models.BooleanField(db_index=True, default=False)),
                     ('is_active', models.BooleanField(db_index=True, default=True)),
                     ('timestamp', models.DateTimeField(auto_now_add=True, db_index=True)),
                     ('actor', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                    ('challenge_comment', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='challenge.challengecomment')),
                     ('comment', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='words.comment')),
                     ('recipient', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='notifications', to=settings.AUTH_USER_MODEL)),
                     ('word', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='words.word')),

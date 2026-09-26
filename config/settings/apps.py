@@ -11,5 +11,4 @@ INSTALLED_APPS = [
     'notifications',
     'core',
     'logs',
-    'challenge',
 ]

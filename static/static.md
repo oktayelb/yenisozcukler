@@ -14,7 +14,7 @@ All stylesheets are imported through `style.css` in cascade order.
 | **variables.css** | CSS custom properties: fonts (`--font-heading`, `--font-body`), spacing, z-index layers (1-9999), and full color palette for both light and dark modes. |
 | **layout.css** | Structural skeleton: body defaults, scrollbar styling, `.app-wrapper` max-width (1200px), header, and top app bar layout. |
 | **components.css** | Reusable UI elements: `.spinner`, `.word-card` (hover/animation states), buttons, form inputs, sort bar, category pills, vote controls, filter banners, notification alerts, contribution form, and the envelope submit animation. |
-| **modals.css** | All modal/overlay styles: `.modal-backdrop`, `.auth-box`, `.about-box`, profile/edit-profile/my-words modals, comment detail view (`.full-comment-view`), add-example modal, and challenge discussion view. Scale/fade transitions. |
+| **modals.css** | All modal/overlay styles: `.modal-backdrop`, `.auth-box`, `.about-box`, profile/edit-profile/my-words modals, comment detail view (`.full-comment-view`), and add-example modal. Scale/fade transitions. |
 | **responsive.css** | Media queries for screens <= 900px. Adjusts form layouts, header sizing, modal dimensions, card spacing, and button sizes for mobile. |
 
 **Load order matters** because later files rely on variables defined in `variables.css` and override component styles in `responsive.css`.
@@ -33,7 +33,7 @@ All stylesheets are imported through `style.css` in cascade order.
 
 | File | Role |
 |---|---|
-| **state.js** | Shared application state. Exports constants (`THEME_KEY`, `ITEMS_PER_PAGE`, `COMMENTS_PER_PAGE`, `CHALLENGE_COMMENTS_PER_PAGE`), a mutable `state` object holding all page-level variables (current page, sort, filters, active modals, auth mode, etc.), `isUserLoggedIn` (read from DOM), and a shared `pendingVotes` map for vote debouncing. |
+| **state.js** | Shared application state. Exports constants (`THEME_KEY`, `ITEMS_PER_PAGE`, `COMMENTS_PER_PAGE`), a mutable `state` object holding all page-level variables (current page, sort, filters, active modals, auth mode, etc.), `isUserLoggedIn` (read from DOM), and a shared `pendingVotes` map for vote debouncing. |
 | **utils.js** | Pure utility functions with no dependencies: `escapeHTML` (XSS prevention), `getCSRFToken` (reads cookie), `showCustomAlert` (toast notifications), `apiRequest` (fetch wrapper with CSRF, JSON parsing, error handling), `updateCount` (character counter for textarea). |
 | **theme.js** | Reads saved theme from `localStorage`, applies dark/light mode to `<body>`, and binds the toggle button. |
 | **sort.js** | Sets up sort bar click handlers, tracks active sort in `state.currentSort`, and triggers a feed refetch on change. |
@@ -47,7 +47,6 @@ All stylesheets are imported through `style.css` in cascade order.
 | **example.js** | "Add Example" modal for words that lack one. Submits to `/api/example` and live-updates the card in the DOM without a page reload. |
 | **comments.js** | Opens the full-screen comment detail view for a word. Loads paginated comments from `/api/comments/{id}`, renders each with author badge and vote controls, and handles new comment submission. |
 | **profile.js** | Profile modal (stats: word count, comment count, total score), "My Words" modal (fetches user's words and renders them as cards), edit profile modal (username change via `/api/username`, password change via `/api/password`). |
-| **challenge.js** | Translation Challenge feature: collapsible challenge box, fetches challenges from `/api/challenges`, renders challenge items, challenge suggestion form, discussion view with its own comment system and vote controls (separate from word comments). |
 
 ---
 
@@ -70,8 +69,7 @@ app.js
  ├── form ───────────> state, utils
  ├── example ────────> state, utils, modal
  ├── comments ───────> state, utils, voting, auth, profile
- ├── profile ────────> state, utils, modal, feed
- └── challenge ──────> state, utils, auth, profile
+ └── profile ────────> state, utils, modal, feed
 ```
 
 ### Circular Dependencies
@@ -88,7 +86,7 @@ These cycles exist but are safe because all cross-references are accessed only i
 state.js (single source of truth)
    │
    ├── Read by: every module
-   ├── Written by: sort, auth, feed, form, categories, comments, profile, challenge, modal, example
+   ├── Written by: sort, auth, feed, form, categories, comments, profile, modal, example
    │
    └── state object properties:
          currentPage, currentSort, currentSearchQuery     ← feed/sort control
@@ -98,8 +96,6 @@ state.js (single source of truth)
          currentWordId, activeCardClone, currentCommentPage ← comment detail view
          currentProfileUser, currentUserUsername            ← profile modals
          wordIdForExample                                  ← add-example modal
-         challengeExpanded, activeChallengeView,            ← challenge feature
-         currentChallengeId, currentChallengeCommentPage
 ```
 
 ---

@@ -95,7 +95,7 @@ function createNotifItem(n) {
     div.className = 'notif-item' + (n.is_read ? '' : ' notif-unread');
 
     const type = n.notification_type;
-    const wordRouteTypes = ['word_like', 'word_dislike', 'comment_like', 'comment_dislike', 'new_comment', 'challenge_win'];
+    const wordRouteTypes = ['word_like', 'word_dislike', 'comment_like', 'comment_dislike', 'new_comment'];
 
     const isWordClickable = wordRouteTypes.includes(type) && n.word_id;
 
@@ -128,18 +128,13 @@ function getNotifIcon(type) {
     switch (type) {
         case 'word_like':
         case 'comment_like':
-        case 'challenge_like':
             return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>';
         case 'word_dislike':
         case 'comment_dislike':
-        case 'challenge_dislike':
             return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#e74c3c" stroke-width="2"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></svg>';
         case 'new_comment':
             return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
-        case 'challenge_win':
-            return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#f1c40f" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
         case 'word_rejected':
-        case 'challenge_rejected':
             return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#e74c3c" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
         default:
             return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--text-muted)" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>';
@@ -159,22 +154,10 @@ function buildNotifText(n) {
             return `${actor} ${word} sözcüğündeki yorumunuzu hoş buldu.`;
         case 'comment_dislike':
             return `${actor} ${word} sözcüğündeki yorumunuzu boş buldu.`;
-        case 'challenge_like': {
-            const suggested = n.challenge_suggested_word ? `<strong>${escapeHTML(n.challenge_suggested_word)}</strong> ` : '';
-            return `${actor} ${suggested}yarışma önerinizi hoş buldu.`;
-        }
-        case 'challenge_dislike': {
-            const suggested = n.challenge_suggested_word ? `<strong>${escapeHTML(n.challenge_suggested_word)}</strong> ` : '';
-            return `${actor} ${suggested}yarışma önerinizi boş buldu.`;
-        }
         case 'new_comment':
             return `${actor} ${word} sözcüğünüze yorum yaptı.`;
-        case 'challenge_win':
-            return escapeHTML(n.message);
         case 'word_rejected':
             return `${word} sözcüğünüz reddedildi: "${escapeHTML(n.message)}"`;
-        case 'challenge_rejected':
-            return `Yarışma öneriniz reddedildi: "${escapeHTML(n.message)}"`;
         default:
             return escapeHTML(n.message || 'Bildirim');
     }

@@ -30,7 +30,7 @@ def get_notifications(request):
 
     # Filtering strictly for active notifications to prevent spam
     qs = Notification.objects.filter(recipient=request.user, is_active=True).select_related(
-        'actor', 'word', 'comment', 'challenge_comment', 'challenge_comment__challenge'
+        'actor', 'word', 'comment'
     )
     paginator = Paginator(qs, limit)
     try:
