@@ -1,9 +1,12 @@
 # logs/models.py
 """Aktivite logu.
 
-Bu uygulamanın tek modeli: her HTTP isteği için bir satır. Yazma işi
-`logs.logger` içindeki arka plan kuyruğundan toplu (bulk) yapılır, istek
-thread'i veritabanına dokunmaz.
+`ActivityLog`: her HTTP isteği için bir satır. Yazma işi `logs.logger`
+içindeki arka plan kuyruğundan toplu (bulk) yapılır, istek thread'i
+veritabanına dokunmaz.
+
+`BannedIP`: siteye hiç giremeyen IP'ler; aktivite logu admin'inden yönetilir
+(bkz. `logs.middleware.BannedIPMiddleware`).
 """
 
 from django.contrib.auth.models import User
@@ -84,3 +87,27 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f'{self.timestamp:%d.%m.%Y %H:%M:%S} {self.action} {self.path}'
+
+
+class BannedIP(models.Model):
+    """Bu IP'lerden gelen her istek 403 alır.
+
+    Liste her process'te bellekte tutulur ve kısa aralıklarla tazelenir
+    (bkz. `logs.middleware.BannedIPMiddleware`); istek başına sorgu atılmaz.
+    """
+
+    ip = models.GenericIPAddressField(
+        unique=True, verbose_name='IP',
+        help_text="Bu IP'den gelen istekler 403 alır. Değişiklik en geç "
+                  "30 saniye içinde tüm worker'larda etkili olur.",
+    )
+    reason = models.CharField(max_length=200, blank=True, default='', verbose_name='Sebep')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Yasaklanma zamanı')
+
+    class Meta:
+        verbose_name = 'Yasaklı IP'
+        verbose_name_plural = "Yasaklı IP'ler"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.ip

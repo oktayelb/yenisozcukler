@@ -2,7 +2,6 @@ import atexit
 import logging
 import os
 import queue
-import random
 import threading
 import time
 from datetime import timedelta
@@ -47,10 +46,6 @@ _DEFAULTS = {
     'ACTIVITY_LOG_BATCH_SIZE': _env('ACTIVITY_LOG_BATCH_SIZE', 100, int),
     # Batch dolmasa da en geç bu kadar saniyede bir yaz.
     'ACTIVITY_LOG_FLUSH_SECONDS': _env('ACTIVITY_LOG_FLUSH_SECONDS', 2.0, float),
-    # Bu günden eski kayıtlar otomatik silinir (0 = hiç silme).
-    'ACTIVITY_LOG_RETENTION_DAYS': _env('ACTIVITY_LOG_RETENTION_DAYS', 30, int),
-    # Saklama süresi kontrolünün writer thread'inde tekrarlanma aralığı.
-    'ACTIVITY_LOG_PRUNE_SECONDS': 3600,
     # Bu ön ekle başlayan yollar hiç loglanmaz.
     'ACTIVITY_LOG_EXCLUDE_PREFIXES': ('/static/', '/favicon.ico'),
 }
@@ -153,6 +148,7 @@ def log_activity(request, action=None, detail=None, username=None, user=None,
         pk = getattr(user, 'pk', None)
         if pk is not None:
             req._activity_user_id = pk
+            req._activity_user_is_staff = _is_staff(user)
             if not getattr(req, '_activity_username', ''):
                 req._activity_username = str(user)[:150]
 
@@ -194,8 +190,12 @@ def _resolve_action(request, path):
 
 # --- Middleware'in çağırdığı kayıt fonksiyonu ---------------------------------
 
+def _is_staff(user):
+    return bool(getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False))
+
+
 def _resolve_user(request):
-    """(user_id, username) döndürür; anonim ziyaretçide (None, '').
+    """(user_id, username, is_staff) döndürür; anonim ziyaretçide (None, '', False).
 
     İki kaynağa bakar:
 
@@ -215,30 +215,37 @@ def _resolve_user(request):
     """
     user_id = getattr(request, '_activity_user_id', None)
     username = getattr(request, '_activity_username', '') or ''
+    is_staff = getattr(request, '_activity_user_is_staff', False)
     if user_id is not None and username:
-        return user_id, username
+        return user_id, username, is_staff
 
     user = getattr(request, 'user', None)
     if user is None:
-        return user_id, username
+        return user_id, username, is_staff
 
     resolved = getattr(user, '_wrapped', None) is not empty
     if not resolved and settings.SESSION_COOKIE_NAME not in request.COOKIES:
-        return user_id, username
+        return user_id, username, is_staff
 
     if user.is_authenticated:
         if user_id is None:
             user_id = user.pk
         if not username:
             username = user.get_username()
-    return user_id, username
+        is_staff = is_staff or _is_staff(user)
+    return user_id, username, is_staff
 
 
 def record_request(request, response, duration_ms):
     if not is_enabled():
         return
     try:
-        user_id, username = _resolve_user(request)
+        user_id, username, is_staff = _resolve_user(request)
+        if is_staff:
+            # Personelin (staff/superuser) eylemleri loglanmaz. Personel
+            # hesabına başarısız giriş denemeleri ise oturum açılmadığı için
+            # yine loglanır.
+            return
         path = request.path
 
         payload = {
@@ -323,7 +330,6 @@ def _drain(q, batch):
 def _run(q):
     batch = []
     deadline = None
-    next_prune = time.monotonic() + random.uniform(60, 300)
 
     while True:
         try:
@@ -332,10 +338,10 @@ def _run(q):
             batch_size = setting('ACTIVITY_LOG_BATCH_SIZE')
             flush_seconds = setting('ACTIVITY_LOG_FLUSH_SECONDS')
 
-            # Boşta beklerken de saklama süresi kontrolü yapılabilsin diye
-            # timeout hiçbir zaman sonsuz değil.
+            # Bekleyen parti yoksa yapılacak iş de yok: yeni kayıt ya da
+            # kapanış sentinel'i gelene kadar bekle.
             if deadline is None:
-                timeout = 60.0
+                timeout = None
             else:
                 timeout = max(0.0, deadline - time.monotonic())
 
@@ -361,10 +367,6 @@ def _run(q):
                 if len(batch) >= batch_size:
                     _flush(batch)
                     deadline = None
-
-            if time.monotonic() >= next_prune:
-                next_prune = time.monotonic() + setting('ACTIVITY_LOG_PRUNE_SECONDS')
-                _prune()
         except Exception:
             # Thread ölmesin: ölürse elindeki parti kaybolur ve bir sonraki
             # isteğe kadar hiçbir şey yazılmaz.
@@ -504,21 +506,23 @@ def _flush(batch):
 _PRUNE_CHUNK = 2000
 
 
-def prune_logs(days=None, chunk=_PRUNE_CHUNK):
-    """Saklama süresini aşan kayıtları parça parça siler, silinen sayıyı döner.
+def prune_logs(days, chunk=_PRUNE_CHUNK, max_seconds=None):
+    """`days` günden eski kayıtları parça parça siler.
 
-    Üç yerden çağrılır: writer thread (saatlik), `prune_activity_logs` komutu
-    ve admin'deki toplu işlem. Tek bir dev DELETE yerine parçalı silmek
-    SQLite'ın yazma kilidini uzun süre tutmasını engeller.
+    Kendiliğinden çalışmaz; yalnızca admin'deki "Logları temizle" sayfası ve
+    `prune_activity_logs` komutu çağırır. `days=0` tüm kayıtları siler.
+    Tek bir dev DELETE yerine parçalı silmek SQLite'ın yazma kilidini uzun
+    süre tutmasını engeller.
+
+    `max_seconds` verilirse süre dolunca durur (admin isteği gunicorn'un
+    timeout'una takılmasın diye); silinmiş parçalar silinmiş kalır.
+
+    Dönüş: (silinen, bitti_mi).
     """
-    if days is None:
-        days = setting('ACTIVITY_LOG_RETENTION_DAYS')
-    if not days:
-        return 0
-
     from .models import ActivityLog
 
     cutoff = timezone.now() - timedelta(days=days)
+    stop_at = None if max_seconds is None else time.monotonic() + max_seconds
     deleted = 0
     while True:
         ids = list(
@@ -526,22 +530,13 @@ def prune_logs(days=None, chunk=_PRUNE_CHUNK):
             .values_list('id', flat=True)[:chunk]
         )
         if not ids:
-            break
+            return deleted, True
         count, _ = ActivityLog.objects.filter(id__in=ids).delete()
         deleted += count
         if len(ids) < chunk:
-            break
-    return deleted
-
-
-def _prune():
-    """Writer thread'in saatlik çağırdığı sarmalayıcı."""
-    try:
-        prune_logs()
-    except Exception as exc:
-        logger.warning('activity log prune failed: %s', exc)
-    finally:
-        close_old_connections()
+            return deleted, True
+        if stop_at is not None and time.monotonic() >= stop_at:
+            return deleted, False
 
 
 def _shutdown(timeout=5):
