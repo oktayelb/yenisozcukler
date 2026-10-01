@@ -1,6 +1,6 @@
 /* --- AUTHENTICATION --- */
 import { state, isUserLoggedIn } from './state.js';
-import { apiRequest, showCustomAlert } from './utils.js';
+import { apiRequest } from './utils.js';
 import { openModal, closeModal } from './modal.js';
 import { openProfileModal } from './profile.js';
 import { submitWord } from './form.js';
@@ -141,8 +141,7 @@ export function handleAuthSubmit() {
     })
     .then(data => {
         closeModal('authModal', true);
-        showCustomAlert(data.message, "success");
-        setTimeout(() => window.location.reload(), 1000);
+        window.location.reload();
     })
     .catch(e => {
         if (err) { err.innerText = e.message; err.style.display = 'block'; }
