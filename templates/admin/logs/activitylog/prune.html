@@ -1,0 +1,53 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} delete-confirmation{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <p>
+    Loglar kendiliğinden silinmez; buradan seçtiğiniz günden eski kayıtları silebilirsiniz.
+    {% if oldest %}En eski kayıt: <b>{{ oldest|date:"d.m.Y H:i" }}</b>.{% else %}Hiç kayıt yok.{% endif %}
+  </p>
+
+  <form method="get">
+    <fieldset class="module aligned">
+      <div class="form-row">
+        {{ form.days.errors }}
+        <div class="flex-container">
+          {{ form.days.label_tag }} {{ form.days }}
+        </div>
+        <div class="help">{{ form.days.help_text }}</div>
+      </div>
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="Kaç kayıt silineceğini göster">
+    </div>
+  </form>
+
+  {% if preview %}
+    {% if preview.count %}
+      <p>
+        <b>{{ preview.cutoff|date:"d.m.Y H:i" }}</b> tarihinden eski
+        <b>{{ preview.count }}</b> log silinecek. Bu işlem geri alınamaz.
+      </p>
+      <form method="post">{% csrf_token %}
+        <input type="hidden" name="days" value="{{ preview.days }}">
+        <input type="submit" value="Evet, sil">
+        <a href="{% url opts|admin_urlname:'changelist' %}" class="button cancel-link">Hayır, geri dön</a>
+      </form>
+    {% else %}
+      <p><b>{{ preview.cutoff|date:"d.m.Y H:i" }}</b> tarihinden eski log yok.</p>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

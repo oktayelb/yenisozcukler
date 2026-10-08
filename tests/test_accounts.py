@@ -207,3 +207,28 @@ class UserProfileTests(TestCase):
     def test_unauthenticated_no_username_param_returns_404(self):
         resp = self.client.get(reverse('get_user_profile'))
         self.assertEqual(resp.status_code, 404)
+
+
+class AdminLoginFormTests(TestCase):
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username='patron', email='', password='Cok-Gizli-1234',
+        )
+
+    def test_admin_login_form_redirects_home_without_logging_in(self):
+        resp = self.client.post(
+            reverse('admin:login'),
+            {'username': 'patron', 'password': 'Cok-Gizli-1234'},
+        )
+        self.assertRedirects(resp, '/', fetch_redirect_response=False)
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_anonymous_admin_visit_ends_on_home(self):
+        resp = self.client.get(reverse('admin:index'), follow=True)
+        self.assertEqual(resp.redirect_chain[-1][0], '/')
+
+    def test_staff_logged_in_on_site_can_open_admin(self):
+        self.client.force_login(self.admin_user)
+        resp = self.client.get(reverse('admin:index'))
+        self.assertEqual(resp.status_code, 200)

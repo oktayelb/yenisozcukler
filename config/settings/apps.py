@@ -1,5 +1,5 @@
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    'config.apps.AdminWithoutLoginFormConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',

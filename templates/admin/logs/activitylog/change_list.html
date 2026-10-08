@@ -1,5 +1,15 @@
 {% extends "admin/change_list.html" %}
 
+{% block object-tools-items %}
+{{ block.super }}
+{% if can_view_banned_ips %}
+<li><a href="{% url 'admin:logs_bannedip_changelist' %}">Yasaklı IP'ler</a></li>
+{% endif %}
+{% if can_prune %}
+<li><a href="{% url 'admin:logs_activitylog_prune' %}">Logları temizle</a></li>
+{% endif %}
+{% endblock %}
+
 {% block object-tools %}
 {{ block.super }}
 {% if activity_stats %}

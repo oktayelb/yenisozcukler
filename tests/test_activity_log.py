@@ -13,7 +13,8 @@ from django.test import TransactionTestCase, override_settings
 from django.urls import reverse
 
 from logs import logger
-from logs.models import ActivityLog
+from logs.middleware import invalidate_banned_ips
+from logs.models import ActivityLog, BannedIP
 
 
 @override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
@@ -110,17 +111,19 @@ class ActivityLogTests(TransactionTestCase):
         self.assertEqual(ActivityLog.objects.count(), 0)
 
     def test_admin_changelist_renders(self):
+        self.client.get('/')  # listede gösterilecek en az bir kayıt (misafir)
+        self.drain()
+
         admin_user = User.objects.create_superuser(
             username='patron', email='', password='Cok-Gizli-1234'
         )
         self.client.force_login(admin_user)
 
-        self.client.get('/')  # listede gösterilecek en az bir kayıt
-        self.drain()
-
         response = self.client.get(reverse('admin:logs_activitylog_changelist'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Son 24 saat')
+        self.assertContains(response, reverse('admin:logs_activitylog_prune'))
+        self.assertContains(response, reverse('admin:logs_bannedip_changelist'))
 
     def test_prune_command_deletes_old_rows(self):
         from datetime import timedelta
@@ -134,6 +137,12 @@ class ActivityLogTests(TransactionTestCase):
 
         self.assertEqual(ActivityLog.objects.count(), 1)
         self.assertEqual(ActivityLog.objects.get().path, '/yeni')
+
+    def test_prune_command_requires_days(self):
+        from django.core.management import CommandError, call_command
+
+        with self.assertRaises(CommandError):
+            call_command('prune_activity_logs', verbosity=0)
 
 
 @override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
@@ -372,7 +381,7 @@ class ActivityLogAttributionTests(TransactionTestCase):
         self.assertEqual(row.action, 'password_change')
         self.assertEqual(row.user_id, user.pk)
 
-    def test_admin_login_is_logged_through_the_auth_signal(self):
+    def test_admin_login_attempt_is_labelled_admin_without_a_login(self):
         User.objects.create_superuser(username='patron2', email='', password=self.PASSWORD)
 
         self.client.post(
@@ -381,19 +390,17 @@ class ActivityLogAttributionTests(TransactionTestCase):
         )
 
         row = self._row('/admin/login/')
-        self.assertEqual(row.action, 'login')
-        self.assertEqual(row.username, 'patron2')
+        self.assertEqual(row.action, 'admin')
+        self.assertEqual(row.username, '')
+        self.assertIsNone(row.user_id)
 
     def test_admin_page_view_is_labelled_admin(self):
-        admin_user = User.objects.create_superuser(
-            username='patron3', email='', password=self.PASSWORD
-        )
-        self.client.force_login(admin_user)
+        # Misafir: personel istekleri hiç loglanmıyor.
         self.client.get('/admin/')
 
         row = self._row('/admin/')
         self.assertEqual(row.action, 'admin')
-        self.assertEqual(row.user_id, admin_user.pk)
+        self.assertIsNone(row.user_id)
 
 
 @override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
@@ -637,3 +644,254 @@ class ActivityLogWriterTests(TransactionTestCase):
             ActivityLogMiddleware(lambda r: None)   # MiddlewareNotUsed atmamalı
         finally:
             logger._paused_until = 0.0
+
+
+@override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
+class ActivityLogStaffTests(TransactionTestCase):
+    """Personelin (staff/superuser) eylemleri loglanmaz."""
+
+    PASSWORD = 'Cok-Gizli-1234'
+
+    def setUp(self):
+        ActivityLog.objects.all().delete()
+
+    def tearDown(self):
+        logger.flush_now()
+        ActivityLog.objects.all().delete()
+
+    def _paths(self):
+        logger.flush_now()
+        return set(ActivityLog.objects.values_list('path', flat=True))
+
+    def test_staff_requests_are_not_logged(self):
+        staff = User.objects.create_user(username='personel', password=self.PASSWORD, is_staff=True)
+        self.client.force_login(staff)
+        self.client.get('/')
+        self.client.get('/api/profile')
+        self.client.get('/admin/')
+        self.assertEqual(self._paths(), set())
+
+    def test_superuser_without_staff_flag_is_not_logged(self):
+        boss = User.objects.create_user(username='patron', password=self.PASSWORD, is_superuser=True)
+        self.client.force_login(boss)
+        self.client.get('/api/profile')
+        self.assertEqual(self._paths(), set())
+
+    def test_staff_login_and_logout_are_not_logged(self):
+        User.objects.create_user(username='personel', password=self.PASSWORD, is_staff=True)
+        with mock.patch('accounts.views.verify_turnstile', return_value=True):
+            response = self.client.post(
+                '/api/login',
+                data={'username': 'personel', 'password': self.PASSWORD},
+                content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 200)
+        # Çıkışta request.user AnonymousUser olur; personel bilgisi sinyalden gelir.
+        self.client.post('/api/logout')
+        self.assertEqual(self._paths(), set())
+
+    def test_failed_login_to_a_staff_account_is_logged(self):
+        User.objects.create_user(username='personel', password=self.PASSWORD, is_staff=True)
+        with mock.patch('accounts.views.verify_turnstile', return_value=True):
+            self.client.post(
+                '/api/login',
+                data={'username': 'personel', 'password': 'yanlis'},
+                content_type='application/json',
+            )
+        logger.flush_now()
+        row = ActivityLog.objects.get(path='/api/login')
+        self.assertEqual(row.action, 'login_failed')
+
+    def test_regular_users_are_still_logged(self):
+        user = User.objects.create_user(username='uye', password=self.PASSWORD)
+        self.client.force_login(user)
+        self.client.get('/api/profile')
+        self.assertEqual(self._paths(), {'/api/profile'})
+
+
+@override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
+class BannedIPTests(TransactionTestCase):
+    """Yasaklı IP'ler siteye giremez; yasak aktivite logu admin'inden verilir."""
+
+    PASSWORD = 'Cok-Gizli-1234'
+
+    def setUp(self):
+        invalidate_banned_ips()
+        ActivityLog.objects.all().delete()
+
+    def tearDown(self):
+        logger.flush_now()
+        ActivityLog.objects.all().delete()
+        # TransactionTestCase tabloyu sinyal göndermeden boşaltır; bellekteki
+        # liste sonraki testlere taşınmasın.
+        invalidate_banned_ips()
+
+    def _get_from(self, ip, path='/'):
+        return self.client.get(path, headers={'cf-connecting-ip': ip})
+
+    def _login_admin(self):
+        admin_user = User.objects.create_superuser(username='patron', email='', password=self.PASSWORD)
+        self.client.force_login(admin_user)
+
+    def test_banned_ip_is_refused_everywhere(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+        self.assertEqual(self._get_from('5.6.7.8', '/api/words').status_code, 403)
+        response = self.client.post(
+            '/api/login', data={'username': 'x', 'password': 'y'},
+            content_type='application/json', headers={'cf-connecting-ip': '5.6.7.8'},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self._get_from('9.9.9.9').status_code, 200)
+
+    def test_refused_request_is_logged_as_blocked(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        self._get_from('5.6.7.8', '/api/words')
+        logger.flush_now()
+
+        row = ActivityLog.objects.get()
+        self.assertEqual(row.action, 'blocked')
+        self.assertEqual(row.detail, 'Yasaklı IP')
+        self.assertEqual(row.status_code, 403)
+        self.assertEqual(row.ip, '5.6.7.8')
+
+    def test_ban_and_unban_take_effect_immediately(self):
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 200)  # liste yüklendi (boş)
+
+        ban = BannedIP.objects.create(ip='5.6.7.8')
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+
+        ban.delete()
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 200)
+
+    def test_other_workers_pick_up_bans_after_the_refresh_interval(self):
+        from logs import middleware
+
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 200)
+        # bulk_create sinyal göndermez: başka bir worker'da yapılmış gibi.
+        BannedIP.objects.bulk_create([BannedIP(ip='5.6.7.8')])
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 200)
+
+        with mock.patch.object(middleware, 'BANNED_IPS_REFRESH_SECONDS', 0):
+            self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+
+    def test_ipv6_spellings_are_matched(self):
+        BannedIP.objects.create(ip='2001:DB8::1')
+        self.assertEqual(self._get_from('2001:db8:0:0::1').status_code, 403)
+
+    def test_admin_action_bans_the_selected_ips(self):
+        self._get_from('5.6.7.8')
+        self._get_from('9.9.9.9')
+        logger.flush_now()
+        row = ActivityLog.objects.get(ip='5.6.7.8')
+
+        self._login_admin()
+        response = self.client.post(reverse('admin:logs_activitylog_changelist'), {
+            'action': 'ban_selected_ips',
+            '_selected_action': [row.pk],
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(set(BannedIP.objects.values_list('ip', flat=True)), {'5.6.7.8'})
+
+        self.client.logout()
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+        self.assertEqual(self._get_from('9.9.9.9').status_code, 200)
+
+    def test_admin_action_does_not_ban_your_own_ip(self):
+        self.client.get('/')  # başlıksız istek: IP = REMOTE_ADDR (127.0.0.1)
+        logger.flush_now()
+        row = ActivityLog.objects.get()
+
+        self._login_admin()
+        self.client.post(reverse('admin:logs_activitylog_changelist'), {
+            'action': 'ban_selected_ips',
+            '_selected_action': [row.pk],
+        })
+        self.assertFalse(BannedIP.objects.exists())
+
+    def test_admin_form_refuses_your_own_ip(self):
+        self._login_admin()
+        add_url = reverse('admin:logs_bannedip_add')
+
+        response = self.client.post(add_url, {'ip': '127.0.0.1', 'reason': ''})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['adminform'].form.errors)
+        self.assertFalse(BannedIP.objects.exists())
+
+        response = self.client.post(add_url, {'ip': '5.6.7.8', 'reason': 'spam'})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+
+
+@override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
+class ActivityLogPruneTests(TransactionTestCase):
+    """Loglar yalnızca elle silinir: admin sayfası ya da komut."""
+
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        ActivityLog.objects.all().delete()
+        now = timezone.now()
+        ActivityLog.objects.create(path='/cok-eski', timestamp=now - timedelta(days=90))
+        ActivityLog.objects.create(path='/eski', timestamp=now - timedelta(days=10))
+        ActivityLog.objects.create(path='/yeni')
+
+    def tearDown(self):
+        logger.flush_now()
+        ActivityLog.objects.all().delete()
+
+    def _paths(self):
+        return set(ActivityLog.objects.values_list('path', flat=True))
+
+    def _login_admin(self):
+        admin_user = User.objects.create_superuser(username='patron', email='', password='Cok-Gizli-1234')
+        self.client.force_login(admin_user)
+
+    def test_writer_does_not_prune_on_its_own(self):
+        logger.enqueue({
+            'timestamp': ActivityLog.objects.get(path='/yeni').timestamp,
+            'action': 'page_view', 'user_id': None, 'username': '', 'ip': '1.2.3.4',
+            'method': 'GET', 'path': '/kuyruktan', 'query': '', 'status_code': 200,
+            'duration_ms': 1, 'detail': '', 'user_agent': '',
+        })
+        logger.flush_now()
+        self.assertIn('/cok-eski', self._paths())
+
+    def test_prune_page_previews_without_deleting(self):
+        self._login_admin()
+        response = self.client.get(reverse('admin:logs_activitylog_prune'), {'days': 30})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['preview']['count'], 1)
+        self.assertContains(response, 'Evet, sil')
+        self.assertEqual(self._paths(), {'/cok-eski', '/eski', '/yeni'})
+
+    def test_prune_page_deletes_on_post(self):
+        self._login_admin()
+        response = self.client.post(reverse('admin:logs_activitylog_prune'), {'days': 30})
+        self.assertRedirects(response, reverse('admin:logs_activitylog_changelist'))
+        self.assertEqual(self._paths(), {'/eski', '/yeni'})
+
+    def test_prune_page_rejects_negative_days(self):
+        self._login_admin()
+        response = self.client.post(reverse('admin:logs_activitylog_prune'), {'days': -1})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['form'].errors)
+        self.assertEqual(self._paths(), {'/cok-eski', '/eski', '/yeni'})
+
+    def test_prune_page_needs_delete_permission(self):
+        staff = User.objects.create_user(username='personel', password='Cok-Gizli-1234', is_staff=True)
+        self.client.force_login(staff)
+        response = self.client.post(reverse('admin:logs_activitylog_prune'), {'days': 0})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(len(self._paths()), 3)
+
+    def test_zero_days_deletes_everything(self):
+        deleted, finished = logger.prune_logs(0)
+        self.assertEqual((deleted, finished), (3, True))
+        self.assertEqual(self._paths(), set())
+
+    def test_time_limit_stops_between_chunks(self):
+        deleted, finished = logger.prune_logs(0, chunk=1, max_seconds=0)
+        self.assertEqual((deleted, finished), (1, False))
+        self.assertEqual(ActivityLog.objects.count(), 2)
