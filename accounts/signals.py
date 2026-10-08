@@ -37,7 +37,7 @@ def anonymize_deleted_user_content(sender, instance, **kwargs):
 
 
 # --- AKTİVİTE LOGU SİNYALLERİ ---
-# Bunlar sayesinde admin panelinden yapılan giriş/çıkışlar da API'dekilerle
+# Bunlar sayesinde admin panelinden yapılan çıkışlar da API'dekilerle
 # aynı log satırlarına düşer. Sadece request üzerine etiket koyarlar;
 # satırı ActivityLogMiddleware yazar.
 

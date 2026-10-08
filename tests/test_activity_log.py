@@ -381,17 +381,18 @@ class ActivityLogAttributionTests(TransactionTestCase):
         self.assertEqual(row.action, 'password_change')
         self.assertEqual(row.user_id, user.pk)
 
-    def test_failed_admin_login_is_logged_through_the_auth_signal(self):
+    def test_admin_login_attempt_is_labelled_admin_without_a_login(self):
         User.objects.create_superuser(username='patron2', email='', password=self.PASSWORD)
 
         self.client.post(
             '/admin/login/',
-            {'username': 'patron2', 'password': 'yanlis', 'next': '/admin/'},
+            {'username': 'patron2', 'password': self.PASSWORD, 'next': '/admin/'},
         )
 
         row = self._row('/admin/login/')
-        self.assertEqual(row.action, 'login_failed')
-        self.assertEqual(row.username, 'patron2')
+        self.assertEqual(row.action, 'admin')
+        self.assertEqual(row.username, '')
+        self.assertIsNone(row.user_id)
 
     def test_admin_page_view_is_labelled_admin(self):
         # Misafir: personel istekleri hiç loglanmıyor.

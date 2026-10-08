@@ -176,12 +176,12 @@ def _resolve_action(request, path):
 
     match = getattr(request, 'resolver_match', None)
     if match is not None:
-        mapped = URL_ACTION_MAP.get(match.url_name)
-        if mapped:
-            return mapped
         if (match.app_names and 'admin' in match.app_names) or \
                 (match.namespaces and 'admin' in match.namespaces):
             return 'admin'
+        mapped = URL_ACTION_MAP.get(match.url_name)
+        if mapped:
+            return mapped
 
     if path.startswith('/api/'):
         return 'api'
