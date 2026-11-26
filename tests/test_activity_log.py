@@ -908,6 +908,7 @@ class BannedIPTests(TransactionTestCase):
         self.assertEqual(response.status_code, 403)
         self.assertContains(response, 'cf-turnstile', status_code=403)
         self.assertContains(response, 'value="/sozcuk/deneme/"', status_code=403)
+        self.assertEqual(response['Cache-Control'], 'no-store')
 
     def test_banned_api_request_gets_json(self):
         BannedIP.objects.create(ip='5.6.7.8')

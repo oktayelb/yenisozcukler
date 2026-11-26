@@ -42,7 +42,9 @@ def challenge_page(next_url, error='', status=403):
         'next': next_url,
         'error': error,
     })
-    return HttpResponse(html, status=status)
+    response = HttpResponse(html, status=status)
+    response['Cache-Control'] = 'no-store'
+    return response
 
 
 def blocked_response(request):
