@@ -438,6 +438,15 @@ def _insert(rows, budget):
     return ok_a + ok_b, bad_a + bad_b
 
 
+BOT_ONLY_PATHS = ('/robots.txt', '/sitemap.xml')
+
+
+def _looks_like_bot(item):
+    if item.get('path') in BOT_ONLY_PATHS:
+        return True
+    return is_bot(item.get('user_agent', ''))
+
+
 def _build_row(item):
     """Kuyruktaki dict'ten ActivityLog nesnesi kurar; kuramazsa None döner.
 
@@ -450,7 +459,7 @@ def _build_row(item):
     try:
         item['ip'] = _clean_ip(item.get('ip'))
         if 'is_bot' not in item:
-            item['is_bot'] = is_bot(item.get('user_agent', ''))
+            item['is_bot'] = _looks_like_bot(item)
         return ActivityLog(**item)
     except Exception as exc:
         logger.warning('activity log payload kurulamadı, düşürüldü: %s', exc)

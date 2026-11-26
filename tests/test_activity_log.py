@@ -104,6 +104,38 @@ class ActivityLogTests(TransactionTestCase):
         log = ActivityLog.objects.get()
         self.assertTrue(log.is_bot)
 
+    def test_robots_and_sitemap_requests_are_flagged_as_bots(self):
+        browser = 'Mozilla/5.0 (X11; Linux x86_64)'
+        self.client.get('/robots.txt', headers={'user-agent': browser})
+        self.client.get('/sitemap.xml', headers={'user-agent': browser})
+        self.client.get('/', headers={'user-agent': browser})
+        self.drain()
+
+        self.assertTrue(ActivityLog.objects.get(path='/robots.txt').is_bot)
+        self.assertTrue(ActivityLog.objects.get(path='/sitemap.xml').is_bot)
+        self.assertFalse(ActivityLog.objects.get(path='/').is_bot)
+
+    def test_admin_changelist_hides_bots_by_default(self):
+        ActivityLog.objects.create(path='/insan-sayfasi', is_bot=False)
+        ActivityLog.objects.create(path='/bot-sayfasi', is_bot=True)
+        admin_user = User.objects.create_superuser(
+            username='patron', email='', password='Cok-Gizli-1234'
+        )
+        self.client.force_login(admin_user)
+        url = reverse('admin:logs_activitylog_changelist')
+
+        default = self.client.get(url)
+        self.assertContains(default, '/insan-sayfasi')
+        self.assertNotContains(default, '/bot-sayfasi')
+
+        included = self.client.get(url, {'bots': 'include'})
+        self.assertContains(included, '/insan-sayfasi')
+        self.assertContains(included, '/bot-sayfasi')
+
+        only = self.client.get(url, {'bots': 'only'})
+        self.assertNotContains(only, '/insan-sayfasi')
+        self.assertContains(only, '/bot-sayfasi')
+
     def test_disabled_logging_writes_nothing(self):
         with override_settings(ACTIVITY_LOG_ENABLED=False):
             self.client.get('/')

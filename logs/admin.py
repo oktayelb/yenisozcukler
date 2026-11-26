@@ -66,6 +66,38 @@ class StatusGroupFilter(admin.SimpleListFilter):
         return queryset
 
 
+class BotFilter(admin.SimpleListFilter):
+    title = 'Bot'
+    parameter_name = 'bots'
+
+    def lookups(self, request, model_admin):
+        return [
+            ('include', 'Botlar dahil'),
+            ('only', 'Yalnızca botlar'),
+        ]
+
+    def choices(self, changelist):
+        yield {
+            'selected': self.value() is None,
+            'query_string': changelist.get_query_string(remove=[self.parameter_name]),
+            'display': 'Botlar hariç',
+        }
+        for lookup, title in self.lookup_choices:
+            yield {
+                'selected': self.value() == lookup,
+                'query_string': changelist.get_query_string({self.parameter_name: lookup}),
+                'display': title,
+            }
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value == 'include':
+            return queryset
+        if value == 'only':
+            return queryset.filter(is_bot=True)
+        return queryset.filter(is_bot=False)
+
+
 class PruneLogsForm(forms.Form):
     days = forms.IntegerField(
         label='Kaç günden eski', min_value=0, initial=30,
@@ -79,7 +111,7 @@ class ActivityLogAdmin(admin.ModelAdmin):
         'when', 'action_label', 'who', 'ip', 'method',
         'target', 'status_label', 'took', 'detail',
     )
-    list_filter = ('action', StatusGroupFilter, 'is_bot', 'method', 'timestamp')
+    list_filter = ('action', StatusGroupFilter, BotFilter, 'method', 'timestamp')
     search_fields = ('path', 'username', 'ip', 'detail', 'user_agent')
     search_help_text = 'Yol, kullanıcı adı, IP veya ayrıntı içinde ara.'
     date_hierarchy = 'timestamp'
