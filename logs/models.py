@@ -38,6 +38,8 @@ class ActivityLog(models.Model):
         ('notifications_read', 'Bildirim okundu'),
         ('admin_word_action', 'Admin sözcük işlemi'),
         ('blocked', 'Engellendi'),
+        ('ban_pass', 'Yasak doğrulamayla aşıldı'),
+        ('ban_pass_failed', 'Yasak doğrulaması başarısız'),
     ]
 
     timestamp = models.DateTimeField(default=timezone.now, verbose_name='Zaman')

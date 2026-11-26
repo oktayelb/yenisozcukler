@@ -9,12 +9,15 @@ kendi bağlantısından yazdığı için satırların gerçekten commit edilmesi
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import TransactionTestCase, override_settings
 from django.urls import reverse
 
 from logs import logger
 from logs.middleware import invalidate_banned_ips
 from logs.models import ActivityLog, BannedIP
+
+from .helpers import _turnstile_fail, _turnstile_ok
 
 
 @override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
@@ -543,6 +546,7 @@ class ActivityLogCoverageTests(TransactionTestCase):
         produced = set(logger.URL_ACTION_MAP.values()) | {
             'page_view', 'api', 'admin', 'blocked',
             'login_failed', 'register_failed', 'admin_word_action',
+            'ban_pass_failed',
         }
         self.assertEqual(produced - declared, set())
 
@@ -748,6 +752,7 @@ class BannedIPTests(TransactionTestCase):
     PASSWORD = 'Cok-Gizli-1234'
 
     def setUp(self):
+        cache.clear()
         invalidate_banned_ips()
         ActivityLog.objects.all().delete()
 
@@ -887,6 +892,92 @@ class BannedIPTests(TransactionTestCase):
             '_selected_action': [row.pk],
         })
         self.assertIsNone(BannedIP.objects.get(ip='5.6.7.8').expires_at)
+
+    def _pass_challenge(self, ip, next_url='/sozcuk/deneme/', verifier=_turnstile_ok):
+        with mock.patch('core.http.http_requests.post', side_effect=verifier):
+            return self.client.post(
+                '/api/ban-pass',
+                {'cf-turnstile-response': 'token', 'next': next_url},
+                headers={'cf-connecting-ip': ip},
+            )
+
+    def test_banned_visitor_sees_the_challenge_page(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        response = self._get_from('5.6.7.8', '/sozcuk/deneme/')
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, 'cf-turnstile', status_code=403)
+        self.assertContains(response, 'value="/sozcuk/deneme/"', status_code=403)
+
+    def test_banned_api_request_gets_json(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        response = self._get_from('5.6.7.8', '/api/words')
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(response.json()['success'])
+
+    def test_passing_the_challenge_lets_the_browser_in(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+
+        response = self._pass_challenge('5.6.7.8')
+        self.assertRedirects(response, '/sozcuk/deneme/', fetch_redirect_response=False)
+        cookie = response.cookies['ban_pass']
+        self.assertTrue(cookie['httponly'])
+        self.assertEqual(cookie['samesite'], 'Lax')
+
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 200)
+        self.assertEqual(self._get_from('5.6.7.8', '/api/words').status_code, 200)
+
+    def test_pass_cookie_is_bound_to_the_ip(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        BannedIP.objects.create(ip='5.6.7.9')
+        self._pass_challenge('5.6.7.8')
+
+        self.assertEqual(self._get_from('5.6.7.9').status_code, 403)
+
+    def test_forged_pass_cookie_is_ignored(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        self.client.cookies['ban_pass'] = '5.6.7.8'
+
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+
+    def test_failed_challenge_keeps_the_ban(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+
+        response = self._pass_challenge('5.6.7.8', verifier=_turnstile_fail)
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, 'Doğrulama başarısız', status_code=403)
+        self.assertNotIn('ban_pass', response.cookies)
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+
+    def test_challenge_does_not_redirect_off_site(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+
+        for next_url in ('https://kotu.example/', '//kotu.example/', '/api/words'):
+            response = self._pass_challenge('5.6.7.8', next_url=next_url)
+            self.assertRedirects(response, '/', fetch_redirect_response=False)
+
+    def test_challenge_results_are_logged(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        self._pass_challenge('5.6.7.8', verifier=_turnstile_fail)
+        self._pass_challenge('5.6.7.8')
+        self._get_from('5.6.7.8', '/sozcuk/deneme/')
+        logger.flush_now()
+
+        actions = list(
+            ActivityLog.objects.filter(ip='5.6.7.8').order_by('id').values_list('action', 'detail')
+        )
+        self.assertEqual(actions, [
+            ('ban_pass_failed', 'Turnstile doğrulanamadı'),
+            ('ban_pass', 'Turnstile doğrulandı'),
+            ('page_view', 'Yasaklı IP, doğrulanmış tarayıcı'),
+        ])
+
+    def test_ipv6_pass_cookie_works(self):
+        BannedIP.objects.create(ip='2001:db8::1')
+        self._pass_challenge('2001:db8::1')
+
+        self.assertEqual(self._get_from('2001:db8::1').status_code, 200)
 
     def test_ipv6_spellings_are_matched(self):
         BannedIP.objects.create(ip='2001:DB8::1')

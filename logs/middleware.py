@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from core.http import clean_ip, get_client_ip, is_public_ip, is_scanner_path
 
+from . import ban_pass
 from .logger import is_configured, log_activity, record_request, setting
 
 logger = logging.getLogger(__name__)
@@ -126,10 +127,16 @@ class BannedIPMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if _banned_ips.contains(get_client_ip(request)):
-            log_activity(request, 'blocked', detail='Yasaklı IP')
-            return HttpResponseForbidden('Erişim Engellendi.')
-        return self.get_response(request)
+        ip = get_client_ip(request)
+        if not _banned_ips.contains(ip):
+            return self.get_response(request)
+        if request.path == ban_pass.PATH:
+            return self.get_response(request)
+        if ban_pass.has_pass(request, ip):
+            log_activity(request, detail='Yasaklı IP, doğrulanmış tarayıcı')
+            return self.get_response(request)
+        log_activity(request, 'blocked', detail='Yasaklı IP')
+        return ban_pass.blocked_response(request)
 
 
 SCANNER_BAN_DAYS = 7

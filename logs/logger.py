@@ -166,6 +166,7 @@ URL_ACTION_MAP = {
     'change_password': 'password_change',
     'change_username': 'username_change',
     'mark_notifications_read': 'notifications_read',
+    'ban_pass': 'ban_pass',
 }
 
 

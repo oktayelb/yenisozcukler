@@ -7,6 +7,7 @@ urlpatterns = [
     path('', include('accounts.urls')),
     path('', include('words.urls')),
     path('', include('notifications.urls')),
+    path('', include('logs.urls')),
     path('', include('core.urls')), # en sonda: SPA catch-all'u içeriyor
 ]
 
