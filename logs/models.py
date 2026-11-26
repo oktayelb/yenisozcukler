@@ -38,6 +38,8 @@ class ActivityLog(models.Model):
         ('notifications_read', 'Bildirim okundu'),
         ('admin_word_action', 'Admin sözcük işlemi'),
         ('blocked', 'Engellendi'),
+        ('ban_pass', 'Yasak doğrulamayla aşıldı'),
+        ('ban_pass_failed', 'Yasak doğrulaması başarısız'),
     ]
 
     timestamp = models.DateTimeField(default=timezone.now, verbose_name='Zaman')
@@ -103,6 +105,10 @@ class BannedIP(models.Model):
     )
     reason = models.CharField(max_length=200, blank=True, default='', verbose_name='Sebep')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Yasaklanma zamanı')
+    expires_at = models.DateTimeField(
+        null=True, blank=True, verbose_name='Bitiş',
+        help_text='Boş bırakılırsa yasak süresizdir.',
+    )
 
     class Meta:
         verbose_name = 'Yasaklı IP'
@@ -111,3 +117,9 @@ class BannedIP(models.Model):
 
     def __str__(self):
         return self.ip
+
+    @classmethod
+    def active(cls):
+        return cls.objects.filter(
+            models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=timezone.now())
+        )

@@ -15,7 +15,7 @@ from django.db import (
 from django.utils import timezone
 from django.utils.functional import empty
 
-from core.http import clean_ip as _clean_ip, get_client_ip, is_bot
+from core.http import clean_ip as _clean_ip, get_client_ip, is_bot, is_scanner_path
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +166,7 @@ URL_ACTION_MAP = {
     'change_password': 'password_change',
     'change_username': 'username_change',
     'mark_notifications_read': 'notifications_read',
+    'ban_pass': 'ban_pass',
 }
 
 
@@ -438,6 +439,16 @@ def _insert(rows, budget):
     return ok_a + ok_b, bad_a + bad_b
 
 
+BOT_ONLY_PATHS = ('/robots.txt', '/sitemap.xml')
+
+
+def _looks_like_bot(item):
+    path = item.get('path')
+    if path in BOT_ONLY_PATHS or is_scanner_path(path):
+        return True
+    return is_bot(item.get('user_agent', ''))
+
+
 def _build_row(item):
     """Kuyruktaki dict'ten ActivityLog nesnesi kurar; kuramazsa None döner.
 
@@ -450,7 +461,7 @@ def _build_row(item):
     try:
         item['ip'] = _clean_ip(item.get('ip'))
         if 'is_bot' not in item:
-            item['is_bot'] = is_bot(item.get('user_agent', ''))
+            item['is_bot'] = _looks_like_bot(item)
         return ActivityLog(**item)
     except Exception as exc:
         logger.warning('activity log payload kurulamadı, düşürüldü: %s', exc)

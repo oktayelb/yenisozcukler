@@ -29,6 +29,8 @@ ACTION_COLORS = {
     'login_failed': '#c62828',
     'register_failed': '#c62828',
     'blocked': '#b71c1c',
+    'ban_pass': '#558b2f',
+    'ban_pass_failed': '#c62828',
     'word_add': '#6a1b9a',
     'comment_add': '#00838f',
     'vote': '#ef6c00',
@@ -66,6 +68,38 @@ class StatusGroupFilter(admin.SimpleListFilter):
         return queryset
 
 
+class BotFilter(admin.SimpleListFilter):
+    title = 'Bot'
+    parameter_name = 'bots'
+
+    def lookups(self, request, model_admin):
+        return [
+            ('include', 'Botlar dahil'),
+            ('only', 'Yalnızca botlar'),
+        ]
+
+    def choices(self, changelist):
+        yield {
+            'selected': self.value() is None,
+            'query_string': changelist.get_query_string(remove=[self.parameter_name]),
+            'display': 'Botlar hariç',
+        }
+        for lookup, title in self.lookup_choices:
+            yield {
+                'selected': self.value() == lookup,
+                'query_string': changelist.get_query_string({self.parameter_name: lookup}),
+                'display': title,
+            }
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value == 'include':
+            return queryset
+        if value == 'only':
+            return queryset.filter(is_bot=True)
+        return queryset.filter(is_bot=False)
+
+
 class PruneLogsForm(forms.Form):
     days = forms.IntegerField(
         label='Kaç günden eski', min_value=0, initial=30,
@@ -79,7 +113,7 @@ class ActivityLogAdmin(admin.ModelAdmin):
         'when', 'action_label', 'who', 'ip', 'method',
         'target', 'status_label', 'took', 'detail',
     )
-    list_filter = ('action', StatusGroupFilter, 'is_bot', 'method', 'timestamp')
+    list_filter = ('action', StatusGroupFilter, BotFilter, 'method', 'timestamp')
     search_fields = ('path', 'username', 'ip', 'detail', 'user_agent')
     search_help_text = 'Yol, kullanıcı adı, IP veya ayrıntı içinde ara.'
     date_hierarchy = 'timestamp'
@@ -168,6 +202,7 @@ class ActivityLogAdmin(admin.ModelAdmin):
             self.message_user(request, 'Yasaklanacak IP yok.', messages.WARNING)
             return
         existing = set(BannedIP.objects.filter(ip__in=ips).values_list('ip', flat=True))
+        BannedIP.objects.filter(ip__in=existing).update(expires_at=None)
         new_ips = ips - existing
         BannedIP.objects.bulk_create(
             [BannedIP(ip=ip, reason='Aktivite logundan yasaklandı') for ip in new_ips],
@@ -177,7 +212,7 @@ class ActivityLogAdmin(admin.ModelAdmin):
         invalidate_banned_ips()
         message = f'{len(new_ips)} IP siteden yasaklandı.'
         if existing:
-            message += f' {len(existing)} IP zaten yasaklıydı.'
+            message += f' {len(existing)} IP zaten listedeydi, yasakları süresiz yapıldı.'
         self.message_user(request, message)
 
     def get_urls(self):
@@ -246,6 +281,7 @@ class ActivityLogAdmin(admin.ModelAdmin):
             logins=Count('id', filter=Q(action='login')),
             failed_logins=Count('id', filter=Q(action='login_failed')),
             blocked=Count('id', filter=Q(action='blocked')),
+            ban_passes=Count('id', filter=Q(action='ban_pass')),
             registrations=Count('id', filter=Q(action='register')),
             words=Count('id', filter=Q(action='word_add', status_code__lt=400)),
             comments=Count('id', filter=Q(action='comment_add', status_code__lt=400)),
@@ -262,6 +298,7 @@ class ActivityLogAdmin(admin.ModelAdmin):
             ('Giriş', stats['logins']),
             ('Başarısız giriş', stats['failed_logins']),
             ('Engellenen istek', stats['blocked']),
+            ('Doğrulamayla aşılan yasak', stats['ban_passes']),
             ('Yeni kayıt', stats['registrations']),
             ('Yeni sözcük', stats['words']),
             ('Yorum', stats['comments']),
@@ -287,7 +324,7 @@ class BannedIPForm(forms.ModelForm):
 @admin.register(BannedIP)
 class BannedIPAdmin(admin.ModelAdmin):
     form = BannedIPForm
-    list_display = ('ip', 'reason', 'banned_at')
+    list_display = ('ip', 'reason', 'banned_at', 'expires')
     search_fields = ('ip', 'reason')
     ordering = ('-created_at',)
 
@@ -299,3 +336,12 @@ class BannedIPAdmin(admin.ModelAdmin):
     @admin.display(description='Yasaklanma zamanı', ordering='created_at')
     def banned_at(self, obj):
         return timezone.localtime(obj.created_at).strftime('%d.%m.%Y %H:%M')
+
+    @admin.display(description='Bitiş', ordering='expires_at')
+    def expires(self, obj):
+        if obj.expires_at is None:
+            return 'Süresiz'
+        label = timezone.localtime(obj.expires_at).strftime('%d.%m.%Y %H:%M')
+        if obj.expires_at <= timezone.now():
+            return format_html('<span style="color:#888;">{} (doldu)</span>', label)
+        return label

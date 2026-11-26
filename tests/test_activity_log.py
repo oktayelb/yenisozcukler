@@ -9,12 +9,15 @@ kendi bağlantısından yazdığı için satırların gerçekten commit edilmesi
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import TransactionTestCase, override_settings
 from django.urls import reverse
 
 from logs import logger
 from logs.middleware import invalidate_banned_ips
 from logs.models import ActivityLog, BannedIP
+
+from .helpers import _turnstile_fail, _turnstile_ok
 
 
 @override_settings(ACTIVITY_LOG_ENABLED=True, ACTIVITY_LOG_FLUSH_SECONDS=0.05)
@@ -103,6 +106,38 @@ class ActivityLogTests(TransactionTestCase):
 
         log = ActivityLog.objects.get()
         self.assertTrue(log.is_bot)
+
+    def test_robots_and_sitemap_requests_are_flagged_as_bots(self):
+        browser = 'Mozilla/5.0 (X11; Linux x86_64)'
+        self.client.get('/robots.txt', headers={'user-agent': browser})
+        self.client.get('/sitemap.xml', headers={'user-agent': browser})
+        self.client.get('/', headers={'user-agent': browser})
+        self.drain()
+
+        self.assertTrue(ActivityLog.objects.get(path='/robots.txt').is_bot)
+        self.assertTrue(ActivityLog.objects.get(path='/sitemap.xml').is_bot)
+        self.assertFalse(ActivityLog.objects.get(path='/').is_bot)
+
+    def test_admin_changelist_hides_bots_by_default(self):
+        ActivityLog.objects.create(path='/insan-sayfasi', is_bot=False)
+        ActivityLog.objects.create(path='/bot-sayfasi', is_bot=True)
+        admin_user = User.objects.create_superuser(
+            username='patron', email='', password='Cok-Gizli-1234'
+        )
+        self.client.force_login(admin_user)
+        url = reverse('admin:logs_activitylog_changelist')
+
+        default = self.client.get(url)
+        self.assertContains(default, '/insan-sayfasi')
+        self.assertNotContains(default, '/bot-sayfasi')
+
+        included = self.client.get(url, {'bots': 'include'})
+        self.assertContains(included, '/insan-sayfasi')
+        self.assertContains(included, '/bot-sayfasi')
+
+        only = self.client.get(url, {'bots': 'only'})
+        self.assertNotContains(only, '/insan-sayfasi')
+        self.assertContains(only, '/bot-sayfasi')
 
     def test_disabled_logging_writes_nothing(self):
         with override_settings(ACTIVITY_LOG_ENABLED=False):
@@ -511,6 +546,7 @@ class ActivityLogCoverageTests(TransactionTestCase):
         produced = set(logger.URL_ACTION_MAP.values()) | {
             'page_view', 'api', 'admin', 'blocked',
             'login_failed', 'register_failed', 'admin_word_action',
+            'ban_pass_failed',
         }
         self.assertEqual(produced - declared, set())
 
@@ -716,6 +752,7 @@ class BannedIPTests(TransactionTestCase):
     PASSWORD = 'Cok-Gizli-1234'
 
     def setUp(self):
+        cache.clear()
         invalidate_banned_ips()
         ActivityLog.objects.all().delete()
 
@@ -774,6 +811,174 @@ class BannedIPTests(TransactionTestCase):
 
         with mock.patch.object(middleware, 'BANNED_IPS_REFRESH_SECONDS', 0):
             self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+
+    def test_scanner_paths_are_recognised(self):
+        from core.http import is_scanner_path
+
+        for path in ('/wp-admin/css/colors/midnight/', '/wp-admin/js/widgets/',
+                     '/wp-good.php', '/index/function.php', '/xmlrpc.php',
+                     '/index.php/x', '/.env', '/.git/config', '/WP-LOGIN.PHP',
+                     '/phpmyadmin/', '/cgi-bin/luci'):
+            self.assertTrue(is_scanner_path(path), path)
+        for path in ('/', '/.well-known/change-password', '/.well-known/acme-challenge/x',
+                     '/sozcuk/wp/', '/api/words', '/robots.txt', '/kategori/php/'):
+            self.assertFalse(is_scanner_path(path), path)
+
+    def test_scanner_request_bans_the_ip_for_a_week(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        self.assertEqual(self._get_from('5.6.7.8', '/wp-admin/js/widgets/').status_code, 403)
+
+        ban = BannedIP.objects.get(ip='5.6.7.8')
+        expected = timezone.now() + timedelta(days=7)
+        self.assertAlmostEqual(ban.expires_at, expected, delta=timedelta(minutes=1))
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+        self.assertEqual(self._get_from('9.9.9.9').status_code, 200)
+
+    def test_scanner_request_is_logged_as_blocked_bot(self):
+        self._get_from('5.6.7.8', '/wp-good.php')
+        logger.flush_now()
+
+        row = ActivityLog.objects.get(path='/wp-good.php')
+        self.assertEqual(row.action, 'blocked')
+        self.assertEqual(row.status_code, 403)
+        self.assertTrue(row.is_bot)
+
+    def test_well_known_is_not_trapped(self):
+        self._get_from('5.6.7.8', '/.well-known/change-password')
+        self.assertFalse(BannedIP.objects.exists())
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 200)
+
+    def test_local_and_private_ips_are_never_banned(self):
+        self.assertEqual(self.client.get('/wp-login.php').status_code, 403)
+        self.assertEqual(self._get_from('10.0.0.5', '/wp-login.php').status_code, 403)
+        self.assertFalse(BannedIP.objects.exists())
+        self.assertEqual(self.client.get('/').status_code, 200)
+
+    def test_staff_is_not_trapped(self):
+        self._login_admin()
+        self._get_from('5.6.7.8', '/wp-admin/')
+        self.assertFalse(BannedIP.objects.exists())
+
+    def test_expired_ban_is_not_enforced_and_is_renewed_on_next_scan(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        BannedIP.objects.create(ip='5.6.7.8', expires_at=timezone.now() - timedelta(minutes=1))
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 200)
+
+        self._get_from('5.6.7.8', '/.env')
+        self.assertGreater(BannedIP.objects.get(ip='5.6.7.8').expires_at, timezone.now())
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+
+    def test_permanent_ban_stays_permanent_after_scan(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        self.client.get('/wp-admin/', headers={'cf-connecting-ip': '5.6.7.8'})
+        self.assertIsNone(BannedIP.objects.get(ip='5.6.7.8').expires_at)
+
+    def test_admin_action_makes_an_existing_ban_permanent(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        self._get_from('5.6.7.8')
+        logger.flush_now()
+        row = ActivityLog.objects.get(ip='5.6.7.8')
+        BannedIP.objects.create(ip='5.6.7.8', expires_at=timezone.now() - timedelta(days=1))
+
+        self._login_admin()
+        self.client.post(reverse('admin:logs_activitylog_changelist'), {
+            'action': 'ban_selected_ips',
+            '_selected_action': [row.pk],
+        })
+        self.assertIsNone(BannedIP.objects.get(ip='5.6.7.8').expires_at)
+
+    def _pass_challenge(self, ip, next_url='/sozcuk/deneme/', verifier=_turnstile_ok):
+        with mock.patch('core.http.http_requests.post', side_effect=verifier):
+            return self.client.post(
+                '/api/ban-pass',
+                {'cf-turnstile-response': 'token', 'next': next_url},
+                headers={'cf-connecting-ip': ip},
+            )
+
+    def test_banned_visitor_sees_the_challenge_page(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        response = self._get_from('5.6.7.8', '/sozcuk/deneme/')
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, 'cf-turnstile', status_code=403)
+        self.assertContains(response, 'value="/sozcuk/deneme/"', status_code=403)
+        self.assertEqual(response['Cache-Control'], 'no-store')
+
+    def test_banned_api_request_gets_json(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        response = self._get_from('5.6.7.8', '/api/words')
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(response.json()['success'])
+
+    def test_passing_the_challenge_lets_the_browser_in(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+
+        response = self._pass_challenge('5.6.7.8')
+        self.assertRedirects(response, '/sozcuk/deneme/', fetch_redirect_response=False)
+        cookie = response.cookies['ban_pass']
+        self.assertTrue(cookie['httponly'])
+        self.assertEqual(cookie['samesite'], 'Lax')
+
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 200)
+        self.assertEqual(self._get_from('5.6.7.8', '/api/words').status_code, 200)
+
+    def test_pass_cookie_is_bound_to_the_ip(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        BannedIP.objects.create(ip='5.6.7.9')
+        self._pass_challenge('5.6.7.8')
+
+        self.assertEqual(self._get_from('5.6.7.9').status_code, 403)
+
+    def test_forged_pass_cookie_is_ignored(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        self.client.cookies['ban_pass'] = '5.6.7.8'
+
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+
+    def test_failed_challenge_keeps_the_ban(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+
+        response = self._pass_challenge('5.6.7.8', verifier=_turnstile_fail)
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, 'Doğrulama başarısız', status_code=403)
+        self.assertNotIn('ban_pass', response.cookies)
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+
+    def test_challenge_does_not_redirect_off_site(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+
+        for next_url in ('https://kotu.example/', '//kotu.example/', '/api/words'):
+            response = self._pass_challenge('5.6.7.8', next_url=next_url)
+            self.assertRedirects(response, '/', fetch_redirect_response=False)
+
+    def test_challenge_results_are_logged(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        self._pass_challenge('5.6.7.8', verifier=_turnstile_fail)
+        self._pass_challenge('5.6.7.8')
+        self._get_from('5.6.7.8', '/sozcuk/deneme/')
+        logger.flush_now()
+
+        actions = list(
+            ActivityLog.objects.filter(ip='5.6.7.8').order_by('id').values_list('action', 'detail')
+        )
+        self.assertEqual(actions, [
+            ('ban_pass_failed', 'Turnstile doğrulanamadı'),
+            ('ban_pass', 'Turnstile doğrulandı'),
+            ('page_view', 'Yasaklı IP, doğrulanmış tarayıcı'),
+        ])
+
+    def test_ipv6_pass_cookie_works(self):
+        BannedIP.objects.create(ip='2001:db8::1')
+        self._pass_challenge('2001:db8::1')
+
+        self.assertEqual(self._get_from('2001:db8::1').status_code, 200)
 
     def test_ipv6_spellings_are_matched(self):
         BannedIP.objects.create(ip='2001:DB8::1')
