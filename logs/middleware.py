@@ -7,11 +7,13 @@
 import logging
 import threading
 import time
+from datetime import timedelta
 
 from django.core.exceptions import MiddlewareNotUsed
 from django.http import HttpResponseForbidden
+from django.utils import timezone
 
-from core.http import clean_ip, get_client_ip
+from core.http import clean_ip, get_client_ip, is_public_ip, is_scanner_path
 
 from .logger import is_configured, log_activity, record_request, setting
 
@@ -97,7 +99,7 @@ class _BannedIPCache:
             # `get_client_ip` ile aynı biçime getir; yoksa ör. IPv4-mapped
             # IPv6 adresleri iki tarafta farklı yazılıp eşleşmezdi.
             self._ips = frozenset(filter(None, (
-                clean_ip(ip) for ip in BannedIP.objects.values_list('ip', flat=True)
+                clean_ip(ip) for ip in BannedIP.active().values_list('ip', flat=True)
             )))
         except Exception as exc:
             # Ör. migration henüz uygulanmadı: site kapanmasın, eldekiyle devam.
@@ -128,3 +130,44 @@ class BannedIPMiddleware:
             log_activity(request, 'blocked', detail='Yasaklı IP')
             return HttpResponseForbidden('Erişim Engellendi.')
         return self.get_response(request)
+
+
+SCANNER_BAN_DAYS = 7
+
+
+class ScannerTrapMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if not is_scanner_path(request.path):
+            return self.get_response(request)
+        user = getattr(request, 'user', None)
+        if user is not None and user.is_staff:
+            return self.get_response(request)
+
+        ip = get_client_ip(request)
+        if is_public_ip(ip):
+            ban_ip_for_scanning(ip)
+            detail = f'Tarama yolu, IP {SCANNER_BAN_DAYS} gün yasaklandı'
+        else:
+            detail = 'Tarama yolu'
+        log_activity(request, 'blocked', detail=detail)
+        return HttpResponseForbidden('Erişim Engellendi.')
+
+
+def ban_ip_for_scanning(ip):
+    from .models import BannedIP
+
+    now = timezone.now()
+    expires_at = now + timedelta(days=SCANNER_BAN_DAYS)
+    try:
+        ban, created = BannedIP.objects.get_or_create(
+            ip=ip,
+            defaults={'reason': 'Tarama yolu isteği (otomatik)', 'expires_at': expires_at},
+        )
+        if not created and ban.expires_at is not None and ban.expires_at <= now:
+            ban.expires_at = expires_at
+            ban.save(update_fields=['expires_at'])
+    except Exception:
+        logger.warning('tarayıcı IP yasaklanamadı: %s', ip, exc_info=True)

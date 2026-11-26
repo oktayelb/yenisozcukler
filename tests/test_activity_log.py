@@ -807,6 +807,87 @@ class BannedIPTests(TransactionTestCase):
         with mock.patch.object(middleware, 'BANNED_IPS_REFRESH_SECONDS', 0):
             self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
 
+    def test_scanner_paths_are_recognised(self):
+        from core.http import is_scanner_path
+
+        for path in ('/wp-admin/css/colors/midnight/', '/wp-admin/js/widgets/',
+                     '/wp-good.php', '/index/function.php', '/xmlrpc.php',
+                     '/index.php/x', '/.env', '/.git/config', '/WP-LOGIN.PHP',
+                     '/phpmyadmin/', '/cgi-bin/luci'):
+            self.assertTrue(is_scanner_path(path), path)
+        for path in ('/', '/.well-known/change-password', '/.well-known/acme-challenge/x',
+                     '/sozcuk/wp/', '/api/words', '/robots.txt', '/kategori/php/'):
+            self.assertFalse(is_scanner_path(path), path)
+
+    def test_scanner_request_bans_the_ip_for_a_week(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        self.assertEqual(self._get_from('5.6.7.8', '/wp-admin/js/widgets/').status_code, 403)
+
+        ban = BannedIP.objects.get(ip='5.6.7.8')
+        expected = timezone.now() + timedelta(days=7)
+        self.assertAlmostEqual(ban.expires_at, expected, delta=timedelta(minutes=1))
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+        self.assertEqual(self._get_from('9.9.9.9').status_code, 200)
+
+    def test_scanner_request_is_logged_as_blocked_bot(self):
+        self._get_from('5.6.7.8', '/wp-good.php')
+        logger.flush_now()
+
+        row = ActivityLog.objects.get(path='/wp-good.php')
+        self.assertEqual(row.action, 'blocked')
+        self.assertEqual(row.status_code, 403)
+        self.assertTrue(row.is_bot)
+
+    def test_well_known_is_not_trapped(self):
+        self._get_from('5.6.7.8', '/.well-known/change-password')
+        self.assertFalse(BannedIP.objects.exists())
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 200)
+
+    def test_local_and_private_ips_are_never_banned(self):
+        self.assertEqual(self.client.get('/wp-login.php').status_code, 403)
+        self.assertEqual(self._get_from('10.0.0.5', '/wp-login.php').status_code, 403)
+        self.assertFalse(BannedIP.objects.exists())
+        self.assertEqual(self.client.get('/').status_code, 200)
+
+    def test_staff_is_not_trapped(self):
+        self._login_admin()
+        self._get_from('5.6.7.8', '/wp-admin/')
+        self.assertFalse(BannedIP.objects.exists())
+
+    def test_expired_ban_is_not_enforced_and_is_renewed_on_next_scan(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        BannedIP.objects.create(ip='5.6.7.8', expires_at=timezone.now() - timedelta(minutes=1))
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 200)
+
+        self._get_from('5.6.7.8', '/.env')
+        self.assertGreater(BannedIP.objects.get(ip='5.6.7.8').expires_at, timezone.now())
+        self.assertEqual(self._get_from('5.6.7.8').status_code, 403)
+
+    def test_permanent_ban_stays_permanent_after_scan(self):
+        BannedIP.objects.create(ip='5.6.7.8')
+        self.client.get('/wp-admin/', headers={'cf-connecting-ip': '5.6.7.8'})
+        self.assertIsNone(BannedIP.objects.get(ip='5.6.7.8').expires_at)
+
+    def test_admin_action_makes_an_existing_ban_permanent(self):
+        from datetime import timedelta
+        from django.utils import timezone
+
+        self._get_from('5.6.7.8')
+        logger.flush_now()
+        row = ActivityLog.objects.get(ip='5.6.7.8')
+        BannedIP.objects.create(ip='5.6.7.8', expires_at=timezone.now() - timedelta(days=1))
+
+        self._login_admin()
+        self.client.post(reverse('admin:logs_activitylog_changelist'), {
+            'action': 'ban_selected_ips',
+            '_selected_action': [row.pk],
+        })
+        self.assertIsNone(BannedIP.objects.get(ip='5.6.7.8').expires_at)
+
     def test_ipv6_spellings_are_matched(self):
         BannedIP.objects.create(ip='2001:DB8::1')
         self.assertEqual(self._get_from('2001:db8:0:0::1').status_code, 403)

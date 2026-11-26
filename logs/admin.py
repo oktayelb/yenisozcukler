@@ -200,6 +200,7 @@ class ActivityLogAdmin(admin.ModelAdmin):
             self.message_user(request, 'Yasaklanacak IP yok.', messages.WARNING)
             return
         existing = set(BannedIP.objects.filter(ip__in=ips).values_list('ip', flat=True))
+        BannedIP.objects.filter(ip__in=existing).update(expires_at=None)
         new_ips = ips - existing
         BannedIP.objects.bulk_create(
             [BannedIP(ip=ip, reason='Aktivite logundan yasaklandı') for ip in new_ips],
@@ -209,7 +210,7 @@ class ActivityLogAdmin(admin.ModelAdmin):
         invalidate_banned_ips()
         message = f'{len(new_ips)} IP siteden yasaklandı.'
         if existing:
-            message += f' {len(existing)} IP zaten yasaklıydı.'
+            message += f' {len(existing)} IP zaten listedeydi, yasakları süresiz yapıldı.'
         self.message_user(request, message)
 
     def get_urls(self):
@@ -319,7 +320,7 @@ class BannedIPForm(forms.ModelForm):
 @admin.register(BannedIP)
 class BannedIPAdmin(admin.ModelAdmin):
     form = BannedIPForm
-    list_display = ('ip', 'reason', 'banned_at')
+    list_display = ('ip', 'reason', 'banned_at', 'expires')
     search_fields = ('ip', 'reason')
     ordering = ('-created_at',)
 
@@ -331,3 +332,12 @@ class BannedIPAdmin(admin.ModelAdmin):
     @admin.display(description='Yasaklanma zamanı', ordering='created_at')
     def banned_at(self, obj):
         return timezone.localtime(obj.created_at).strftime('%d.%m.%Y %H:%M')
+
+    @admin.display(description='Bitiş', ordering='expires_at')
+    def expires(self, obj):
+        if obj.expires_at is None:
+            return 'Süresiz'
+        label = timezone.localtime(obj.expires_at).strftime('%d.%m.%Y %H:%M')
+        if obj.expires_at <= timezone.now():
+            return format_html('<span style="color:#888;">{} (doldu)</span>', label)
+        return label

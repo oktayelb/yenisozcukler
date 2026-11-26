@@ -121,3 +121,22 @@ def is_bot(ua):
     """
     ua = (ua or '').lower()
     return any(p in ua for p in BOT_SPECIFIC) or any(p in ua for p in BOT_GENERIC)
+
+
+SCANNER_PATH_PREFIXES = ('/wp-', '/wordpress', '/phpmyadmin', '/cgi-bin')
+
+
+def is_scanner_path(path):
+    path = (path or '').lower()
+    if path.startswith('/.'):
+        return not path.startswith('/.well-known')
+    if path.startswith(SCANNER_PATH_PREFIXES):
+        return True
+    return path.endswith('.php') or '.php/' in path
+
+
+def is_public_ip(ip):
+    try:
+        return ipaddress.ip_address(ip).is_global
+    except (ValueError, TypeError):
+        return False

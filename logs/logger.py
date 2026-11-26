@@ -15,7 +15,7 @@ from django.db import (
 from django.utils import timezone
 from django.utils.functional import empty
 
-from core.http import clean_ip as _clean_ip, get_client_ip, is_bot
+from core.http import clean_ip as _clean_ip, get_client_ip, is_bot, is_scanner_path
 
 logger = logging.getLogger(__name__)
 
@@ -442,7 +442,8 @@ BOT_ONLY_PATHS = ('/robots.txt', '/sitemap.xml')
 
 
 def _looks_like_bot(item):
-    if item.get('path') in BOT_ONLY_PATHS:
+    path = item.get('path')
+    if path in BOT_ONLY_PATHS or is_scanner_path(path):
         return True
     return is_bot(item.get('user_agent', ''))
 

@@ -8,6 +8,7 @@ MIDDLEWARE = [
     'logs.middleware.BannedIPMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'logs.middleware.ScannerTrapMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 
